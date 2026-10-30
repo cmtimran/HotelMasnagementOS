@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -76,6 +77,7 @@ interface MealPlan {
 const MEAL_STORAGE_KEY = 'hotel_meal_plans_v1';
 
 export default function MealPlanManagement() {
+    const currencySymbol = getCurrencySymbol();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [mealPlans, setMealPlans] = useState<MealPlan[]>(() => {
         try {
@@ -409,7 +411,7 @@ export default function MealPlanManagement() {
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
-                                        <div className="font-mono text-slate-900 text-sm">৳{plan.sellingPriceAdult} <span className="text-slate-400 text-xs font-normal">/ ৳{plan.sellingPriceChild}</span></div>
+                                        <div className="font-mono text-slate-900 text-sm">{currencySymbol}{plan.sellingPriceAdult} <span className="text-slate-400 text-xs font-normal">/ {currencySymbol}{plan.sellingPriceChild}</span></div>
                                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">{plan.revenueCode}</div>
                                     </td>
                                     <td className="py-3.5 px-4 text-center">
@@ -723,7 +725,7 @@ export default function MealPlanManagement() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-700">Internal Cost / Unit (৳)</label>
+                                    <label className="text-xs font-semibold text-slate-700">Internal Cost / Unit ({currencySymbol})</label>
                                     <input 
                                         type="number" 
                                         className="input-standard" 
@@ -749,7 +751,7 @@ export default function MealPlanManagement() {
                             <div className="space-y-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-800">Selling Price Adult (৳)</label>
+                                        <label className="text-xs font-semibold text-slate-800">Selling Price Adult ({currencySymbol})</label>
                                         <input 
                                             type="number" 
                                             className="input-standard font-mono font-bold" 
@@ -758,7 +760,7 @@ export default function MealPlanManagement() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-800">Selling Price Child (৳)</label>
+                                        <label className="text-xs font-semibold text-slate-800">Selling Price Child ({currencySymbol})</label>
                                         <input 
                                             type="number" 
                                             className="input-standard font-mono font-bold" 

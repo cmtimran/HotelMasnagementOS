@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { getDynamicRoomTypes, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -45,35 +46,36 @@ const STORAGE_KEY = 'hotel_room_types_v1';
 
 const mapDynamicToRoomType = (rt: any, idx: number): RoomType => ({
     id: Number(rt.id) || (idx + 1),
-    name: rt.name || 'Room Category',
+    name: rt.name || '',
     shortCode: rt.code || rt.shortCode || `RT${idx + 1}`,
-    description: rt.description || `${rt.name} category configured in property inventory.`,
-    size: Number(rt.size) || 350,
+    description: rt.description || '',
+    size: Number(rt.size) || 0,
     status: rt.status || 'Active',
     displayOrder: Number(rt.displayOrder) || (idx + 1),
-    baseAdult: Number(rt.baseOccupancy || rt.baseAdult) || 2,
-    baseChild: Number(rt.baseChild) || 1,
-    maxAdult: Number(rt.maxOccupancy || rt.maxAdult) || 3,
-    maxChild: Number(rt.maxChild) || 2,
-    totalCapacity: (Number(rt.maxOccupancy || rt.maxAdult) || 3) + (Number(rt.maxChild) || 1),
-    extraBedAllowed: rt.extraBedAllowed ?? true,
-    extraBedQuantity: Number(rt.extraBedQuantity) || 1,
-    babyCotAllowed: rt.babyCotAllowed ?? true,
+    baseAdult: Number(rt.baseOccupancy ?? rt.baseAdult ?? 2),
+    baseChild: Number(rt.baseChild ?? 0),
+    maxAdult: Number(rt.maxOccupancy ?? rt.maxAdult ?? 2),
+    maxChild: Number(rt.maxChild ?? 0),
+    totalCapacity: (Number(rt.maxOccupancy ?? rt.maxAdult ?? 2)) + (Number(rt.maxChild ?? 0)),
+    extraBedAllowed: Boolean(rt.extraBedAllowed ?? rt.extra_bed_rate),
+    extraBedQuantity: Number(rt.extraBedQuantity ?? 0),
+    babyCotAllowed: Boolean(rt.babyCotAllowed),
     isConnecting: Boolean(rt.isConnecting),
-    basePrice: Number(rt.baseRate || rt.basePrice) || 3500,
-    extraAdultPrice: Number(rt.extraAdultPrice) || 1000,
-    extraChildPrice: Number(rt.extraChildPrice) || 500,
+    basePrice: Number(rt.baseRate ?? rt.basePrice ?? 0),
+    extraAdultPrice: Number(rt.extraAdultPrice ?? 0),
+    extraChildPrice: Number(rt.extraChildPrice ?? 0),
     pricingUnit: rt.pricingUnit || 'Per Room',
-    bedType: rt.bedType || 'King',
-    viewType: rt.viewType || 'City View',
+    bedType: rt.bedType || '',
+    viewType: rt.viewType || '',
     smokingPolicy: rt.smokingPolicy || 'Non-Smoking',
-    amenities: Array.isArray(rt.amenities) ? rt.amenities : ['AC', 'TV', 'Wifi', 'Safe', 'Desk'],
+    amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
     photos: Array.isArray(rt.photos) ? rt.photos : [],
     showOnWebsite: rt.showOnWebsite ?? true
 });
 
 const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) => {
     const activePropId = propertyId || getActivePropertyId();
+    const currencySymbol = getCurrencySymbol();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -108,26 +110,26 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                         name: rt.name,
                         shortCode: rt.code,
                         description: rt.description || '',
-                        size: Number(rt.size) || 350,
+                        size: Number(rt.size) || 0,
                         status: rt.status || 'Active',
                         displayOrder: idx + 1,
-                        baseAdult: Number(rt.base_occupancy || rt.baseAdult) || 2,
-                        baseChild: Number(rt.base_child || rt.max_child || rt.baseChild) || 1,
-                        maxAdult: Number(rt.max_occupancy || rt.max_adult || rt.maxAdult) || 3,
-                        maxChild: Number(rt.max_child || rt.maxChild) || 2,
-                        totalCapacity: (Number(rt.max_occupancy || rt.maxAdult) || 3) + (Number(rt.max_child || rt.maxChild) || 1),
+                        baseAdult: Number(rt.base_occupancy ?? rt.baseAdult ?? 2),
+                        baseChild: Number(rt.base_child ?? rt.max_child ?? rt.baseChild ?? 0),
+                        maxAdult: Number(rt.max_occupancy ?? rt.max_adult ?? rt.maxAdult ?? 2),
+                        maxChild: Number(rt.max_child ?? rt.maxChild ?? 0),
+                        totalCapacity: (Number(rt.max_occupancy ?? rt.maxAdult ?? 2)) + (Number(rt.max_child ?? rt.maxChild ?? 0)),
                         extraBedAllowed: Boolean(rt.extra_bed_rate || rt.extraBedAllowed),
-                        extraBedQuantity: 1,
-                        babyCotAllowed: true,
+                        extraBedQuantity: Number(rt.extra_bed_quantity ?? (rt.extra_bed_rate ? 1 : 0)),
+                        babyCotAllowed: Boolean(rt.baby_cot_allowed ?? true),
                         isConnecting: Boolean(rt.is_connecting || rt.isConnecting),
-                        basePrice: Number(rt.base_rate || rt.basePrice) || 3000,
-                        extraAdultPrice: Number(rt.extra_adult_price || rt.extraAdultPrice) || 1000,
-                        extraChildPrice: Number(rt.extra_child_price || rt.extraChildPrice) || 500,
+                        basePrice: Number(rt.base_rate ?? rt.basePrice ?? 0),
+                        extraAdultPrice: Number(rt.extra_adult_price ?? rt.extraAdultPrice ?? 0),
+                        extraChildPrice: Number(rt.extra_child_price ?? rt.extraChildPrice ?? 0),
                         pricingUnit: rt.pricing_unit || rt.pricingUnit || 'Per Room',
-                        bedType: rt.bed_type || rt.bedType || 'King',
-                        viewType: rt.view_type || rt.viewType || 'City View',
+                        bedType: rt.bed_type || rt.bedType || '',
+                        viewType: rt.view_type || rt.viewType || '',
                         smokingPolicy: rt.smoking_policy || rt.smokingPolicy || 'Non-Smoking',
-                        amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : ['AC', 'TV', 'Wifi', 'Safe']),
+                        amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : []),
                         photos: Array.isArray(rt.photos) ? rt.photos : (typeof rt.photos === 'string' ? JSON.parse(rt.photos || '[]') : []),
                         showOnWebsite: Boolean(rt.show_on_website ?? true)
                     }));
@@ -171,26 +173,26 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
             name: defaultName,
             shortCode: '',
             description: '',
-            size: 350,
+            size: 0,
             status: 'Active',
             displayOrder: roomTypes.length + 1,
             baseAdult: 2,
             baseChild: 0,
             maxAdult: 2,
-            maxChild: 1,
-            totalCapacity: 3,
-            extraBedAllowed: true,
-            extraBedQuantity: 1,
-            babyCotAllowed: true,
+            maxChild: 0,
+            totalCapacity: 2,
+            extraBedAllowed: false,
+            extraBedQuantity: 0,
+            babyCotAllowed: false,
             isConnecting: false,
-            basePrice: 3500,
-            extraAdultPrice: 1000,
-            extraChildPrice: 500,
+            basePrice: 0,
+            extraAdultPrice: 0,
+            extraChildPrice: 0,
             pricingUnit: 'Per Room',
-            bedType: 'King',
-            viewType: 'City View',
+            bedType: '',
+            viewType: '',
             smokingPolicy: 'Non-Smoking',
-            amenities: ['AC', 'TV', 'Wifi'],
+            amenities: [],
             photos: [],
             showOnWebsite: true
         });
@@ -360,7 +362,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
         { id: 'identity', label: 'Basic Info', icon: <Tags size={16} /> },
         { id: 'occupancy', label: 'Occupancy', icon: <Users size={16} /> },
         { id: 'extraBed', label: 'Extra Bed', icon: <BedDouble size={16} /> },
-        { id: 'pricing', label: 'Pricing & Tariff', icon: <span className="font-bold">৳</span> },
+        { id: 'pricing', label: 'Pricing & Tariff', icon: <span className="font-bold">{currencySymbol}</span> },
         { id: 'attributes', label: 'Attributes & Amenities', icon: <Star size={16} /> },
     ];
 
@@ -420,7 +422,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                 <DollarSign className="size-3.5" />
                             </div>
                         </div>
-                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight font-mono">৳{avgTariff.toLocaleString()}</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight font-mono">{currencySymbol}{avgTariff.toLocaleString()}</div>
                         <div className="mt-0.5 text-[10px] text-slate-500 font-medium">Rack rate average</div>
                     </div>
 
@@ -511,7 +513,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                 </div>
                                 <div className="text-right">
                                     <span className="block text-[9px] uppercase text-slate-400 tracking-wider">Base Tariff</span>
-                                    <span className="font-mono text-primary font-bold text-xs">৳{rt.basePrice.toLocaleString()}</span>
+                                    <span className="font-mono text-primary font-bold text-xs">{currencySymbol}{rt.basePrice.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -795,10 +797,10 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                             <div className="space-y-1.5">
                                                 <label className="text-xs font-semibold text-slate-700">Extra Bed Tariff per Night</label>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-2 text-slate-400 font-bold">৳</span>
+                                                    <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
                                                     <input
                                                         type="number"
-                                                        value={formData?.extraAdultPrice || 1000}
+                                                        value={formData?.extraAdultPrice ?? 0}
                                                         onChange={e => updateField('extraAdultPrice', parseInt(e.target.value) || 0)}
                                                         className="input-standard pl-8 bg-white font-mono font-bold"
                                                     />
@@ -837,7 +839,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-semibold text-slate-700">Base Rack Rate <span className="text-rose-500">*</span></label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2 text-slate-400 font-bold">৳</span>
+                                            <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
                                             <input
                                                 type="number"
                                                 value={formData?.basePrice || 0}
@@ -859,7 +861,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-700">Extra Adult Surcharge (৳)</label>
+                                        <label className="text-xs font-semibold text-slate-700">Extra Adult Surcharge ({currencySymbol})</label>
                                         <input
                                             type="number"
                                             value={formData?.extraAdultPrice || 0}
@@ -868,7 +870,7 @@ const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) =
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-700">Extra Child Surcharge (৳)</label>
+                                        <label className="text-xs font-semibold text-slate-700">Extra Child Surcharge ({currencySymbol})</label>
                                         <input
                                             type="number"
                                             value={formData?.extraChildPrice || 0}

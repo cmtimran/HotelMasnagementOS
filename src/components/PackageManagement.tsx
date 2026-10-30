@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -161,15 +162,15 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     color: '#3B82F6',
     roomConfig: {
         applicableRoomTypes: [],
-        extraBedAllowed: true,
-        extraBedRate: 2500,
-        extraAdultRate: 2000,
-        extraChildRate: 1000,
+        extraBedAllowed: false,
+        extraBedRate: 0,
+        extraAdultRate: 0,
+        extraChildRate: 0,
         childAgeFrom: 5,
         childAgeTo: 12,
         infantFree: true,
         infantMaxAge: 4,
-        maxExtraBeds: 1,
+        maxExtraBeds: 0,
         extraBedMealIncluded: false,
         welcomeAmenity: '',
         lateCheckoutAllowed: false,
@@ -186,39 +187,24 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
         hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
         hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
     },
-    poolConfig: { included: false, complimentaryAdults: 2, complimentaryChildren: 1, extraAdultRate: 500, extraChildRate: 300 },
-    transportConfig: { type: 'None', vehicleType: 'Sedan', pickupRate: 1500, dropRate: 1500 },
+    poolConfig: { included: false, complimentaryAdults: 0, complimentaryChildren: 0, extraAdultRate: 0, extraChildRate: 0 },
+    transportConfig: { type: 'None', vehicleType: '', pickupRate: 0, dropRate: 0 },
     laundryConfig: {
         included: false,
         allowanceType: 'Per Stay',
-        itemsAllowance: 10,
-        extraItemRate: 150,
-        items: [
-            { name: 'Shirt', includedQty: 3, extraRate: 120 },
-            { name: 'Trouser', includedQty: 2, extraRate: 150 },
-            { name: 'Dress', includedQty: 2, extraRate: 200 },
-            { name: 'Underwear', includedQty: 3, extraRate: 80 },
-        ]
+        itemsAllowance: 0,
+        extraItemRate: 0,
+        items: []
     },
     minibarConfig: {
         included: false,
-        dailyCredit: 500,
+        dailyCredit: 0,
         replenishment: 'Daily',
-        items: [
-            { name: 'Water 500ml', category: 'Beverage', qty: 4, unitPrice: 80 },
-            { name: 'Soft Drink', category: 'Beverage', qty: 2, unitPrice: 120 },
-            { name: 'Juice', category: 'Beverage', qty: 2, unitPrice: 150 },
-            { name: 'Nuts', category: 'Snack', qty: 2, unitPrice: 200 },
-            { name: 'Chocolate', category: 'Snack', qty: 2, unitPrice: 180 },
-        ]
+        items: []
     },
     recreationConfig: {
         included: false,
-        activities: [
-            { name: 'Horse Riding', includedSessions: 1, adultRate: 1200, childRate: 800, minAge: 8 },
-            { name: 'Rock Climbing', includedSessions: 1, adultRate: 900, childRate: 600, minAge: 12 },
-            { name: 'Cycling', includedSessions: 2, adultRate: 400, childRate: 300, minAge: 6 },
-        ]
+        activities: []
     },
     outletCredits: [],
     validity: { startDate: '', endDate: '', minNights: 1, maxNights: 30, blackoutDates: '' },
@@ -250,6 +236,7 @@ export const normalizePackage = (raw: any): HotelPackage => {
 // ============================================================
 
 const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
+    const currencySymbol = getCurrencySymbol();
     const safePkg = normalizePackage(pkg);
     const rules: { icon: React.ReactNode; label: string; detail: string; code: string; dept: string }[] = [];
 
@@ -268,13 +255,13 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
     if (safePkg.mealInclusions?.hasDinner) rules.push({
         icon: <Utensils size={14} />,
         label: `Dinner (${safePkg.mealInclusions.dinnerStyle || 'Buffet'})`,
-        detail: safePkg.mealInclusions.dinnerStyle === 'Credit' ? `৳${safePkg.mealInclusions.dinnerCredit || 0} limit · ${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}` : `${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerCuisine || 'Multi-Cuisine'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}`,
+        detail: safePkg.mealInclusions.dinnerStyle === 'Credit' ? `${currencySymbol}${safePkg.mealInclusions.dinnerCredit || 0} limit · ${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}` : `${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerCuisine || 'Multi-Cuisine'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}`,
         code: 'REV-FB-DINNER', dept: 'DEPT-02 F&B'
     });
     if (safePkg.mealInclusions?.hasCupole) rules.push({
         icon: <Star size={14} />,
         label: 'Cupole Rooftop Dinner',
-        detail: `৳${safePkg.mealInclusions.cupoleCredit || 0} limit · ${safePkg.mealInclusions.cupoleMenu || 'Special'} · ${safePkg.mealInclusions.cupoleVenue || 'Rooftop'}`,
+        detail: `${currencySymbol}${safePkg.mealInclusions.cupoleCredit || 0} limit · ${safePkg.mealInclusions.cupoleMenu || 'Special'} · ${safePkg.mealInclusions.cupoleVenue || 'Rooftop'}`,
         code: 'REV-FB-CUPOLE', dept: 'DEPT-02 F&B'
     });
     if (safePkg.roomConfig?.welcomeAmenity) rules.push({
@@ -292,37 +279,37 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
     if (safePkg.poolConfig?.included) rules.push({
         icon: <Waves size={14} />,
         label: 'Swimming Pool',
-        detail: `${safePkg.poolConfig.complimentaryAdults || 0} Adults + ${safePkg.poolConfig.complimentaryChildren || 0} Children complimentary · Extra Adult ৳${safePkg.poolConfig.extraAdultRate || 0}`,
+        detail: `${safePkg.poolConfig.complimentaryAdults || 0} Adults + ${safePkg.poolConfig.complimentaryChildren || 0} Children complimentary · Extra Adult ${currencySymbol}${safePkg.poolConfig.extraAdultRate || 0}`,
         code: 'REV-REC-POOL', dept: 'DEPT-04 Recreation'
     });
     if (safePkg.transportConfig?.type && safePkg.transportConfig.type !== 'None') rules.push({
         icon: <Car size={14} />,
         label: `Airport Transfer (${safePkg.transportConfig.type})`,
-        detail: `${safePkg.transportConfig.vehicleType || 'Sedan'} · Pickup ৳${safePkg.transportConfig.pickupRate || 0} · Drop ৳${safePkg.transportConfig.dropRate || 0}`,
+        detail: `${safePkg.transportConfig.vehicleType || 'Sedan'} · Pickup ${currencySymbol}${safePkg.transportConfig.pickupRate || 0} · Drop ${currencySymbol}${safePkg.transportConfig.dropRate || 0}`,
         code: 'REV-TRN-PCKU', dept: 'DEPT-05 Transport'
     });
     if (safePkg.laundryConfig?.included) rules.push({
         icon: <Shirt size={14} />,
         label: 'Laundry Allowance',
-        detail: `${safePkg.laundryConfig.itemsAllowance || 0} items ${safePkg.laundryConfig.allowanceType || 'Per Stay'} · Extra ৳${safePkg.laundryConfig.extraItemRate || 0}/item`,
+        detail: `${safePkg.laundryConfig.itemsAllowance || 0} items ${safePkg.laundryConfig.allowanceType || 'Per Stay'} · Extra ${currencySymbol}${safePkg.laundryConfig.extraItemRate || 0}/item`,
         code: 'REV-LAUN-STD', dept: 'DEPT-06 Minor'
     });
     if (safePkg.minibarConfig?.included) rules.push({
         icon: <Wine size={14} />,
         label: 'Minibar Credit',
-        detail: `৳${safePkg.minibarConfig.dailyCredit || 0}/day credit · ${safePkg.minibarConfig.replenishment || 'Daily'} replenishment · Extra charged to folio`,
+        detail: `${currencySymbol}${safePkg.minibarConfig.dailyCredit || 0}/day credit · ${safePkg.minibarConfig.replenishment || 'Daily'} replenishment · Extra charged to folio`,
         code: 'REV-MINI-BAR', dept: 'DEPT-02 Minibar'
     });
     if (safePkg.recreationConfig?.included && Array.isArray(safePkg.recreationConfig.activities)) safePkg.recreationConfig.activities.forEach((act: RecreationActivity) => rules.push({
         icon: <Dumbbell size={14} />,
         label: act.name,
-        detail: `${act.includedSessions || 1} session(s) included · Extra Adult ৳${act.adultRate || 0} · Child ৳${act.childRate || 0}`,
+        detail: `${act.includedSessions || 1} session(s) included · Extra Adult ${currencySymbol}${act.adultRate || 0} · Child ${currencySymbol}${act.childRate || 0}`,
         code: 'REV-REC-SPORT', dept: 'DEPT-04 Recreation'
     }));
     if (Array.isArray(safePkg.outletCredits)) safePkg.outletCredits.forEach((oc: OutletCredit) => rules.push({
         icon: <Gift size={14} />,
         label: `${oc.outletName} Credit`,
-        detail: `৳${oc.creditAmount || 0} ${oc.creditType || 'Fixed'} · Extra usage charged to folio`,
+        detail: `${currencySymbol}${oc.creditAmount || 0} ${oc.creditType || 'Fixed'} · Extra usage charged to folio`,
         code: oc.revenueCode || 'REV-OTHER', dept: 'DEPT-03 Spa/Other'
     }));
 
@@ -344,7 +331,7 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                             <span className="text-[10px] text-primary uppercase tracking-wider">{alloc.department}</span>
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-slate-900">
-                                    {alloc.type === 'Fixed' ? `৳${alloc.amount.toLocaleString()}` : `${alloc.amount}%`}
+                                    {alloc.type === 'Fixed' ? `${currencySymbol}${alloc.amount.toLocaleString()}` : `${alloc.amount}%`}
                                 </span>
                                 <div className="h-1.5 flex-1 bg-slate-100 mx-3 rounded-full overflow-hidden">
                                     <div className="h-full bg-primary rounded-full" style={{ width: alloc.type === 'Percentage' ? `${alloc.amount}%` : '40%' }}></div>
@@ -359,7 +346,7 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                         {surcharges.map((s, i) => (
                             <div key={i} className="flex justify-between items-center bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
                                 <span className="text-xs text-amber-900 font-medium">{s.reason}</span>
-                                <span className="text-xs font-black text-amber-800 font-mono">+৳{s.surchargeAmount.toLocaleString()}</span>
+                                <span className="text-xs font-black text-amber-800 font-mono">+{currencySymbol}{s.surchargeAmount.toLocaleString()}</span>
                             </div>
                         ))}
                     </div>
@@ -435,6 +422,7 @@ const sel = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
 const PKG_STORAGE_KEY = 'hotel_packages_v2';
 
 const PackageManagement = () => {
+    const currencySymbol = getCurrencySymbol();
     const [packages, setPackages] = useState<HotelPackage[]>(() => {
         try {
             const saved = localStorage.getItem(PKG_STORAGE_KEY);
@@ -754,7 +742,7 @@ const PackageManagement = () => {
                         pkg.poolConfig?.included && '🏊 Pool',
                         pkg.transportConfig?.type !== 'None' && `✈️ Transfer (${pkg.transportConfig?.type})`,
                         pkg.laundryConfig?.included && `👕 Laundry (${pkg.laundryConfig?.itemsAllowance || 0} items)`,
-                        pkg.minibarConfig?.included && `🍾 Minibar (৳${pkg.minibarConfig?.dailyCredit || 0}/day)`,
+                        pkg.minibarConfig?.included && `🍾 Minibar (${currencySymbol}${pkg.minibarConfig?.dailyCredit || 0}/day)`,
                         pkg.recreationConfig?.included && '🎯 Recreation',
                         (pkg.outletCredits?.length || 0) > 0 && `💆 ${pkg.outletCredits.map(o => o.outletName).join(', ')}`,
                     ].filter(Boolean);
@@ -831,7 +819,7 @@ const PackageManagement = () => {
                                     </div>
                                     <div className="text-right">
                                         <span className="text-[10px] text-slate-400 uppercase font-semibold block">Surcharge</span>
-                                        <span className="text-base text-slate-900 font-mono">৳{(pkg.finance?.baseSurcharge || 0).toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
+                                        <span className="text-base text-slate-900 font-mono">{currencySymbol}{(pkg.finance?.baseSurcharge || 0).toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -1030,15 +1018,15 @@ const PackageManagement = () => {
 
                                     <div className="grid grid-cols-3 gap-4">
                                         <Field label="Extra Bed Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                 <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraBedRate} onChange={e => upd('roomConfig.extraBedRate', +e.target.value)} disabled={!fm.roomConfig.extraBedAllowed} /></div>
                                         </Field>
                                         <Field label="Extra Adult Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                 <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraAdultRate} onChange={e => upd('roomConfig.extraAdultRate', +e.target.value)} /></div>
                                         </Field>
                                         <Field label="Extra Child Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                 <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraChildRate} onChange={e => upd('roomConfig.extraChildRate', +e.target.value)} /></div>
                                         </Field>
                                         <Field label="Child Age From">
@@ -1140,22 +1128,22 @@ const PackageManagement = () => {
 
                                                 <div className="grid grid-cols-3 gap-4">
                                                 {meal.showCredit && meal.creditKey && (
-                                                    <Field label={`${meal.label} Credit (৳)`} hint="Guest uses up to this amount free">
-                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <Field label={`${meal.label} Credit (${currencySymbol})`} hint="Guest uses up to this amount free">
+                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                             <input type="number" className={inp + ' pl-7'}
                                                                 value={fm.mealInclusions[meal.creditKey as keyof typeof fm.mealInclusions] as number}
                                                                 onChange={e => upd(`mealInclusions.${meal.creditKey}`, +e.target.value)} /></div>
                                                     </Field>
                                                 )}
                                                 <Field label="Adult Rate" hint="/person/night">
-                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                         <input type="number" className={inp + ' pl-7'}
                                                             value={fm.mealInclusions[meal.adultKey as keyof typeof fm.mealInclusions] as number}
                                                             onChange={e => upd(`mealInclusions.${meal.adultKey}`, +e.target.value)} /></div>
                                                 </Field>
                                                 {meal.childKey && (
                                                     <Field label="Child Rate" hint="/person/night">
-                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                             <input type="number" className={inp + ' pl-7'}
                                                                 value={fm.mealInclusions[meal.childKey as keyof typeof fm.mealInclusions] as number}
                                                                 onChange={e => upd(`mealInclusions.${meal.childKey}`, +e.target.value)} /></div>
@@ -1199,17 +1187,17 @@ const PackageManagement = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <Field label="Extra Adult Pool Rate" hint="/person">
-                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                         <input type="number" className={inp + ' pl-7'} value={fm.poolConfig.extraAdultRate} onChange={e => upd('poolConfig.extraAdultRate', +e.target.value)} /></div>
                                                 </Field>
                                                 <Field label="Extra Child Pool Rate" hint="/person">
-                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                         <input type="number" className={inp + ' pl-7'} value={fm.poolConfig.extraChildRate} onChange={e => upd('poolConfig.extraChildRate', +e.target.value)} /></div>
                                                 </Field>
                                             </div>
                                             <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-100 text-xs text-amber-700">
                                                 <AlertCircle size={12} className="inline mr-1" />
-                                                Engine: If guest brings extra {fm.poolConfig.complimentaryAdults + 1}+ adults, system auto-charges ৳{fm.poolConfig.extraAdultRate} each → DEPT-04 Recreation
+                                                Engine: If guest brings extra {fm.poolConfig.complimentaryAdults + 1}+ adults, system auto-charges {currencySymbol}{fm.poolConfig.extraAdultRate} each → DEPT-04 Recreation
                                             </div>
                                         </div>
                                     )}
@@ -1235,7 +1223,7 @@ const PackageManagement = () => {
                                                                 }} />
                                                         </Field>
                                                         <Field label="Extra Adult Rate">
-                                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">৳</span>
+                                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">{currencySymbol}</span>
                                                                 <input type="number" className={inp + ' pl-6'} value={act.adultRate}
                                                                     onChange={e => {
                                                                         const acts = [...fm.recreationConfig.activities];
@@ -1244,7 +1232,7 @@ const PackageManagement = () => {
                                                                     }} /></div>
                                                         </Field>
                                                         <Field label="Extra Child Rate">
-                                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">৳</span>
+                                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">{currencySymbol}</span>
                                                                 <input type="number" className={inp + ' pl-6'} value={act.childRate}
                                                                     onChange={e => {
                                                                         const acts = [...fm.recreationConfig.activities];
@@ -1287,13 +1275,13 @@ const PackageManagement = () => {
                                             <div />
                                             {(fm.transportConfig.type === 'Pickup' || fm.transportConfig.type === 'Both') && (
                                                 <Field label="Airport Pickup Rate">
-                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                         <input type="number" className={inp + ' pl-7'} value={fm.transportConfig.pickupRate} onChange={e => upd('transportConfig.pickupRate', +e.target.value)} /></div>
                                                 </Field>
                                             )}
                                             {(fm.transportConfig.type === 'Drop' || fm.transportConfig.type === 'Both') && (
                                                 <Field label="Airport Drop Rate">
-                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                         <input type="number" className={inp + ' pl-7'} value={fm.transportConfig.dropRate} onChange={e => upd('transportConfig.dropRate', +e.target.value)} /></div>
                                                 </Field>
                                             )}
@@ -1335,7 +1323,7 @@ const PackageManagement = () => {
                                                             onChange={e => upd('laundryConfig.itemsAllowance', +e.target.value)} />
                                                     </Field>
                                                     <Field label="Extra Item Rate" hint="/piece">
-                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                             <input type="number" className={inp + ' pl-7'} value={fm.laundryConfig.extraItemRate}
                                                                 onChange={e => upd('laundryConfig.extraItemRate', +e.target.value)} /></div>
                                                     </Field>
@@ -1355,7 +1343,7 @@ const PackageManagement = () => {
                                                                     items[i] = { ...items[i], includedQty: +e.target.value };
                                                                     upd('laundryConfig.items', items);
                                                                 }} />
-                                                            <span className="text-xs text-gray-400">Extra ৳</span>
+                                                            <span className="text-xs text-gray-400">Extra {currencySymbol}</span>
                                                             <input type="number" className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center" value={item.extraRate} min={0}
                                                                 onChange={e => {
                                                                     const items = [...fm.laundryConfig.items];
@@ -1368,7 +1356,7 @@ const PackageManagement = () => {
                                             </div>
                                             <div className="mt-3 p-2.5 bg-amber-50 rounded-lg border border-amber-100 text-xs text-amber-700">
                                                 <AlertCircle size={12} className="inline mr-1" />
-                                                Engine: Guest sends {fm.laundryConfig.itemsAllowance} pieces → Free. Piece {fm.laundryConfig.itemsAllowance + 1}+ → ৳{fm.laundryConfig.extraItemRate} each, auto-charged to folio
+                                                Engine: Guest sends {fm.laundryConfig.itemsAllowance} pieces → Free. Piece {fm.laundryConfig.itemsAllowance + 1}+ → {currencySymbol}{fm.laundryConfig.extraItemRate} each, auto-charged to folio
                                             </div>
                                         </div>
                                     )}
@@ -1389,7 +1377,7 @@ const PackageManagement = () => {
                                                 <div className="text-xs font-semibold text-blue-700 mb-3 flex items-center gap-1"><Zap size={12} /> Allowance Engine — Credit Limit</div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <Field label="Daily Credit" hint="free amount per day">
-                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                             <input type="number" className={inp + ' pl-7'} value={fm.minibarConfig.dailyCredit}
                                                                 onChange={e => upd('minibarConfig.dailyCredit', +e.target.value)} /></div>
                                                     </Field>
@@ -1419,7 +1407,7 @@ const PackageManagement = () => {
                                                                     items[i] = { ...items[i], qty: +e.target.value };
                                                                     upd('minibarConfig.items', items);
                                                                 }} />
-                                                            <span className="text-gray-400">৳</span>
+                                                            <span className="text-gray-400">{currencySymbol}</span>
                                                             <input type="number" className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center" value={item.unitPrice} min={0}
                                                                 onChange={e => {
                                                                     const items = [...fm.minibarConfig.items];
@@ -1432,7 +1420,7 @@ const PackageManagement = () => {
                                             </div>
                                             <div className="mt-3 p-2.5 bg-emerald-50 rounded-lg border border-emerald-100 text-xs text-emerald-700">
                                                 <Check size={12} className="inline mr-1" />
-                                                Engine: Guest consumes ৳{fm.minibarConfig.dailyCredit} or less → Free. Above ৳{fm.minibarConfig.dailyCredit} → Extra auto-charged to folio
+                                                Engine: Guest consumes {currencySymbol}{fm.minibarConfig.dailyCredit} or less → Free. Above {currencySymbol}{fm.minibarConfig.dailyCredit} → Extra auto-charged to folio
                                             </div>
                                         </div>
                                     )}
@@ -1465,8 +1453,8 @@ const PackageManagement = () => {
                                                             <option value="Per Day">Per Day</option>
                                                         </select>
                                                     </Field>
-                                                    <Field label="Credit Amount (৳)">
-                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                    <Field label={`Credit Amount (${currencySymbol})`}>
+                                                        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                             <input type="number" className={inp + ' pl-7'} value={oc.creditAmount}
                                                                 onChange={e => {
                                                                     const list = [...fm.outletCredits];
@@ -1524,12 +1512,12 @@ const PackageManagement = () => {
                                 <FormSection title="Finance & Revenue Routing" icon={<DollarSign size={16} />}>
                                     <div className="grid grid-cols-2 gap-4 mb-5">
                                         <Field label="Total Inclusion Cost" hint="internal cost of all services">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                 <input type="number" className={inp + ' pl-7 bg-gray-50'} value={fm.finance.totalCost}
                                                     onChange={e => upd('finance.totalCost', +e.target.value)} /></div>
                                         </Field>
                                         <Field label="Package Surcharge (Selling)" hint="added to room rate/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">৳</span>
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">{currencySymbol}</span>
                                                 <input type="number" className={inp + ' pl-7 border-emerald-100 bg-emerald-50/20 text-emerald-900'} value={fm.finance.baseSurcharge}
                                                     onChange={e => upd('finance.baseSurcharge', +e.target.value)} /></div>
                                         </Field>
@@ -1544,7 +1532,7 @@ const PackageManagement = () => {
                                                 <div className="text-right">
                                                     <div className="text-[10px] text-gray-500 uppercase font-black">Bundle Margin</div>
                                                     <div className={`text-sm font-black ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                        ৳{(fm.finance.baseSurcharge - fm.finance.totalCost).toLocaleString()}
+                                                        {currencySymbol}{(fm.finance.baseSurcharge - fm.finance.totalCost).toLocaleString()}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1564,11 +1552,11 @@ const PackageManagement = () => {
                                             {fm.poolConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Pool Access (Complimentary)</span><span className="text-blue-400 font-mono text-[9px]">DEPT-04 Recreation → REV-REC-POOL</span></div>}
                                             {fm.transportConfig.type !== 'None' && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Airport Transfer (In/Out)</span><span className="text-purple-400 font-mono text-[9px]">DEPT-05 Transport → REV-TRN</span></div>}
                                             {fm.laundryConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Laundry ({fm.laundryConfig.itemsAllowance} items)</span><span className="text-yellow-400 font-mono text-[9px]">DEPT-06 Minor → REV-LAUN-STD</span></div>}
-                                            {fm.minibarConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Minibar Credit ৳{fm.minibarConfig.dailyCredit}</span><span className="text-pink-400 font-mono text-[9px]">DEPT-02 Minibar → REV-MINI-BAR</span></div>}
+                                            {fm.minibarConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Minibar Credit {currencySymbol}{fm.minibarConfig.dailyCredit}</span><span className="text-pink-400 font-mono text-[9px]">DEPT-02 Minibar → REV-MINI-BAR</span></div>}
                                             {fm.outletCredits.map((oc, i) => <div key={i} className="flex justify-between text-[10px]"><span className="text-gray-500">{oc.outletName} Credit ({oc.creditType})</span><span className="text-orange-400 font-mono text-[9px]">DEPT-03 Outlets → {oc.revenueCode}</span></div>)}
                                             <div className="flex justify-between text-[10px] border-t border-gray-800 pt-2 mt-2">
                                                 <span className="text-gray-300 uppercase tracking-widest">Base Pkg Surcharge</span>
-                                                <span className="text-white font-black">৳{fm.finance.baseSurcharge}/night → DEPT-01 Rooms</span>
+                                                <span className="text-white font-black">{currencySymbol}{fm.finance.baseSurcharge}/night → DEPT-01 Rooms</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1588,7 +1576,7 @@ const PackageManagement = () => {
                                     <p className="text-xs text-gray-500 mb-3">{fm.description || 'No description yet'}</p>
                                     <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-2">
                                         <span>Min {fm.validity.minNights} nights</span>
-                                        <span className="text-gray-900">+৳{fm.finance.baseSurcharge}<span className="font-normal">/night</span></span>
+                                        <span className="text-gray-900">+{currencySymbol}{fm.finance.baseSurcharge}<span className="font-normal">/night</span></span>
                                     </div>
                                 </div>
                                 <AllowanceEngineViewer pkg={{ ...fm, id: 0 }} />

@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
-import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
+import { getCurrencySymbol, getActiveCurrencyCode } from '../utils/currencyUtils';
+import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 interface RatePlan {
@@ -65,6 +66,7 @@ interface RatePricing {
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function RatePlanManagement() {
+    const currencySymbol = getCurrencySymbol();
     const [view, setView] = useState<'list' | 'form' | 'calendar'>('list');
     const [ratePlans, setRatePlans] = useState<RatePlan[]>(() => {
         try {
@@ -90,7 +92,7 @@ export default function RatePlanManagement() {
         fetch(`${API_BASE}/api/rates/plans?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
-                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                if (json.success && Array.isArray(json.data)) {
                     setRatePlans(json.data);
                     localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
                 }
@@ -131,11 +133,27 @@ export default function RatePlanManagement() {
 
     const openCreate = () => {
         setIsCodeManual(false);
+        const dynamicRooms = getDynamicRoomTypes();
+        const initialPricing = dynamicRooms.map(rt => ({
+            roomTypeId: rt.name,
+            structure: 'Flat' as const,
+            operatingCost: 0,
+            baseRate: rt.baseRate || 0,
+            doubleRate: rt.baseRate || 0,
+            tripleRate: (rt.baseRate || 0) + (rt.extraAdultPrice || 0),
+            extraAdult: rt.extraAdultPrice || 0,
+            extraChild: rt.extraChildPrice || 0,
+            baseOccupancy: rt.baseOccupancy || 2,
+            maxOccupancy: rt.maxAdults || 3
+        }));
+        const oneYearAhead = new Date();
+        oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
+
         setFormData({
             status: 'Active',
-            currency: 'BDT',
+            currency: getActiveCurrencyCode(),
             validDays: DAYS_OF_WEEK,
-            mealPlan: 'EP',
+            mealPlan: availableMealPlans[0]?.shortCode || '',
             policies: {
                 depositRequired: false,
                 depositAmount: 0,
@@ -145,7 +163,7 @@ export default function RatePlanManagement() {
                 refundPercentage: 100
             },
             activationDate: new Date().toISOString().split('T')[0],
-            expirationDate: '2025-12-31',
+            expirationDate: oneYearAhead.toISOString().split('T')[0],
             minNights: 1,
             cutOffDays: 0,
             taxIncluded: false,
@@ -153,7 +171,7 @@ export default function RatePlanManagement() {
             closedToArrival: false,
             closedToDeparture: false,
             stopSell: false,
-            pricing: [{ roomTypeId: 'New Room Category', structure: 'Flat', operatingCost: 0, baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 3 }]
+            pricing: initialPricing
         });
         setEditingPlan(null);
         setView('form');
@@ -424,7 +442,7 @@ export default function RatePlanManagement() {
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
-                                        <div className="text-slate-900 font-mono text-sm">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
+                                        <div className="text-slate-900 font-mono text-sm">{currencySymbol}{plan.pricing[0]?.baseRate.toLocaleString()}</div>
                                         <div className="text-[10px] text-slate-400 font-medium">Exc. Tax</div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
@@ -627,7 +645,7 @@ export default function RatePlanManagement() {
                                                 >
                                                     <div className="text-sm font-bold">{code}</div>
                                                     <div className={`text-[10px] leading-tight mt-1 ${formData.mealPlan === code ? 'text-blue-100' : 'text-gray-400'}`}>
-                                                        {item.name} {Number(item.sellingPriceAdult) > 0 ? `(৳${item.sellingPriceAdult})` : ''}
+                                                        {item.name} {Number(item.sellingPriceAdult) > 0 ? `(${currencySymbol}${item.sellingPriceAdult})` : ''}
                                                     </div>
                                                 </button>
                                             );
@@ -795,14 +813,14 @@ export default function RatePlanManagement() {
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tier-Wise Revenue Grid</div>
                                                 <div className={`text-[10px] px-2 py-0.5 rounded ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                                                    GOP: ৳{(price.baseRate - price.operatingCost).toLocaleString()}
+                                                    GOP: {currencySymbol}{(price.baseRate - price.operatingCost).toLocaleString()}
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Internal Operating Cost (OPEX)</label>
                                             <div className="relative inline-block">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
                                                 <input 
                                                     type="number"
                                                     className="w-32 pl-7 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-500 text-right focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -827,7 +845,7 @@ export default function RatePlanManagement() {
                                             <div key={field.key} className="space-y-2">
                                                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block pl-1">{field.label}</label>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 font-bold">৳</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 font-bold">{currencySymbol}</span>
                                                     <input 
                                                         type="number" 
                                                         className="w-full pl-7 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-800"
@@ -892,11 +910,11 @@ export default function RatePlanManagement() {
                             <div className="space-y-1">
                                 <div className="flex justify-between text-[10px] bg-blue-50/80 px-1.5 py-0.5 rounded text-blue-700">
                                     <span>BAR</span>
-                                    <span>৳{(baseRate / 1000).toFixed(1)}k</span>
+                                    <span>{currencySymbol}{(baseRate / 1000).toFixed(1)}k</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] bg-purple-50/80 px-1.5 py-0.5 rounded text-purple-700">
                                     <span>CORP</span>
-                                    <span>৳4.0k</span>
+                                    <span>{currencySymbol}4.0k</span>
                                 </div>
                             </div>
                         </div>
