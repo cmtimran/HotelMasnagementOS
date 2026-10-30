@@ -1542,29 +1542,33 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
 
                                         <div className="flex items-center gap-1.5">
-                                            {isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isRoomUnassignedActive}
-                                                    onClick={() => {
-                                                        if (isRoomUnassignedActive) {
-                                                            toast.error('Cannot check in: Room is unassigned. Please assign a room first.');
-                                                            return;
-                                                        }
-                                                        onCheckIn(activeSubBookingNo || booking.reservationNumber);
-                                                    }}
-                                                    className={`h-8 px-3.5 rounded-md text-[9.5px] font-semibold flex items-center gap-1 transition-colors shadow-xs ${
-                                                        isRoomUnassignedActive
-                                                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
-                                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                                                    }`}
-                                                    title={isRoomUnassignedActive ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In active room'}
-                                                >
-                                                    <DoorOpen size={11} />
-                                                    <span>Check In</span>
-                                                    {isRoomUnassignedActive && <span className="text-[8px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Unassigned</span>}
-                                                </button>
-                                            )}
+                                            {(() => {
+                                                const arrivalDateVal = activeRoom.checkInDate || booking.arrivalDate || (booking as any)?.checkIn;
+                                                const isArrivalToday = arrivalDateVal === (systemDate || getOperatingSystemDate());
+                                                return isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && isArrivalToday ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isRoomUnassignedActive}
+                                                        onClick={() => {
+                                                            if (isRoomUnassignedActive) {
+                                                                toast.error('Cannot check in: Room is unassigned. Please assign a room first.');
+                                                                return;
+                                                            }
+                                                            onCheckIn(activeSubBookingNo || booking.reservationNumber);
+                                                        }}
+                                                        className={`h-8 px-3.5 rounded-md text-[9.5px] font-semibold flex items-center gap-1 transition-colors shadow-xs ${
+                                                            isRoomUnassignedActive
+                                                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
+                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                                        }`}
+                                                        title={isRoomUnassignedActive ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In active room'}
+                                                    >
+                                                        <DoorOpen size={11} />
+                                                        <span>Check In</span>
+                                                        {isRoomUnassignedActive && <span className="text-[8px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Unassigned</span>}
+                                                    </button>
+                                                ) : null;
+                                            })()}
                                             {isCurrentActiveInHouse && !booking?.isPast && onCheckOut && (
                                                 <button
                                                     type="button"

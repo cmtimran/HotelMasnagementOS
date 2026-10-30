@@ -2062,6 +2062,12 @@ export const StayView: React.FC = () => {
                 return;
             }
 
+            const targetArrival = (targetB as any)?.checkInDate || (targetB as any)?.arrivalDate || storedTarget?.checkIn;
+            if (targetArrival && targetArrival !== operatingDateStr) {
+                toast.error(`Check-in is only permitted on the PMS Business Date (${operatingDateStr}). Arrival date is ${targetArrival}.`);
+                return;
+            }
+
             const regNo = generateRegistrationNumber(reservationNumber);
             const folioNo = generateFolioNumber(reservationNumber);
             const ok = await updateReservationStatusInDB(reservationNumber, 'in-house');

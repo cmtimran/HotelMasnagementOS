@@ -50,7 +50,8 @@ import {
     generateSubBookingNumber,
     generateRegistrationNumber,
     generateFolioNumber,
-    getRoomSmokingPolicy
+    getRoomSmokingPolicy,
+    getOperatingSystemDate
 } from '../../utils/roomInventoryEngine';
 import { getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { getApiBaseUrl } from '../../utils/apiUrl';
@@ -956,6 +957,11 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Save Reservation to LocalStorage
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+        if (actionType === 'checkin' && checkIn !== getOperatingSystemDate()) {
+            toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkIn}.`);
+            return;
+        }
+
         if (availableRatePlans.length === 0) {
             toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
             return;
@@ -2790,13 +2796,15 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                 >
                                     Hold Till
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleFinalizeBooking('checkin')}
-                                    className="h-9 px-6 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-sm font-semibold cursor-pointer shadow-2xs transition-colors"
-                                >
-                                    CheckIn
-                                </button>
+                                {checkIn === getOperatingSystemDate() && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleFinalizeBooking('checkin')}
+                                        className="h-9 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold cursor-pointer shadow-2xs transition-colors"
+                                    >
+                                        CheckIn
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => handleFinalizeBooking('reserve')}

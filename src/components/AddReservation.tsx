@@ -67,6 +67,7 @@ import {
     syncConnectingSuitesFromDB,
     getRoomSmokingPolicy,
     getHotelReservationPolicies,
+    getOperatingSystemDate,
     type StoredReservation,
     type ConnectingSuite
 } from '../utils/roomInventoryEngine';
@@ -1494,6 +1495,11 @@ export const AddReservation: React.FC = () => {
 
     // Save Reservation with Atomic Pre-Commit Validation Guard
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+        if (actionType === 'checkin' && checkIn !== getOperatingSystemDate()) {
+            toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkIn}.`);
+            return;
+        }
+
         if (availableRatePlans.length === 0) {
             toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
             return;
@@ -4293,7 +4299,7 @@ export const AddReservation: React.FC = () => {
                                             <Check size={12} className="stroke-[2.5]" />
                                             <span>Update Reservation</span>
                                         </button>
-                                        {editingReservation?.status !== 'in-house' && (
+                                        {editingReservation?.status !== 'in-house' && checkIn === getOperatingSystemDate() && (
                                             <button
                                                 type="button"
                                                 onClick={() => handleFinalizeBooking('checkin')}
@@ -4312,13 +4318,15 @@ export const AddReservation: React.FC = () => {
                                         >
                                             Hold Till
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleFinalizeBooking('checkin')}
-                                            className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                        >
-                                            Check In
-                                        </button>
+                                        {checkIn === getOperatingSystemDate() && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleFinalizeBooking('checkin')}
+                                                className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                            >
+                                                Check In
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => handleFinalizeBooking('reserve')}

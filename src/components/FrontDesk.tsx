@@ -1133,6 +1133,8 @@ export const FrontDesk: React.FC = () => {
                                                 <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1.5">
                                                         {(item.status === 'arriving' || item.status === 'confirmed') && (() => {
+                                                            const isArrivalToday = item.checkIn === getOperatingSystemDate();
+                                                            if (!isArrivalToday) return null;
                                                             const unassigned = isRoomUnassigned(item.roomNumber);
                                                             return (
                                                                 <button

@@ -58,7 +58,8 @@ import {
     generateRegistrationNumber,
     generateFolioNumber,
     getRoomSmokingPolicy,
-    getHotelReservationPolicies
+    getHotelReservationPolicies,
+    getOperatingSystemDate
 } from '../../utils/roomInventoryEngine';
 import {
     calculateReservationTaxes,
@@ -1037,6 +1038,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Submit reservation action
     const handleCompleteReservation = (status: 'hold' | 'confirmed' | 'stayover' | 'arrived') => {
+        if (status === 'arrived' && checkInDate !== getOperatingSystemDate()) {
+            toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkInDate}.`);
+            return;
+        }
+
         if (availableRatePlans.length === 0) {
             toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
             return;
@@ -2818,24 +2824,26 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                         >
                             Reserve
                         </button>
-                        <button
-                            type="button"
-                            disabled={hasOverbookingError}
-                            onClick={() => {
-                                if (hasOverbookingError) {
-                                    toast.error('Cannot proceed: Selected rooms exceed available inventory!');
-                                    return;
-                                }
-                                handleCompleteReservation('arrived');
-                            }}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition-colors ${
-                                hasOverbookingError
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                            }`}
-                        >
-                            Check In
-                        </button>
+                        {checkInDate === getOperatingSystemDate() && (
+                            <button
+                                type="button"
+                                disabled={hasOverbookingError}
+                                onClick={() => {
+                                    if (hasOverbookingError) {
+                                        toast.error('Cannot proceed: Selected rooms exceed available inventory!');
+                                        return;
+                                    }
+                                    handleCompleteReservation('arrived');
+                                }}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition-colors ${
+                                    hasOverbookingError
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                }`}
+                            >
+                                Check In
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
