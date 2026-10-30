@@ -634,7 +634,7 @@ function App() {
     return (
       <>
         <Login onLogin={handleLogin} />
-        <Devnotation evergreen />
+        <Devnotation />
       </>
     );
   }
@@ -664,7 +664,7 @@ function App() {
           sections={modalConfig.sections}
         />
       </div>
-      <Devnotation evergreen />
+      <Devnotation />
     </>
   );
 }
