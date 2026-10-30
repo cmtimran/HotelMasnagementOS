@@ -772,6 +772,22 @@ export const getDynamicPackages = (): any[] => {
 };
 
 /**
+ * Dynamic Rate Plans cache helper (synced with PostgreSQL/SQLite rate_plans table)
+ */
+export const getDynamicRatePlans = (): any[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        }
+    } catch {}
+    return [];
+};
+
+/**
  * Hospitality Standard: Dynamically calculate room tariff based on Rate Plan, Room Type, and Occupancy
  */
 export const calculateTariffForRatePlan = (

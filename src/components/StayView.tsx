@@ -48,6 +48,7 @@ import {
     getActiveLocks,
     getCanonicalRooms,
     syncConnectingSuitesFromDB,
+    getConnectingPartnerMap,
     validateAndCommitReservation,
     syncReservationsFromDB,
     syncRoomTypesAndRoomsFromDB,
@@ -1581,11 +1582,19 @@ export const StayView: React.FC = () => {
         const canonicalDeparture = depDateObj.toISOString().split('T')[0];
         const calculatedEndCol = targetB.startIndex + canonicalNights - 1;
 
-        // Strict Double-Booking Collision Check before amending stay
-        const conflict = findRoomConflict(targetB.roomNumber, targetB.startIndex, calculatedEndCol, targetB.id);
-        if (conflict) {
-            toast.error(`Cannot extend Room ${targetB.roomNumber} to ${canonicalDeparture}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
-            return;
+        // Strict Double-Booking Collision Check for all suite rooms before amending stay
+        const isConnSuite = Boolean(targetB.isConnectingSuite);
+        const suiteBookings = isConnSuite
+            ? bookings.filter(b => b.isConnectingSuite && b.reservationNumber === targetB.reservationNumber)
+            : [targetB];
+
+        for (const sb of suiteBookings) {
+            const conflict = findRoomConflict(sb.roomNumber, sb.startIndex, calculatedEndCol, sb.id);
+            if (conflict) {
+                const label = isConnSuite ? `Connecting Suite (Room ${sb.roomNumber})` : `Room ${sb.roomNumber}`;
+                toast.error(`Cannot extend ${label} to ${canonicalDeparture}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
+                return;
+            }
         }
 
         // Persist to central reservation storage & Database
@@ -1601,10 +1610,12 @@ export const StayView: React.FC = () => {
 
             if (updated.roomsList && Array.isArray(updated.roomsList)) {
                 updated.roomsList = updated.roomsList.map((r: any) => {
-                    if (String(r.roomNumber) === String(targetB.roomNumber)) {
-                        const rowAdults = newAdults !== undefined ? newAdults : (r.adults ?? 2);
-                        const rowChildren = newChildren !== undefined ? newChildren : (r.children ?? 0);
-                        const standardRate = getStandardDailyRateForRoom(targetB.roomNumber, r.roomType || res.roomType);
+                    const isTargetRoom = String(r.roomNumber) === String(targetB.roomNumber);
+                    const isSuiteRoom = isConnSuite;
+                    if (isTargetRoom || isSuiteRoom) {
+                        const rowAdults = newAdults !== undefined && isTargetRoom ? newAdults : (r.adults ?? 2);
+                        const rowChildren = newChildren !== undefined && isTargetRoom ? newChildren : (r.children ?? 0);
+                        const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType || res.roomType);
                         const updatedRate = calculateTariffForRatePlan(r.ratePlan || res.ratePlan, r.roomType || res.roomType, standardRate, rowAdults, rowChildren);
                         return {
                             ...r,
@@ -1661,7 +1672,9 @@ export const StayView: React.FC = () => {
         }
 
         setBookings(prev => prev.map(b => {
-            if (b.id !== bookingId) return b;
+            const isTarget = b.id === bookingId;
+            const isSuitePartner = isConnSuite && b.isConnectingSuite && b.reservationNumber === targetB.reservationNumber;
+            if (!isTarget && !isSuitePartner) return b;
             return {
                 ...b,
                 endIndex: calculatedEndCol,
@@ -1690,6 +1703,34 @@ export const StayView: React.FC = () => {
         const stayNights = Math.max(1, Math.round((new Date(newToDate).getTime() - new Date(validatedFromDate).getTime()) / 86400000) || (targetB.endIndex - targetB.startIndex + 1));
         const endCol = isGuestInHouse ? targetB.endIndex : (startCol + stayNights - 1);
 
+        // Connecting Room Atomic Drag: Group connecting suite component rooms
+        const isConnSuite = Boolean(targetB.isConnectingSuite);
+        const connectingMap = getConnectingPartnerMap();
+        let targetPartnerRoom = '';
+        if (isConnSuite && newRoomNumber !== targetB.roomNumber) {
+            const partners = connectingMap.get(newRoomNumber)?.split(',').map(s => s.trim()) || [];
+            if (partners.length > 0) targetPartnerRoom = partners[0];
+        }
+
+        const partnerBooking = isConnSuite
+            ? bookings.find(b => b.isConnectingSuite && b.reservationNumber === targetB.reservationNumber && b.id !== targetB.id)
+            : null;
+
+        // If partner room is changing, check collision for partner room as well
+        if (isConnSuite && partnerBooking) {
+            const effectivePartnerRoom = targetPartnerRoom || partnerBooking.roomNumber;
+            const partnerConflict = findRoomConflict(
+                effectivePartnerRoom,
+                isGuestInHouse ? partnerBooking.startIndex : startCol,
+                isGuestInHouse ? partnerBooking.endIndex : endCol,
+                partnerBooking.id
+            );
+            if (partnerConflict) {
+                toast.error(`Cannot move Connecting Suite: Partner Room ${effectivePartnerRoom} is already booked by ${partnerConflict.guestName} (${partnerConflict.reservationNumber})!`);
+                return;
+            }
+        }
+
         // Strict Double-Booking Collision Check on target room before moving
         const conflict = findRoomConflict(newRoomNumber, isGuestInHouse ? targetB.startIndex : startCol, endCol, targetB.id);
         if (conflict) {
@@ -1705,11 +1746,26 @@ export const StayView: React.FC = () => {
 
             if (updated.roomsList && Array.isArray(updated.roomsList)) {
                 updated.roomsList = updated.roomsList.map((r: any) => {
-                    if (String(r.roomNumber) === String(targetB.roomNumber)) {
+                    const isTargetRoom = String(r.roomNumber) === String(targetB.roomNumber);
+                    const isPartnerRoom = isConnSuite && partnerBooking && String(r.roomNumber) === String(partnerBooking.roomNumber);
+
+                    if (isTargetRoom) {
                         return {
                             ...r,
                             roomNumber: newRoomNumber,
                             assignedRooms: [newRoomNumber],
+                            checkIn: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
+                            checkOut: newToDate,
+                            checkInDate: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
+                            checkOutDate: newToDate,
+                            nights: isGuestInHouse ? (r.nights || res.nights || stayNights) : stayNights
+                        };
+                    } else if (isPartnerRoom) {
+                        const effectivePartnerRoom = targetPartnerRoom || partnerBooking.roomNumber;
+                        return {
+                            ...r,
+                            roomNumber: effectivePartnerRoom,
+                            assignedRooms: [effectivePartnerRoom],
                             checkIn: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
                             checkOut: newToDate,
                             checkInDate: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
@@ -1755,17 +1811,38 @@ export const StayView: React.FC = () => {
         }
 
         setBookings(prev => prev.map(b => {
-            if (b.id !== bookingId) return b;
-            return {
-                ...b,
-                roomNumber: newRoomNumber,
-                startIndex: isGuestInHouse ? b.startIndex : startCol,
-                endIndex: isGuestInHouse ? b.endIndex : endCol,
-                checkInDate: isGuestInHouse ? b.checkInDate : validatedFromDate,
-                checkOutDate: newToDate,
-                nights: isGuestInHouse ? b.nights : stayNights
-            };
+            if (b.id === bookingId) {
+                return {
+                    ...b,
+                    roomNumber: newRoomNumber,
+                    startIndex: isGuestInHouse ? b.startIndex : startCol,
+                    endIndex: isGuestInHouse ? b.endIndex : endCol,
+                    checkInDate: isGuestInHouse ? b.checkInDate : validatedFromDate,
+                    checkOutDate: newToDate,
+                    nights: isGuestInHouse ? b.nights : stayNights
+                };
+            }
+            if (isConnSuite && b.isConnectingSuite && b.reservationNumber === targetB.reservationNumber) {
+                const effectivePartnerRoom = targetPartnerRoom || b.roomNumber;
+                return {
+                    ...b,
+                    roomNumber: effectivePartnerRoom,
+                    startIndex: isGuestInHouse ? b.startIndex : startCol,
+                    endIndex: isGuestInHouse ? b.endIndex : endCol,
+                    checkInDate: isGuestInHouse ? b.checkInDate : validatedFromDate,
+                    checkOutDate: newToDate,
+                    nights: isGuestInHouse ? b.nights : stayNights
+                };
+            }
+            return b;
         }));
+
+        if (isConnSuite && partnerBooking && targetPartnerRoom) {
+            moveRoomInDB(partnerBooking.reservationNumber, targetPartnerRoom, validatedFromDate, newToDate, partnerBooking.roomNumber);
+            if (isGuestInHouse && partnerBooking.roomNumber) {
+                updateRoomHousekeepingInDB(partnerBooking.roomNumber, 'Dirty');
+            }
+        }
 
         showToast(`Reservation ${targetB.reservationNumber} (${targetB.guestName}) moved to Room ${newRoomNumber} (${newFromDate} to ${newToDate})!`);
     };
@@ -2140,13 +2217,24 @@ export const StayView: React.FC = () => {
                 const minCol = extendDrag.booking.startIndex;
                 const rawTargetCol = Math.max(minCol, extendDrag.originalEndIndex + deltaCols);
 
-                const roomBookings = bookingsByRoom.get(extendDrag.booking.roomNumber) || [];
-                const nextBookings = roomBookings.filter(
-                    other => other.id !== extendDrag.booking.id && other.startIndex > extendDrag.booking.startIndex
-                );
-                const maxAllowedCol = nextBookings.length > 0
-                    ? Math.min(...nextBookings.map(nb => nb.startIndex - 1))
-                    : daysWindow - 1;
+                // Group connecting suite component rooms so extension clamps across all component rooms
+                const suiteBookings = extendDrag.booking.isConnectingSuite
+                    ? bookings.filter(b => b.isConnectingSuite && b.reservationNumber === extendDrag.booking.reservationNumber)
+                    : [extendDrag.booking];
+
+                let maxAllowedCol = daysWindow - 1;
+                for (const sb of suiteBookings) {
+                    const roomBookings = bookingsByRoom.get(sb.roomNumber) || [];
+                    const nextBookings = roomBookings.filter(
+                        other => other.id !== sb.id && other.startIndex > sb.startIndex
+                    );
+                    if (nextBookings.length > 0) {
+                        const roomMax = Math.min(...nextBookings.map(nb => nb.startIndex - 1));
+                        if (roomMax < maxAllowedCol) {
+                            maxAllowedCol = roomMax;
+                        }
+                    }
+                }
 
                 const clampedCol = Math.min(maxAllowedCol, rawTargetCol);
 
@@ -2252,12 +2340,20 @@ export const StayView: React.FC = () => {
                     ? Math.max(minCol, extendDrag.attemptedEndIndex ?? extendDrag.currentEndIndex)
                     : (b.endIndex + 1);
 
-                // Check for room collision across [b.startIndex, desiredCol]
-                const conflict = findRoomConflict(b.roomNumber, b.startIndex, desiredCol, b.id);
-                if (conflict) {
-                    toast.error(`Cannot extend Room ${b.roomNumber}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
-                    setExtendDrag(null);
-                    return;
+                // Atomic Check: Check collision across all component rooms of the suite
+                const isConn = Boolean(b.isConnectingSuite);
+                const suiteBookings = isConn
+                    ? bookings.filter(item => item.isConnectingSuite && item.reservationNumber === b.reservationNumber)
+                    : [b];
+
+                for (const sb of suiteBookings) {
+                    const conflict = findRoomConflict(sb.roomNumber, sb.startIndex, desiredCol, sb.id);
+                    if (conflict) {
+                        const roomLabel = isConn ? `Connecting Suite (Room ${sb.roomNumber})` : `Room ${sb.roomNumber}`;
+                        toast.error(`Cannot extend ${roomLabel}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
+                        setExtendDrag(null);
+                        return;
+                    }
                 }
 
                 // If user dragged and returned to the exact original night, do nothing
@@ -2304,6 +2400,52 @@ export const StayView: React.FC = () => {
                         showToast('🔒 Cannot move reservations into past audit-locked dates.');
                         setMoveDrag(null);
                         return;
+                    }
+
+                    // Connecting Room Atomic Drag: Group connecting suite component rooms
+                    const isConn = Boolean(b.isConnectingSuite);
+                    const partnerBooking = isConn
+                        ? bookings.find(item => item.isConnectingSuite && item.reservationNumber === b.reservationNumber && item.id !== b.id)
+                        : null;
+
+                    let partnerTargetRoom = partnerBooking?.roomNumber || '';
+                    const deltaCols = moveDrag.targetStartIndex - b.startIndex;
+                    const partnerTargetStart = partnerBooking ? Math.max(0, Math.min(daysWindow - 1, partnerBooking.startIndex + deltaCols)) : 0;
+                    const partnerTargetEnd = partnerBooking ? (partnerTargetStart + (partnerBooking.endIndex - partnerBooking.startIndex)) : 0;
+
+                    if (isConn && partnerBooking) {
+                        // If moving across rooms, ensure target room is part of an active connecting pair
+                        if (moveDrag.targetRoomNumber !== b.roomNumber) {
+                            const connectingMap = getConnectingPartnerMap();
+                            const targetPartners = connectingMap.get(moveDrag.targetRoomNumber)?.split(',').map(s => s.trim()) || [];
+                            if (targetPartners.length === 0) {
+                                toast.error(`Cannot move Interconnecting Suite: Room ${moveDrag.targetRoomNumber} is not configured as an interconnecting suite pair.`);
+                                setMoveDrag(null);
+                                return;
+                            }
+                            partnerTargetRoom = targetPartners[0];
+                        }
+
+                        // Strict Room Collision Check for partner room
+                        const partnerConflict = findRoomConflict(
+                            partnerTargetRoom,
+                            partnerTargetStart,
+                            partnerTargetEnd,
+                            partnerBooking.id
+                        );
+                        if (partnerConflict) {
+                            toast.error(`Cannot move Connecting Suite partner (Room ${partnerTargetRoom}): Already booked by ${partnerConflict.guestName} (${partnerConflict.reservationNumber})!`);
+                            setMoveDrag(null);
+                            return;
+                        }
+
+                        // Room Status Check for partner room
+                        const partnerCanonical = getCanonicalRooms().find(r => String(r.number) === String(partnerTargetRoom));
+                        if (partnerCanonical && (partnerCanonical.status === 'Out of Order' || String(partnerCanonical.status).toLowerCase().includes('out of order'))) {
+                            toast.error(`Cannot move Connecting Suite partner to Room ${partnerTargetRoom}: Room is Out of Order!`);
+                            setMoveDrag(null);
+                            return;
+                        }
                     }
 
                     // Strict Room Collision Check before allowing drop
@@ -2890,7 +3032,17 @@ export const StayView: React.FC = () => {
                                                     {/* Room Info Cell */}
                                                     <div
                                                         style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
-                                                        className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+                                                        className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${moveDrag && moveDrag.isDragging && (
+                                                            moveDrag.targetRoomNumber === room.roomNumber ||
+                                                            (moveDrag.booking.isConnectingSuite && (() => {
+                                                                if (moveDrag.targetRoomNumber === moveDrag.booking.roomNumber) {
+                                                                    const pb = bookings.find(x => x.isConnectingSuite && x.reservationNumber === moveDrag.booking.reservationNumber && x.id !== moveDrag.booking.id);
+                                                                    return pb?.roomNumber === room.roomNumber;
+                                                                }
+                                                                const partners = getConnectingPartnerMap().get(moveDrag.targetRoomNumber)?.split(',').map(s => s.trim()) || [];
+                                                                return partners[0] === room.roomNumber;
+                                                            })())
+                                                        ) ? 'bg-blue-100 ring-2 ring-blue-500' : ''
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -3075,6 +3227,55 @@ export const StayView: React.FC = () => {
                                                             );
                                                         })()}
 
+                                                        {/* Live Move Connecting Suite Partner Ghost Preview */}
+                                                        {moveDrag && moveDrag.isDragging && moveDrag.booking.isConnectingSuite && (() => {
+                                                            const partnerBooking = bookings.find(
+                                                                b => b.isConnectingSuite &&
+                                                                     b.reservationNumber === moveDrag.booking.reservationNumber &&
+                                                                     b.id !== moveDrag.booking.id
+                                                            );
+                                                            if (!partnerBooking) return null;
+
+                                                            const deltaCols = moveDrag.targetStartIndex - moveDrag.booking.startIndex;
+                                                            const partnerStart = Math.max(0, Math.min(daysWindow - 1, partnerBooking.startIndex + deltaCols));
+                                                            const partnerNights = partnerBooking.endIndex - partnerBooking.startIndex + 1;
+                                                            const partnerEnd = Math.max(0, Math.min(daysWindow - 1, partnerStart + partnerNights - 1));
+
+                                                            let partnerTargetRoom = partnerBooking.roomNumber;
+                                                            if (moveDrag.targetRoomNumber !== moveDrag.booking.roomNumber) {
+                                                                const connectingMap = getConnectingPartnerMap();
+                                                                const partners = connectingMap.get(moveDrag.targetRoomNumber)?.split(',').map(s => s.trim()) || [];
+                                                                partnerTargetRoom = partners[0] || '';
+                                                            }
+
+                                                            if (partnerTargetRoom !== room.roomNumber) return null;
+
+                                                            const hasPartnerConflict = Boolean(findRoomConflict(
+                                                                room.roomNumber,
+                                                                partnerStart,
+                                                                partnerEnd,
+                                                                partnerBooking.id
+                                                            ));
+
+                                                            return (
+                                                                <div
+                                                                    style={{
+                                                                        left: `${partnerStart * colWidth + 2}px`,
+                                                                        width: `${Math.max(20, (partnerEnd - partnerStart + 1) * colWidth - 4)}px`
+                                                                    }}
+                                                                    className={`absolute top-[6px] bottom-[4px] border-2 border-dashed border-white text-white rounded px-2 py-0.5 text-[10px] flex items-center gap-1 shadow-lg z-20 pointer-events-none animate-pulse ${
+                                                                        hasPartnerConflict ? 'bg-red-600/85' : 'bg-indigo-600/75'
+                                                                    }`}
+                                                                >
+                                                                    <span className="truncate">
+                                                                        {hasPartnerConflict
+                                                                            ? `🚫 Conflict: Partner Room ${room.roomNumber} Occupied`
+                                                                            : `🔗 Suite Partner: ${partnerBooking.guestName} → Room ${room.roomNumber}`}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })()}
+
                                                         {/* Render Active Maintenance (OOO / OOS) Blocks */}
                                                         {(activeOOOBlocksByRoom.get(room.roomNumber) || []).map(block => {
                                                             const isOverdue = isBlockOverdue(block, operatingDateStr);
@@ -3137,16 +3338,27 @@ export const StayView: React.FC = () => {
                                                         {/* Render Booking Bars with O(1) Precomputed Room Lookup */}
                                                         {(bookingsByRoom.get(room.roomNumber) || [])
                                                             .map(booking => {
-                                                                const isBeingExtended = extendDrag && extendDrag.booking.id === booking.id;
+                                                                const isBeingExtended = Boolean(
+                                                                    extendDrag && (
+                                                                        extendDrag.booking.id === booking.id ||
+                                                                        (extendDrag.booking.isConnectingSuite && booking.isConnectingSuite && booking.reservationNumber === extendDrag.booking.reservationNumber)
+                                                                    )
+                                                                );
                                                                 const isExtendBlocked = Boolean(
                                                                     isBeingExtended &&
+                                                                    extendDrag &&
                                                                     extendDrag.attemptedEndIndex !== undefined &&
                                                                     extendDrag.attemptedEndIndex > extendDrag.currentEndIndex
                                                                 );
-                                                                const isBeingMoved = moveDrag && moveDrag.booking.id === booking.id && moveDrag.isDragging;
+                                                                const isBeingMoved = Boolean(
+                                                                    moveDrag && moveDrag.isDragging && (
+                                                                        moveDrag.booking.id === booking.id ||
+                                                                        (moveDrag.booking.isConnectingSuite && booking.isConnectingSuite && booking.reservationNumber === moveDrag.booking.reservationNumber)
+                                                                    )
+                                                                );
                                                                 const isAnyDragActive = Boolean(dragState || extendDrag || (moveDrag && moveDrag.isDragging));
 
-                                                                const effectiveEnd = isBeingExtended
+                                                                const effectiveEnd = (isBeingExtended && extendDrag)
                                                                     ? extendDrag.currentEndIndex
                                                                     : booking.endIndex;
                                                                 const start = Math.max(0, booking.startIndex);
@@ -3342,7 +3554,7 @@ export const StayView: React.FC = () => {
                                                                                     <div className="block absolute -top-6 right-0 bg-red-600 text-white border border-white shadow-lg rounded px-2 py-0.5 text-[10px] font-sans whitespace-nowrap z-50 pointer-events-none select-none">
                                                                                         🚫 Already Booked
                                                                                     </div>
-                                                                                ) : isBeingExtended ? (
+                                                                                ) : (isBeingExtended && extendDrag) ? (
                                                                                     <div className="block absolute -top-6 right-0 bg-slate-900 text-white border border-white/40 shadow-lg rounded px-2 py-0.5 text-[10px] font-sans whitespace-nowrap z-50 pointer-events-none select-none">
                                                                                         {Math.max(1, extendDrag.currentEndIndex - booking.startIndex + 1)} Night(s)
                                                                                     </div>

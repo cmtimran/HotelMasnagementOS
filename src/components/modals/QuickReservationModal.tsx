@@ -72,7 +72,7 @@ import {
     getTaxConfigurations,
     type TaxCalculationResult
 } from '../../utils/taxCalculationEngine';
-import { getApiBaseUrl } from '../../utils/apiUrl';
+import { useReservationBookingEngine } from '../../hooks/useReservationBookingEngine';
 import { toast } from '../../context/ToastContext';
 
 export interface QuickReservationModalProps {
@@ -106,6 +106,8 @@ interface RoomItem {
     roomType: string;
     noOfRooms: number;
     ratePlan: string;
+    packageId?: number | string;
+    packageName?: string;
     roomNumber: string;
     assignedRooms?: string[];
     adults: number;
@@ -147,32 +149,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     });
     const availableTaxConfigs = useMemo(() => getTaxConfigurations().filter(c => c.status === 'Active'), []);
 
-    const [dbRatePlans, setDbRatePlans] = useState<any[]>(() => {
-        try {
-            const saved = localStorage.getItem('hotel_rate_plans_v1');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
-                }
-            }
-        } catch {}
-        return [];
-    });
-
-    useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=`)
-            .then(res => res.json())
-            .then(json => {
-                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                    setDbRatePlans(json.data);
-                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
-                }
-            })
-            .catch(() => {});
-    }, []);
-
-    const availableRatePlans = dbRatePlans;
+    const {
+        availableRatePlans,
+        calculateRoomRate,
+        getPackageById,
+        getApplicablePackagesForRoomType,
+        validateAllRoomRestrictions
+    } = useReservationBookingEngine();
 
     // Reservation Details
     const [checkInDate, setCheckInDate] = useState<string>(() => getSystemDateISO());
@@ -897,6 +880,30 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const handleRoomFieldChange = <K extends keyof RoomItem>(id: number, field: K, value: RoomItem[K]) => {
         setRoomsList(roomsList.map(r => {
             if (r.id !== id) return r;
+            if (field === 'packageId') {
+                const pkgId = value ? String(value) : undefined;
+                const pkg = getPackageById(pkgId);
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateRoomRate({
+                    roomType: r.roomType,
+                    ratePlan: r.ratePlan,
+                    packageId: pkgId,
+                    adults: r.adults,
+                    children: r.children,
+                    baseRate: canonicalRate,
+                    nights
+                });
+                return {
+                    ...r,
+                    packageId: pkgId,
+                    packageName: pkg?.name,
+                    rate: newRate
+                };
+            }
             if (field === 'ratePlan') {
                 const planName = String(value);
                 const restriction = validateRatePlanRestrictions(planName, nights, checkInDate, availableRatePlans);
@@ -908,7 +915,15 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateTariffForRatePlan(planName, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                const newRate = calculateRoomRate({
+                    roomType: r.roomType,
+                    ratePlan: planName,
+                    packageId: r.packageId,
+                    adults: r.adults,
+                    children: r.children,
+                    baseRate: canonicalRate,
+                    nights
+                });
                 return {
                     ...r,
                     ratePlan: planName,
@@ -927,7 +942,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, newAdults, r.children, availableRatePlans);
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: newAdults, children: r.children, baseRate: canonicalRate, nights });
                 return {
                     ...r,
                     adults: newAdults,
@@ -946,7 +961,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, newChildren, availableRatePlans);
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: newChildren, baseRate: canonicalRate, nights });
                 return {
                     ...r,
                     children: newChildren,
@@ -976,7 +991,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     toast.info(`Occupancy adjusted to fit ${newType} limits (Max Adults: ${newCapacity.maxAdults}, Max Children: ${newCapacity.maxChildren}).`);
                 }
 
-                const resolvedRate = calculateTariffForRatePlan(r.ratePlan, newType, canonicalRate, clampedAdults, clampedChildren, availableRatePlans);
+                const resolvedRate = calculateRoomRate({ roomType: newType, ratePlan: r.ratePlan, packageId: r.packageId, adults: clampedAdults, children: clampedChildren, baseRate: canonicalRate, nights });
                 return { 
                     ...r, 
                     roomType: newType, 
@@ -995,7 +1010,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: r.children, baseRate: canonicalRate, nights });
                 return {
                     ...r,
                     roomNumber: selectedRoomNum,
@@ -1068,13 +1083,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             return;
         }
 
-        // Validate Rate Plan restrictions for all requested rooms
-        for (const r of roomsList) {
-            const planCheck = validateRatePlanRestrictions(r.ratePlan, nights, checkInDate, availableRatePlans);
-            if (!planCheck.allowed) {
-                toast.error(planCheck.reason || `Rate plan restrictions violated for ${r.roomType}.`);
-                return;
-            }
+        // Validate Rate Plan & Package Commercial Restrictions via Unified Booking Engine
+        const restrictionCheck = validateAllRoomRestrictions(roomsList, nights, checkInDate);
+        if (!restrictionCheck.isValid) {
+            toast.error(restrictionCheck.error || 'Stay parameters violate commercial policy.');
+            return;
         }
 
         if (hasOverbookingError) {
@@ -1224,6 +1237,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             idExpiryDate,
             idIssueCountry,
             idIssuePlace,
+            packageId: roomsList[0]?.packageId,
+            packageName: roomsList[0]?.packageName,
             roomNumber: primaryRoom,
             roomType: roomsList[0]?.roomType || 'Standard Room',
             smokingPolicy: primarySmokingPolicy.smokingStatus,
@@ -1684,7 +1699,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="py-2 px-2.5 min-w-[120px]">Room Type</th>
                                                 <th className="py-2 px-1 text-center w-11">Qty</th>
-                                                <th className="py-2 px-2 min-w-[120px]">Rate Plan</th>
+                                                <th className="py-2 px-2 min-w-[110px]">Rate Plan</th>
+                                                <th className="py-2 px-1.5 min-w-[110px]">Package</th>
                                                 <th className="py-2 px-1 text-center w-16">Room No.</th>
                                                 <th className="py-2 px-1 text-center w-11">Adult</th>
                                                 <th className="py-2 px-1 text-center w-22">Child</th>
@@ -1796,10 +1812,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             <select
                                                                 value={item.ratePlan}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
-                                                                className="w-full min-w-[115px] max-w-[140px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                                className="w-full min-w-[110px] max-w-[135px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                             >
                                                                 {availableRatePlans.length === 0 ? (
-                                                                    <option value="" disabled>No rate plans configured (Configure in Rate Plans)</option>
+                                                                    <option value="" disabled>No rate plans configured</option>
                                                                 ) : (
                                                                     availableRatePlans.map(p => {
                                                                         const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
@@ -1812,6 +1828,26 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                     })
                                                                 )}
                                                             </select>
+                                                        </td>
+                                                        <td className="py-1.5 px-1.5">
+                                                            {(() => {
+                                                                const applicablePkgs = getApplicablePackagesForRoomType(item.roomType);
+                                                                return (
+                                                                    <select
+                                                                        value={item.packageId || ''}
+                                                                        onChange={e => handleRoomFieldChange(item.id, 'packageId', e.target.value)}
+                                                                        className="w-full min-w-[105px] max-w-[130px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                                        title={item.packageName || 'Select Package'}
+                                                                    >
+                                                                        <option value="">No Package (Standard)</option>
+                                                                        {applicablePkgs.map(p => (
+                                                                            <option key={p.id} value={p.id}>
+                                                                                {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="py-1.5 px-1 text-center">
                                                             {item.noOfRooms > 1 ? (
