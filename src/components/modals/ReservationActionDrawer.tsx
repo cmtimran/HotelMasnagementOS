@@ -29,7 +29,10 @@ import {
     ShieldCheck,
     Link as LinkIcon,
     FileText,
-    Key
+    Key,
+    ArrowRight,
+    Sparkles,
+    TrendingUp
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
@@ -46,7 +49,10 @@ import {
     unlinkBookingInDB,
     generateRegistrationNumber,
     getConnectingPartnerMap,
-    isRoomUnassigned
+    isRoomUnassigned,
+    getDynamicRoomTypes,
+    getDynamicRatePlans,
+    getDynamicPackages
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
@@ -77,7 +83,15 @@ export interface ReservationActionDrawerProps {
     initialTargetRoomNumber?: string;
     // Core PMS Action Handlers
     onSaveAmendStay?: (bookingId: string, newDeparture: string, newNights: number, newAdults?: number, newChildren?: number) => void;
-    onSaveRoomMove?: (bookingId: string, newRoomNumber: string, newFromDate: string, newToDate: string) => void;
+    onSaveRoomMove?: (
+        bookingId: string,
+        newRoomNumber: string,
+        newFromDate: string,
+        newToDate: string,
+        newRoomType?: string,
+        newRatePlan?: string,
+        upgradeAdjustment?: { mode: 'complimentary' | 'charge'; amount: number }
+    ) => void;
     onSavePayment?: (bookingId: string, method: string, amount: number, remarks: string) => void;
     onSaveRoomSplit?: (bookingId: string, targetRoomNumber: string, fromDate: string, toDate: string) => void;
     onStopRoomMove?: (bookingId: string, allowRoomMove: boolean) => void;
@@ -167,8 +181,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [moveSelectedRoom, setMoveSelectedRoom] = useState<string>('');
     const [moveFromDate, setMoveFromDate] = useState<string>('');
     const [moveToDate, setToDate] = useState<string>('');
-    const [moveRoomType, setMoveRoomType] = useState<string>('Winter Rate Plan');
-    const [moveRateType, setMoveRateType] = useState<string>('Summer Vacation');
+    const [moveRoomType, setMoveRoomType] = useState<string>('All');
+    const [moveRateType, setMoveRateType] = useState<string>('Direct');
+    const [upgradeBillingMode, setUpgradeBillingMode] = useState<'complimentary' | 'charge'>('complimentary');
 
     // 3. Add Payment Form States
     const [paymentFolio, setPaymentFolio] = useState<string>('');
@@ -241,7 +256,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setAmendChildren(booking.children ?? 0);
             setAmendSelectedRoom(true);
 
-            setMoveSelectedRoom(initialTargetRoomNumber || booking.roomNumber);
+            const initialTargetRoom = initialTargetRoomNumber || booking.roomNumber;
+            setMoveSelectedRoom(initialTargetRoom);
+            const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(initialTargetRoom));
+            const targetRoomType = targetRoomObj?.type || booking.roomType || 'All';
+            setMoveRoomType(targetRoomType);
+            setMoveRateType(booking.ratePlan || 'Direct');
+            setUpgradeBillingMode('complimentary');
             const isGuestInHouse = booking.status === 'IN-HOUSE' || booking.status === 'ARRIVED' || booking.status === 'STAYOVER';
             // For in-house guests, room move is strictly locked to take effect from System Date onwards
             const effectiveMoveStart = isGuestInHouse
@@ -249,8 +270,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 : arr;
             setMoveFromDate(effectiveMoveStart);
             setToDate(dep);
-            setMoveRoomType(booking.roomType || 'Winter Rate Plan');
-            setMoveRateType(booking.ratePlan || 'Summer Vacation');
 
             setPaymentFolio(`${booking.guestName} - ${booking.folioNumber || `FOL-${booking.reservationNumber}-1`}`);
             setPaymentMethod('Cash');
@@ -488,7 +507,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         ? calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId)
         : (booking.taxDetails || calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId));
 
-    const totalAmount = isAmendingStay ? activeTaxCalc.grandTotal : origTotal;
+    const totalAmount = isAmendingStay
+        ? activeTaxCalc.grandTotal
+        : (isTaxApplicable && activeTaxCalc.totalTaxAmount > 0 ? (currentBaseAmount + activeTaxCalc.totalTaxAmount) : origTotal);
     const paidAmount = Number(booking.paidAmount || 0);
     const dueAmount = isAmendingStay
         ? Math.max(0, totalAmount - paidAmount)
@@ -565,6 +586,85 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             rooms: roomRows
         };
     })();
+
+    // Dynamic Room Types available for selection
+    const dynamicRoomTypes = useMemo(() => {
+        const listFromRooms = Array.from(new Set(allRooms.map(r => r.type).filter(Boolean)));
+        const listFromEngine = getDynamicRoomTypes().map(t => t.name).filter(Boolean);
+        const combined = Array.from(new Set([...listFromRooms, ...listFromEngine]));
+        return combined.length > 0 ? combined : ['Deluxe Suite', 'Deluxe Double', 'Superior King', 'Executive Suite'];
+    }, [allRooms]);
+
+    // Dynamic Rate Plans and Packages available for selection
+    const dynamicRatePlansAndPackages = useMemo(() => {
+        const plans = getDynamicRatePlans();
+        const pkgs = getDynamicPackages();
+        const result: Array<{ label: string; value: string; isPackage?: boolean }> = [];
+
+        if (booking?.ratePlan && !plans.some(p => p.name === booking.ratePlan || p.code === booking.ratePlan)) {
+            result.push({ label: `🏷️ ${booking.ratePlan}`, value: booking.ratePlan });
+        }
+        plans.forEach(p => {
+            result.push({ label: `🏷️ ${p.name || p.code}`, value: p.name || p.code });
+        });
+        pkgs.forEach(pkg => {
+            result.push({ label: `🎁 ${pkg.name || pkg.code}`, value: pkg.name || pkg.code, isPackage: true });
+        });
+        if (result.length === 0) {
+            result.push({ label: '🏷️ Direct BAR', value: 'Direct' });
+        }
+        return result;
+    }, [booking?.ratePlan]);
+
+    // Comprehensive Room Move & Upgrade Analysis Engine
+    const roomMoveAnalysis = useMemo(() => {
+        if (!booking) return null;
+        const currentRoomObj = allRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
+        const currentRoomType = booking.roomType || currentRoomObj?.type || 'Standard';
+        const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
+        const targetRoomType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : currentRoomType);
+
+        const currentDailyRate = getStandardDailyRateForRoom(booking.roomNumber, currentRoomType);
+        const targetDailyRate = getStandardDailyRateForRoom(moveSelectedRoom, targetRoomType);
+        const dailyDiff = targetDailyRate - currentDailyRate;
+
+        const stayNights = Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / 86400000) || (booking.nights || 1));
+        const totalDiff = dailyDiff * stayNights;
+
+        const isDifferentRoom = String(moveSelectedRoom) !== String(booking.roomNumber);
+        const isDifferentCategory = targetRoomType !== currentRoomType;
+
+        // Smart Category Hierarchy Check (Suite > Executive > Deluxe > Superior > Standard)
+        const isHigherCategory = (() => {
+            if (dailyDiff > 0) return true;
+            const normTarget = targetRoomType.toLowerCase();
+            const normCurrent = currentRoomType.toLowerCase();
+            if (normTarget.includes('suite') && !normCurrent.includes('suite')) return true;
+            if (normTarget.includes('executive') && !normCurrent.includes('executive')) return true;
+            if (normTarget.includes('deluxe') && (normCurrent.includes('standard') || normCurrent.includes('single'))) return true;
+            return false;
+        })();
+
+        const isUpgrade = isDifferentRoom && (isHigherCategory || (isDifferentCategory && dailyDiff >= 0));
+        const isDowngrade = isDifferentRoom && isDifferentCategory && !isHigherCategory && dailyDiff < 0;
+        const isSameCategory = isDifferentRoom && !isDifferentCategory;
+
+        return {
+            currentRoomType,
+            targetRoomType,
+            currentDailyRate,
+            targetDailyRate,
+            dailyDiff: Math.abs(dailyDiff),
+            totalDiff: Math.abs(totalDiff),
+            rawDailyDiff: dailyDiff,
+            rawTotalDiff: totalDiff,
+            stayNights,
+            isDifferentRoom,
+            isUpgrade,
+            isDowngrade,
+            isSameCategory,
+        };
+    }, [booking, allRooms, moveSelectedRoom, moveRoomType, moveToDate, moveFromDate]);
 
     // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
@@ -681,7 +781,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     excludeReservationId: booking.reservationNumber || booking.id
                 });
                 const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(moveSelectedRoom));
-                if (rmStatus && !rmStatus.isAvailable) {
+                if (rmStatus && !rmStatus.isAvailable && String(moveSelectedRoom) !== String(booking.roomNumber)) {
                     const cr = rmStatus.conflictingReservation;
                     toast.error(
                         cr
@@ -690,7 +790,26 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     );
                     return;
                 }
-                if (onSaveRoomMove) onSaveRoomMove(booking.id, moveSelectedRoom, moveFromDate, moveToDate);
+
+                const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
+                const resolvedTargetType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : booking.roomType);
+
+                const upgradeAdj = roomMoveAnalysis?.isUpgrade ? {
+                    mode: upgradeBillingMode,
+                    amount: upgradeBillingMode === 'charge' ? (roomMoveAnalysis.totalDiff || 0) : 0
+                } : undefined;
+
+                if (onSaveRoomMove) {
+                    onSaveRoomMove(
+                        booking.id,
+                        moveSelectedRoom,
+                        moveFromDate,
+                        moveToDate,
+                        resolvedTargetType,
+                        moveRateType || booking.ratePlan,
+                        upgradeAdj
+                    );
+                }
                 break;
             }
             case 'payment':
@@ -746,7 +865,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             case 'amend':
                 return { title: 'Amend Stay', buttonText: 'Save Changes', buttonIcon: <Edit3 size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'move':
-                return { title: 'Room Move', buttonText: 'Save Room Move', buttonIcon: <Home size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+                return {
+                    title: 'Room Move',
+                    buttonText: roomMoveAnalysis?.isUpgrade ? 'Save Room Move & Upgrade' : 'Save Room Move',
+                    buttonIcon: roomMoveAnalysis?.isUpgrade ? <Sparkles size={13} className="text-amber-300" /> : <Home size={13} />,
+                    buttonClass: roomMoveAnalysis?.isUpgrade ? 'bg-gradient-to-r from-amber-600 via-blue-600 to-emerald-600 hover:brightness-110 font-bold shadow-md' : 'bg-[#1a73e8] hover:bg-blue-600'
+                };
             case 'payment':
                 return { title: 'Add Payment', buttonText: 'Save Payment', buttonIcon: <CreditCard size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'split':
@@ -1690,51 +1814,43 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* MODE 2: ROOM MOVE (media_1792541566827_b05dc667.png) */}
+                                {/* MODE 2: ROOM MOVE (Enhanced with Dynamic Inventory & Upgrade Detection Engine) */}
                                 {mode === 'move' && (
                                     <div className="space-y-3">
                                         {isBookingInHouse && (
-                                            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-lg p-2 text-emerald-200 text-[10.5px] flex items-center gap-1.5 font-medium shadow-xs">
-                                                <ShieldCheck size={12} className="text-emerald-400 shrink-0" />
+                                            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-lg p-2 text-emerald-200 text-[10px] flex items-center gap-1.5 font-medium shadow-xs">
+                                                <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
                                                 <span>In-House Guest: Room Move applies from current System Date ({operatingSystemDate}) for the remaining stay.</span>
                                             </div>
                                         )}
-                                        <div className="text-[8px]  text-white">New Room Assignment:</div>
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Select Room</label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={booking.roomNumber}
-                                                        disabled
-                                                        className="w-full h-8 px-2 border border-blue-300/40 rounded text-[8px] bg-white text-gray-900  outline-none cursor-not-allowed appearance-none pr-6"
-                                                    >
-                                                        <option value={booking.roomNumber}>{booking.roomNumber}</option>
-                                                    </select>
-                                                    <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
+
+                                        {/* Current Room & Guest Information Card */}
+                                        <div className="bg-slate-900/50 border border-blue-400/25 rounded-lg p-2.5 flex items-center justify-between text-[10px]">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center font-bold text-xs">
+                                                    {booking.roomNumber}
                                                 </div>
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Select Guest</label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={booking.guestName}
-                                                        disabled
-                                                        className="w-full h-8 px-2 border border-blue-300/40 rounded text-[8px] bg-white text-gray-900  outline-none cursor-not-allowed appearance-none pr-6 truncate"
-                                                    >
-                                                        <option value={booking.guestName}>{booking.guestName}</option>
-                                                    </select>
-                                                    <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
+                                                <div>
+                                                    <div className="text-white font-semibold flex items-center gap-1.5">
+                                                        <span>{booking.guestName}</span>
+                                                        <span className="text-[8.5px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-mono">
+                                                            {booking.reservationNumber}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-slate-300 text-[9px] mt-0.5">
+                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) • Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-1">
+                                        {/* Date Range Selection */}
+                                        <div className="grid grid-cols-2 gap-2">
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center justify-between">
-                                                    <label className="text-[8px] font-semibold text-blue-100">From Date</label>
+                                                    <label className="text-[9px] font-semibold text-blue-100">From Date</label>
                                                     {isBookingInHouse && (
-                                                        <span className="text-[8px] text-emerald-300 bg-emerald-500/20 px-1 rounded">System Date Locked</span>
+                                                        <span className="text-[7.5px] text-emerald-300 bg-emerald-500/20 px-1 rounded">Locked (In-House)</span>
                                                     )}
                                                 </div>
                                                 <input
@@ -1743,82 +1859,118 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     disabled={isBookingInHouse}
                                                     min={isBookingInHouse ? operatingSystemDate : undefined}
                                                     onChange={e => setMoveFromDate(e.target.value)}
-                                                    className={`w-full h-8 px-2 border border-blue-300 rounded text-[8px] outline-none focus:ring-2 focus:ring-blue-400 ${isBookingInHouse
-                                                        ? 'bg-blue-900/60 text-blue-200 cursor-not-allowed opacity-90 border-blue-400/30'
-                                                        : 'bg-white text-gray-900 cursor-pointer'
-                                                        }`}
+                                                    className={`w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] outline-none focus:ring-2 focus:ring-blue-400 ${
+                                                        isBookingInHouse
+                                                            ? 'bg-blue-900/60 text-blue-200 cursor-not-allowed opacity-90 border-blue-400/30'
+                                                            : 'bg-white text-gray-900 cursor-pointer'
+                                                    }`}
                                                 />
                                             </div>
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">To Date</label>
+                                                <label className="text-[9px] font-semibold text-blue-100">To Date</label>
                                                 <input
                                                     type="date"
                                                     value={moveToDate}
                                                     min={moveFromDate}
                                                     onChange={e => setToDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                                                 />
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-1">
+                                        {/* Room Type Filter & Rate Plan / Package */}
+                                        <div className="grid grid-cols-2 gap-2">
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Room Type</label>
+                                                <label className="text-[9px] font-semibold text-blue-100">Filter by Room Type</label>
                                                 <div className="relative">
                                                     <select
                                                         value={moveRoomType}
-                                                        onChange={e => setMoveRoomType(e.target.value)}
-                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                                        onChange={e => {
+                                                            const selectedType = e.target.value;
+                                                            setMoveRoomType(selectedType);
+                                                            if (selectedType !== 'All') {
+                                                                const moveAvail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
+                                                                    excludeReservationId: booking.reservationNumber || booking.id
+                                                                });
+                                                                const firstAvail = allRooms.find(r => 
+                                                                    r.type === selectedType && 
+                                                                    (moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber))?.isAvailable || String(r.roomNumber) === String(booking.roomNumber))
+                                                                );
+                                                                if (firstAvail) {
+                                                                    setMoveSelectedRoom(firstAvail.roomNumber);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-medium"
                                                     >
-                                                        <option value="Winter Rate Plan">Winter Rate Plan</option>
-                                                        <option value="Deluxe Double">Deluxe Double</option>
-                                                        <option value="Superior King">Superior King</option>
-                                                        <option value="Executive Suite">Executive Suite</option>
+                                                        <option value="All">All Room Types</option>
+                                                        {dynamicRoomTypes.map(t => (
+                                                            <option key={t} value={t}>{t}</option>
+                                                        ))}
                                                     </select>
                                                     <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
                                                 </div>
                                             </div>
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Rate Type</label>
+                                                <label className="text-[9px] font-semibold text-blue-100">Rate Plan / Package</label>
                                                 <div className="relative">
                                                     <select
                                                         value={moveRateType}
                                                         onChange={e => setMoveRateType(e.target.value)}
-                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-medium"
                                                     >
-                                                        <option value="Summer Vacation">Summer Vacation</option>
-                                                        <option value="Standard EP Rate">Standard EP Rate</option>
-                                                        <option value="Corporate CP">Corporate CP</option>
-                                                        <option value="Weekend Special">Weekend Special</option>
+                                                        {dynamicRatePlansAndPackages.map(p => (
+                                                            <option key={p.value} value={p.value}>{p.label}</option>
+                                                        ))}
                                                     </select>
                                                     <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
                                                 </div>
                                             </div>
                                         </div>
 
+                                        {/* Target Room Dropdown */}
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[8px] font-semibold text-blue-100">Room</label>
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[9px] font-semibold text-blue-100">Assign Target Room</label>
+                                                {roomMoveAnalysis?.targetRoomType && (
+                                                    <span className="text-[8px] bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 rounded font-medium">
+                                                        Category: {roomMoveAnalysis.targetRoomType}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="relative">
                                                 <select
                                                     value={moveSelectedRoom}
-                                                    onChange={e => setMoveSelectedRoom(e.target.value)}
-                                                    className="w-full h-8 px-2.5 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                                    onChange={e => {
+                                                        const roomNo = e.target.value;
+                                                        setMoveSelectedRoom(roomNo);
+                                                        const rObj = allRooms.find(r => String(r.roomNumber) === String(roomNo));
+                                                        if (rObj?.type) {
+                                                            setMoveRoomType(rObj.type);
+                                                        }
+                                                    }}
+                                                    className="w-full h-8.5 px-2.5 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-semibold"
                                                 >
                                                     {(() => {
                                                         const moveAvail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
                                                             excludeReservationId: booking.reservationNumber || booking.id
                                                         });
-                                                        return allRooms.map(r => {
+                                                        const roomsToShow = moveRoomType === 'All' 
+                                                            ? allRooms 
+                                                            : allRooms.filter(r => r.type === moveRoomType);
+
+                                                        return roomsToShow.map(r => {
                                                             const st = moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber));
                                                             const isBooked = st ? !st.isAvailable : false;
                                                             const guestNote = st?.conflictingReservation ? `Booked: ${st.conflictingReservation.guestName}` : (st?.reason || 'Occupied');
+                                                            const isCurrent = String(r.roomNumber) === String(booking.roomNumber);
                                                             return (
                                                                 <option
                                                                     key={r.id || r.roomNumber}
                                                                     value={r.roomNumber}
-                                                                    disabled={isBooked && String(r.roomNumber) !== String(moveSelectedRoom)}
+                                                                    disabled={isBooked && !isCurrent}
                                                                 >
-                                                                    A-({r.roomNumber}) {r.type ? `• ${r.type}` : ''} {isBooked ? `[${guestNote}]` : '[Available]'}
+                                                                    Room {r.roomNumber} • {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
                                                                 </option>
                                                             );
                                                         });
@@ -1827,6 +1979,95 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
                                             </div>
                                         </div>
+
+                                        {/* PROMINENT ROOM UPGRADE DETECTED CARD */}
+                                        {roomMoveAnalysis?.isUpgrade && (
+                                            <div className="bg-gradient-to-r from-amber-500/20 via-blue-900/50 to-emerald-500/20 border border-amber-400/60 rounded-xl p-3 shadow-md space-y-2.5 animate-in fade-in zoom-in-95">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-1.5 text-amber-300 font-bold text-[10.5px] tracking-wide uppercase">
+                                                        <Sparkles size={14} className="text-amber-400 animate-pulse shrink-0" />
+                                                        <span>Room Upgrade Detected</span>
+                                                    </div>
+                                                    <span className="text-[9px] bg-amber-400/25 text-amber-200 border border-amber-400/40 px-2 py-0.5 rounded-full font-mono font-bold">
+                                                        +{currencySymbol} {roomMoveAnalysis.dailyDiff.toFixed(2)} / night
+                                                    </span>
+                                                </div>
+
+                                                <div className="bg-slate-900/70 border border-white/10 rounded-lg p-2.5 flex items-center justify-between text-[9.5px]">
+                                                    <div>
+                                                        <span className="text-slate-400 block text-[7.5px] uppercase tracking-wider font-semibold">Current Category</span>
+                                                        <span className="text-white font-semibold">Room {booking.roomNumber}</span>
+                                                        <span className="text-blue-200 block text-[8.5px]">({roomMoveAnalysis.currentRoomType})</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center px-2">
+                                                        <span className="text-[7.5px] text-amber-300 uppercase tracking-widest font-black">Upgrade</span>
+                                                        <ArrowRight size={16} className="text-amber-400 my-0.5 animate-pulse" />
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-emerald-400 block text-[7.5px] uppercase tracking-wider font-semibold">New Category</span>
+                                                        <span className="text-emerald-200 font-bold text-[11px]">Room {moveSelectedRoom}</span>
+                                                        <span className="text-emerald-300 block text-[8.5px] font-medium">({roomMoveAnalysis.targetRoomType})</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Upgrade Billing Selector */}
+                                                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[9.5px]">
+                                                    <span className="text-blue-100 font-medium">Upgrade Tariff Policy:</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setUpgradeBillingMode('complimentary')}
+                                                            className={`px-2.5 py-1 rounded text-[8.5px] transition-all flex items-center gap-1 cursor-pointer ${
+                                                                upgradeBillingMode === 'complimentary'
+                                                                    ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-300 font-bold'
+                                                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                                            }`}
+                                                        >
+                                                            <span>✓ Complimentary (Free)</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setUpgradeBillingMode('charge')}
+                                                            className={`px-2.5 py-1 rounded text-[8.5px] transition-all flex items-center gap-1 cursor-pointer ${
+                                                                upgradeBillingMode === 'charge'
+                                                                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm ring-1 ring-amber-300'
+                                                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                                            }`}
+                                                        >
+                                                            <span>+ Charge Diff (+{currencySymbol} {roomMoveAnalysis.totalDiff.toFixed(2)})</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* DOWNGRADE WARNING CARD */}
+                                        {roomMoveAnalysis?.isDowngrade && (
+                                            <div className="bg-rose-500/15 border border-rose-400/40 rounded-xl p-2.5 text-[9.5px] text-rose-200 space-y-1">
+                                                <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                                                    <Info size={13} />
+                                                    <span>Room Downgrade Warning</span>
+                                                </div>
+                                                <div className="text-slate-300 flex items-center justify-between">
+                                                    <span>{roomMoveAnalysis.currentRoomType} (Room {booking.roomNumber})</span>
+                                                    <ArrowRight size={12} className="text-rose-400 mx-1" />
+                                                    <span className="text-white font-semibold">{roomMoveAnalysis.targetRoomType} (Room {moveSelectedRoom})</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* SAME CATEGORY TRANSFER */}
+                                        {roomMoveAnalysis?.isSameCategory && (
+                                            <div className="bg-blue-500/15 border border-blue-400/30 rounded-xl p-2.5 text-[9.5px] text-blue-200 flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5 font-medium">
+                                                    <RefreshCw size={12} className="text-blue-400" />
+                                                    <span>Lateral Transfer: Room {booking.roomNumber} ➔ Room {moveSelectedRoom}</span>
+                                                </div>
+                                                <span className="text-[8px] bg-blue-400/20 text-blue-200 px-1.5 py-0.5 rounded font-medium">
+                                                    Same Type ({roomMoveAnalysis.currentRoomType})
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

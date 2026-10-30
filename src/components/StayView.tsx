@@ -1687,7 +1687,15 @@ export const StayView: React.FC = () => {
     };
 
     // Save Room Move to Central PMS Storage & Database
-    const handleSaveRoomMove = (bookingId: string, newRoomNumber: string, newFromDate: string, newToDate: string) => {
+    const handleSaveRoomMove = (
+        bookingId: string,
+        newRoomNumber: string,
+        newFromDate: string,
+        newToDate: string,
+        newRoomType?: string,
+        newRatePlan?: string,
+        upgradeAdjustment?: { mode: 'complimentary' | 'charge'; amount: number }
+    ) => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
@@ -1753,6 +1761,8 @@ export const StayView: React.FC = () => {
                         return {
                             ...r,
                             roomNumber: newRoomNumber,
+                            roomType: newRoomType || r.roomType,
+                            ratePlan: newRatePlan || r.ratePlan,
                             assignedRooms: [newRoomNumber],
                             checkIn: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
                             checkOut: newToDate,
@@ -1779,6 +1789,8 @@ export const StayView: React.FC = () => {
 
             if (String(updated.roomNumber) === String(targetB.roomNumber)) {
                 updated.roomNumber = newRoomNumber;
+                if (newRoomType) updated.roomType = newRoomType;
+                if (newRatePlan) updated.ratePlan = newRatePlan;
                 if (!isGuestInHouse) {
                     updated.checkIn = validatedFromDate;
                 }
@@ -1789,6 +1801,14 @@ export const StayView: React.FC = () => {
             }
             if (updated.allocatedRooms && Array.isArray(updated.allocatedRooms)) {
                 updated.allocatedRooms = updated.allocatedRooms.map((rm: string) => rm === targetB.roomNumber ? newRoomNumber : rm);
+            }
+
+            // Apply Upgrade Tariff Adjustment if chosen
+            if (upgradeAdjustment?.mode === 'charge' && upgradeAdjustment.amount > 0) {
+                const addDiff = upgradeAdjustment.amount;
+                updated.baseAmount = (updated.baseAmount || 0) + addDiff;
+                updated.totalAmount = (updated.totalAmount || 0) + addDiff;
+                updated.dueAmount = (updated.dueAmount || 0) + addDiff;
             }
 
             stored[resIdx] = updated;
@@ -1815,6 +1835,8 @@ export const StayView: React.FC = () => {
                 return {
                     ...b,
                     roomNumber: newRoomNumber,
+                    roomType: newRoomType || b.roomType,
+                    ratePlan: newRatePlan || b.ratePlan,
                     startIndex: isGuestInHouse ? b.startIndex : startCol,
                     endIndex: isGuestInHouse ? b.endIndex : endCol,
                     checkInDate: isGuestInHouse ? b.checkInDate : validatedFromDate,
@@ -1844,7 +1866,12 @@ export const StayView: React.FC = () => {
             }
         }
 
-        showToast(`Reservation ${targetB.reservationNumber} (${targetB.guestName}) moved to Room ${newRoomNumber} (${newFromDate} to ${newToDate})!`);
+        const isUpgrade = Boolean(newRoomType && targetB.roomType && newRoomType !== targetB.roomType);
+        showToast(
+            isUpgrade 
+                ? `✨ Room Move & Upgrade Applied: ${targetB.guestName} moved to Room ${newRoomNumber} (${newRoomType})!`
+                : `Room Move Applied: ${targetB.guestName} moved to Room ${newRoomNumber}!`
+        );
     };
 
     // Core PMS Live Action Handlers for Unified Action Drawer
