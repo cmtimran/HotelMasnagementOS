@@ -8,6 +8,7 @@ import {
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { getNextDayISO } from './common/StayPeriodPicker';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { 
     getCanonicalRooms, 
     getAllStoredReservations, 
@@ -166,6 +167,7 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
 };
 
 export const RoomRack: React.FC = () => {
+    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
     const { setActivePage } = useNavigation();
 
     // Operating System Date & Rack Date
@@ -908,7 +910,7 @@ export const RoomRack: React.FC = () => {
                                                     <div>
                                                         <span className="text-[8px] text-slate-400 uppercase leading-none block">Tariff</span>
                                                         <span className="text-xs font-black text-slate-900 font-mono">
-                                                            ৳{room.rate.toLocaleString()}
+                                                            {currencySymbol}{room.rate.toLocaleString()}
                                                         </span>
                                                     </div>
 
@@ -967,7 +969,7 @@ export const RoomRack: React.FC = () => {
                                                 {room.status === 'occupied' ? (room.guestName || 'Occupied') : room.upcomingGuestName ? `Next: ${room.upcomingCheckIn?.slice(5)} (${room.upcomingGuestName.split(' ')[0]})` : room.roomType}
                                             </p>
                                             <div className="flex items-center justify-between text-[9px] mt-1 pt-1 border-t border-slate-100">
-                                                <span className="text-slate-700">৳{room.rate}</span>
+                                                <span className="text-slate-700">{currencySymbol}{room.rate}</span>
                                                 <span className={`px-1 rounded text-[8px] ${theme.badge}`}>
                                                     {theme.label.split(' ')[0]}
                                                 </span>
@@ -1031,7 +1033,7 @@ export const RoomRack: React.FC = () => {
                                 <div>
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Tariff (Rate Plan)</span>
                                     <div className="flex items-baseline gap-1 mt-1">
-                                        <span className="font-mono text-slate-900 text-base font-bold">৳{selectedRoom.rate.toLocaleString()}</span>
+                                        <span className="font-mono text-slate-900 text-base font-bold">{currencySymbol}{selectedRoom.rate.toLocaleString()}</span>
                                         <span className="text-[11px] text-slate-500 font-medium">/ night</span>
                                     </div>
                                 </div>

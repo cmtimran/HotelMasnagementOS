@@ -1039,6 +1039,19 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             });
         }
 
+        // Housekeeping Cleanliness Guard on Check-in
+        if (actionType === 'checkin') {
+            const canonicalRooms = getCanonicalRooms();
+            const dirtyRooms = allocatedRoomNumbers.filter(rn => {
+                const found = canonicalRooms.find(cr => cr.number === rn);
+                return found && String(found.housekeepingStatus).toUpperCase() === 'DIRTY';
+            });
+            if (dirtyRooms.length > 0) {
+                const proceed = window.confirm(`⚠️ Room ${dirtyRooms.join(', ')} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with check-in?`);
+                if (!proceed) return;
+            }
+        }
+
         const isGroup = allocatedRoomNumbers.length > 1;
         const groupCode = isGroup ? (editingReservation?.groupCode || generateGroupCode()) : (editingReservation?.groupCode || undefined);
         const paymentEval = determineBookingStatusFromPayment(totalPaid, finalPayable, netBaseAmount);

@@ -29,6 +29,7 @@ import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
+import { getCurrencySymbol } from '../../utils/currencyUtils';
 import { toast } from '../../context/ToastContext';
 import {
     syncReservationsFromDB,
@@ -76,6 +77,7 @@ export interface ReservationItem {
 
 
 export const ReservationsView: React.FC = () => {
+    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
     const { setActivePage } = useNavigation();
     
     // Active Tab: 'reservations' (Active Bookings), 'arrivals', 'departures', 'checked-out', 'in-house', 'cancelled'
@@ -1164,13 +1166,13 @@ export const ReservationsView: React.FC = () => {
 
                                             {/* Total Tariff */}
                                             <td className="px-3 py-2 text-gray-900 font-mono whitespace-nowrap">
-                                                ৳ {r.totalAmount.toLocaleString()}
+                                                {currencySymbol} {r.totalAmount.toLocaleString()}
                                             </td>
 
                                             {/* Due Balance */}
                                             <td className="px-3 py-2 font-mono whitespace-nowrap">
                                                 {r.dueAmount > 0 ? (
-                                                    <span className="text-rose-600">৳ {r.dueAmount.toLocaleString()}</span>
+                                                    <span className="text-rose-600">{currencySymbol} {r.dueAmount.toLocaleString()}</span>
                                                 ) : (
                                                     <span className="text-emerald-600 font-semibold flex items-center gap-1">
                                                         <Check size={11} /> Settled
@@ -1427,7 +1429,7 @@ export const ReservationsView: React.FC = () => {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Tariff:</span>
-                                            <span className="text-gray-900 font-mono">৳ {r.totalAmount.toLocaleString()}</span>
+                                            <span className="text-gray-900 font-mono">{currencySymbol} {r.totalAmount.toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Due:</span>

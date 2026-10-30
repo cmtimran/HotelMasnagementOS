@@ -8,6 +8,8 @@ import { initDatabase } from './database/db.js';
 import { initPostgres } from './database/postgres.js';
 import { initRedis } from './services/redis.service.js';
 import { broadcastServerEvent } from './routes/realtime.routes.js';
+import { pgPool } from './database/postgres.js';
+import { bookingService } from './services/booking.service.js';
 
 dotenv.config();
 
@@ -87,6 +89,24 @@ if (!process.env.VERCEL) {
     console.log(`📑 Bookings API: http://localhost:${PORT}/api/bookings`);
     console.log(`🔒 Distributed Redlock API: http://localhost:${PORT}/api/realtime/locks`);
   });
+
+  // Background Worker: Auto-release expired Holds whose cutoff deadline has elapsed (Runs every 60s)
+  setInterval(async () => {
+    try {
+      const activeProps = await pgPool.query("SELECT id FROM properties WHERE status = 'ACTIVE' LIMIT 50").catch(() => ({ rows: [] }));
+      for (const row of activeProps.rows) {
+        const res = await bookingService.checkExpiredHolds(row.id).catch(() => ({ releasedCount: 0 }));
+        if (res && res.releasedCount > 0) {
+          broadcastServerEvent({
+            type: 'INVENTORY_REFRESH',
+            propertyId: row.id
+          });
+        }
+      }
+    } catch {
+      // background exception silently guarded
+    }
+  }, 60000);
 }
 
 export default app;

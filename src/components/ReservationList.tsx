@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { Calendar, Users, MapPin, Phone, Mail, Download, CheckCircle, ArrowUpDown, Edit3 } from 'lucide-react';
 import GuestProfile360 from './GuestProfile360';
 import { useNavigation } from '../context/NavigationContext';
@@ -36,6 +37,7 @@ interface Reservation {
 }
 
 const ReservationList = () => {
+    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
     const { setActivePage } = useNavigation();
     const [activeTab, setActiveTab] = useState<'arrivals' | 'in-house' | 'departures' | 'all'>('arrivals');
     const [searchTerm, setSearchTerm] = useState('');
@@ -432,7 +434,7 @@ const ReservationList = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <p className="text-sm text-gray-900">৳ {res.totalAmount.toLocaleString()}</p>
+                                        <p className="text-sm text-gray-900">{currencySymbol} {res.totalAmount.toLocaleString()}</p>
                                         <p className="text-xs text-gray-500">{res.source}</p>
                                     </td>
                                     <td className="px-6 py-4">

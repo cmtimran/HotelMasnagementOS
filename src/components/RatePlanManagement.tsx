@@ -629,12 +629,18 @@ export default function RatePlanManagement() {
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Meal Plan Selection</label>
                                     <div className="grid grid-cols-2 gap-3">
-                                        {(availableMealPlans.length > 0 ? availableMealPlans : [
-                                            { id: 1, shortCode: 'EP', name: 'European Plan (Room Only/No Meals)', sellingPriceAdult: 0 },
-                                            { id: 2, shortCode: 'CP', name: 'Continental Plan: Buffet Breakfast', sellingPriceAdult: 850 },
-                                            { id: 3, shortCode: 'MAP', name: 'Modified American Plan: Breakfast + Lunch/Dinner', sellingPriceAdult: 2200 },
-                                            { id: 4, shortCode: 'AP', name: 'American Plan: All Inclusive Full Board', sellingPriceAdult: 3500 }
-                                        ]).map((item: any) => {
+                                        <button 
+                                            type="button"
+                                            key="room_only" 
+                                            onClick={() => setFormData({ ...formData, mealPlan: '' })}
+                                            className={`p-4 rounded-xl border-2 text-left transition-all ${!formData.mealPlan || formData.mealPlan === 'EP' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-gray-50 border-gray-100 hover:border-blue-200 hover:bg-white text-gray-600'}`}
+                                        >
+                                            <div className="text-sm font-bold">Room Only (EP)</div>
+                                            <div className={`text-[10px] leading-tight mt-1 ${!formData.mealPlan || formData.mealPlan === 'EP' ? 'text-blue-100' : 'text-gray-400'}`}>
+                                                No meals included (Standard Room Rate)
+                                            </div>
+                                        </button>
+                                        {availableMealPlans.map((item: any) => {
                                             const code = item.shortCode || item.code || item.id;
                                             return (
                                                 <button 
@@ -650,6 +656,13 @@ export default function RatePlanManagement() {
                                                 </button>
                                             );
                                         })}
+                                        {availableMealPlans.length === 0 && (
+                                            <div className="p-4 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center">
+                                                <div className="text-[11px] text-slate-400">
+                                                    No meal plans configured in <span className="font-semibold text-slate-600">Meal Plans</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-4">

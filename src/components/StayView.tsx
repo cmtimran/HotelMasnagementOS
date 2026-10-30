@@ -2078,6 +2078,15 @@ export const StayView: React.FC = () => {
                 return;
             }
 
+            // Housekeeping Cleanliness Guard before Check-in
+            const assignedRoomNum = targetB?.roomNumber || storedTarget?.roomNumber;
+            const canonicalRooms = getCanonicalRooms();
+            const targetRoomObj = canonicalRooms.find(r => r.number === assignedRoomNum);
+            if (targetRoomObj && String(targetRoomObj.housekeepingStatus).toUpperCase() === 'DIRTY') {
+                const proceed = window.confirm(`⚠️ Room ${assignedRoomNum} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with check-in?`);
+                if (!proceed) return;
+            }
+
             const regNo = generateRegistrationNumber(reservationNumber);
             const folioNo = generateFolioNumber(reservationNumber);
             const ok = await updateReservationStatusInDB(reservationNumber, 'in-house');
