@@ -1741,9 +1741,17 @@ export const StayView: React.FC = () => {
             // Persist to Relational Database via API
             moveRoomInDB(targetB.reservationNumber, newRoomNumber, validatedFromDate, newToDate, targetB.roomNumber);
 
+            // Auto-mark vacated room as Dirty if in-house guest moved
+            if (isGuestInHouse && targetB.roomNumber) {
+                updateRoomHousekeepingInDB(targetB.roomNumber, 'Dirty');
+            }
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
         } else {
             moveRoomInDB(targetB.reservationNumber || bookingId, newRoomNumber, validatedFromDate, newToDate, targetB.roomNumber);
+            if (isGuestInHouse && targetB.roomNumber) {
+                updateRoomHousekeepingInDB(targetB.roomNumber, 'Dirty');
+            }
         }
 
         setBookings(prev => prev.map(b => {

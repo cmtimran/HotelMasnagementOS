@@ -59,6 +59,7 @@ import {
     getStandardDailyRateForRoom,
     getDynamicRoomTypes,
     calculateTariffForRatePlan,
+    validateRatePlanRestrictions,
     getRoomTypeCapacity,
     getAllStoredReservations,
     saveStoredReservations,
@@ -1247,6 +1248,10 @@ export const AddReservation: React.FC = () => {
                 if (r.id !== id) return r;
                 if (field === 'ratePlan') {
                     const planName = String(value);
+                    const restriction = validateRatePlanRestrictions(planName, nights, checkIn, availableRatePlans);
+                    if (!restriction.allowed) {
+                        toast.warning(restriction.reason || 'Selected rate plan has restrictions for this stay duration.');
+                    }
                     const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
                     const newRate = calculateTariffForRatePlan(planName, r.roomType, standardRate, r.adults, r.children, availableRatePlans);
                     return {
@@ -1507,6 +1512,15 @@ export const AddReservation: React.FC = () => {
         if (availableRatePlans.length === 0) {
             toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
             return;
+        }
+
+        // Validate Rate Plan restrictions for all requested rooms
+        for (const r of roomsList) {
+            const planCheck = validateRatePlanRestrictions(r.ratePlan, nights, checkIn, availableRatePlans);
+            if (!planCheck.allowed) {
+                toast.error(planCheck.reason || `Rate plan restrictions violated for ${r.roomType}.`);
+                return;
+            }
         }
 
         if (hasOverbookingError) {
@@ -2497,9 +2511,15 @@ export const AddReservation: React.FC = () => {
                                                             {availableRatePlans.length === 0 ? (
                                                                 <option value="" disabled>No rate plans configured</option>
                                                             ) : (
-                                                                availableRatePlans.map(p => (
-                                                                    <option key={p.id} value={p.name}>{p.name}</option>
-                                                                ))
+                                                                availableRatePlans.map(p => {
+                                                                    const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
+                                                                    const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
+                                                                    return (
+                                                                        <option key={p.id} value={p.name} disabled={isPlanDisabled}>
+                                                                            {p.name}{badge}
+                                                                        </option>
+                                                                    );
+                                                                })
                                                             )}
                                                         </select>
                                                     </td>

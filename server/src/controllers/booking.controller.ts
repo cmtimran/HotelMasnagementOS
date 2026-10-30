@@ -185,6 +185,14 @@ export const bookingController = {
           reservation: updated,
           propertyId
         });
+        if (req.body?.oldRoomNumber) {
+          broadcastServerEvent({
+            type: 'ROOM_STATUS_CHANGED',
+            propertyId,
+            roomNo: req.body.oldRoomNumber,
+            hkStatus: 'DIRTY'
+          });
+        }
         broadcastServerEvent({
           type: 'INVENTORY_REFRESH',
           propertyId

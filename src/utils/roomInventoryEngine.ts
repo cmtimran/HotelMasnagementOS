@@ -899,6 +899,76 @@ export const calculateTariffForRatePlan = (
     return Math.max(0, Math.round(base));
 };
 
+export interface RatePlanRestrictionResult {
+    allowed: boolean;
+    reason?: string;
+    ratePlan?: any;
+}
+
+/**
+ * Validates Rate Plan commercial restrictions (MinLOS, MaxLOS, Stop Sell, CTA, Status)
+ */
+export const validateRatePlanRestrictions = (
+    ratePlanNameOrId: string | number,
+    nights: number,
+    checkInDate?: string,
+    ratePlansList?: any[]
+): RatePlanRestrictionResult => {
+    let plans: any[] = ratePlansList || [];
+    if (!plans || plans.length === 0) {
+        try {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) plans = JSON.parse(saved);
+        } catch {}
+    }
+    if (!plans || plans.length === 0) return { allowed: true };
+
+    const planQuery = String(ratePlanNameOrId).trim().toLowerCase();
+    const plan = plans.find(p =>
+        String(p.id) === String(ratePlanNameOrId) ||
+        (p.name && p.name.trim().toLowerCase() === planQuery) ||
+        (p.shortCode && p.shortCode.trim().toLowerCase() === planQuery)
+    );
+
+    if (!plan) return { allowed: true };
+
+    if (plan.status === 'Inactive') {
+        return { allowed: false, reason: `Rate plan "${plan.name}" is currently inactive.`, ratePlan: plan };
+    }
+
+    if (plan.stopSell) {
+        return { allowed: false, reason: `Rate plan "${plan.name}" is on Stop Sell and cannot be booked.`, ratePlan: plan };
+    }
+
+    const minNights = Number(plan.minNights) || 1;
+    if (nights < minNights) {
+        return {
+            allowed: false,
+            reason: `Rate plan "${plan.name}" requires a minimum length of stay of ${minNights} night(s). (Stay is ${nights} night${nights > 1 ? 's' : ''})`,
+            ratePlan: plan
+        };
+    }
+
+    const maxNights = Number(plan.maxNights);
+    if (maxNights && maxNights > 0 && nights > maxNights) {
+        return {
+            allowed: false,
+            reason: `Rate plan "${plan.name}" allows a maximum stay of ${maxNights} night(s). (Stay is ${nights} nights)`,
+            ratePlan: plan
+        };
+    }
+
+    if (plan.closedToArrival) {
+        return {
+            allowed: false,
+            reason: `Rate plan "${plan.name}" is Closed to Arrival (CTA) for check-in on ${checkInDate || "the selected date"}.`,
+            ratePlan: plan
+        };
+    }
+
+    return { allowed: true, ratePlan: plan };
+};
+
 // Canonical Property Inventory (Dynamic Baseline)
 export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [];
 
@@ -1997,6 +2067,11 @@ export const moveRoomInDB = async (
                 newList = [updatedRec, ...existing];
             }
             saveStoredReservations(newList);
+            // If reservation is in-house, automatically set vacated room to Dirty
+            const isCurrentlyInHouse = ['checked_in', 'in_house', 'in-house', 'checked-in', 'arrived'].includes(String(updatedRec.status || '').toLowerCase());
+            if (oldRoomNumber && isCurrentlyInHouse) {
+                updateRoomHousekeepingInDB(oldRoomNumber, 'Dirty');
+            }
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
             return updatedRec;
         }

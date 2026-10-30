@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -43,15 +44,7 @@ const ConnectingRoomManagement: React.FC<ConnectingRoomManagementProps> = ({ pro
 
     // Dynamic Currency Symbol based on active property configuration
     const currencySymbol = useMemo(() => {
-        switch (activeProperty?.currency) {
-            case 'USD': return '$';
-            case 'EUR': return '€';
-            case 'GBP': return '£';
-            case 'INR': return '₹';
-            case 'AED': return 'AED ';
-            case 'BDT':
-            default: return '৳';
-        }
+        return getCurrencySymbol(activeProperty?.currency);
     }, [activeProperty?.currency]);
 
     const [view, setView] = useState<'list' | 'form'>('list');
@@ -102,7 +95,7 @@ const ConnectingRoomManagement: React.FC<ConnectingRoomManagementProps> = ({ pro
         id: String(rt.id),
         name: rt.name,
         code: rt.code,
-        price: Number(rt.baseRate) || 3000
+        price: Number(rt.baseRate) || 0
     })), [roomTypes]);
 
     const physicalRoomsList = useMemo(() => physicalRoomsState.map(r => ({

@@ -1111,6 +1111,20 @@ export const bookingService = {
               check_out_date = COALESCE($3, check_out_date)
           WHERE reservation_id = $4 AND room_id = $5
         `, [targetRoomId, newFromDate || null, newToDate || null, resId, oldRoomRes.rows[0].id]);
+
+        // If reservation is currently IN-HOUSE or active, mark the vacated room as DIRTY
+        const isCurrentlyInHouse = existing.status === 'in-house' || existing.status === 'checked-in' as any;
+        if (isCurrentlyInHouse) {
+          try {
+            await getPool().query(`
+              UPDATE rooms
+              SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1
+            `, [oldRoomRes.rows[0].id]);
+          } catch (hkErr) {
+            console.warn('Failed to update vacated room to DIRTY during room move:', hkErr);
+          }
+        }
       }
     } else {
       await getPool().query(`

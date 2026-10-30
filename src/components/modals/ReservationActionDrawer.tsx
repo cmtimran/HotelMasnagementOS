@@ -32,6 +32,7 @@ import {
     Key
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
+import { getCurrencySymbol } from '../../utils/currencyUtils';
 import type { AmendBookingData } from './AmendStayModal';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
 import {
@@ -121,6 +122,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 }) => {
     const operatingSystemDate = systemDate || getOperatingSystemDate();
     const isBookingInHouse = booking?.status === 'IN-HOUSE' || booking?.status === 'ARRIVED' || booking?.status === 'STAYOVER';
+    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
 
     // Current Active Mode State
     const [mode, setMode] = useState<DrawerMode>(initialMode);
@@ -1169,7 +1171,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             Avg Daily Rate
                                         </div>
                                         <div className="text-[8px]  text-white font-mono">
-                                            ৳ {dailyRate.toFixed(2)}
+                                            {currencySymbol} {dailyRate.toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
@@ -1184,7 +1186,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
                                         <span>Base Tariff</span>
                                     </div>
-                                    <span className="font-mono  text-white">৳ {baseAmount.toFixed(2)}</span>
+                                    <span className="font-mono  text-white">{currencySymbol} {baseAmount.toFixed(2)}</span>
                                 </div>
 
                                 {/* Statutory Tax & VAT Breakdown */}
@@ -1195,18 +1197,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <ShieldCheck size={11} className="text-emerald-400" />
                                                 <span>Taxes ({taxConfigCode})</span>
                                             </span>
-                                            <span className="font-mono text-emerald-300 ">+৳ {totalTax.toFixed(2)}</span>
+                                            <span className="font-mono text-emerald-300 ">+{currencySymbol} {totalTax.toFixed(2)}</span>
                                         </div>
                                         {serviceCharge > 0 && (
                                             <div className="flex justify-between text-blue-200/80 text-[8px]">
                                                 <span>Service Charge:</span>
-                                                <span className="font-mono text-white">+৳ {serviceCharge.toFixed(2)}</span>
+                                                <span className="font-mono text-white">+{currencySymbol} {serviceCharge.toFixed(2)}</span>
                                             </div>
                                         )}
                                         {vatAmount > 0 && (
                                             <div className="flex justify-between text-blue-200/80 text-[8px]">
                                                 <span>VAT:</span>
-                                                <span className="font-mono text-white">+৳ {vatAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-white">+{currencySymbol} {vatAmount.toFixed(2)}</span>
                                             </div>
                                         )}
                                     </div>
@@ -1219,7 +1221,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
                                 <div className="flex items-center justify-between text-blue-100 text-[8px] pt-1 border-t border-white/10 ">
                                     <span className="text-white">Grand Total (Payable)</span>
-                                    <span className="font-mono font-black text-white">৳ {totalAmount.toFixed(2)}</span>
+                                    <span className="font-mono font-black text-white">{currencySymbol} {totalAmount.toFixed(2)}</span>
                                 </div>
 
                                 <div className="flex items-center justify-between text-blue-100 text-[8px]">
@@ -1229,7 +1231,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
                                         <span>Advance Paid</span>
                                     </div>
-                                    <span className="font-mono  text-emerald-300">৳ {paidAmount.toFixed(2)}</span>
+                                    <span className="font-mono  text-emerald-300">{currencySymbol} {paidAmount.toFixed(2)}</span>
                                 </div>
                             </div>
 
@@ -1242,7 +1244,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     <span className="text-[8px]">Net Balance Due</span>
                                 </div>
                                 <span className={`font-mono font-black text-[8px] ${dueAmount > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                                    ৳ {dueAmount.toFixed(2)}
+                                    {currencySymbol} {dueAmount.toFixed(2)}
                                 </span>
                             </div>
                         </div>
@@ -1572,7 +1574,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             {isCurrentActiveInHouse && !booking?.isPast && onCheckOut && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onCheckOut(activeSubBookingNo || booking.reservationNumber)}
+                                                    onClick={() => {
+                                                        if (dueAmount > 0) {
+                                                            toast.error(`Cannot Check Out: Guest has an outstanding balance of ${currencySymbol}${dueAmount.toLocaleString()}. Please settle payment before checkout.`);
+                                                            setMode('payment');
+                                                            return;
+                                                        }
+                                                        onCheckOut(activeSubBookingNo || booking.reservationNumber);
+                                                    }}
                                                     className="h-8 px-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
                                                     title="Check Out active room"
                                                 >
@@ -1891,29 +1900,29 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px] pt-0.5">
                                                 <span>Base Room Tariff</span>
-                                                <span className="font-mono  text-white">৳ {baseAmount.toFixed(2)}</span>
+                                                <span className="font-mono  text-white">{currencySymbol} {baseAmount.toFixed(2)}</span>
                                             </div>
                                             {isTaxApplicable && totalTax > 0 && (
                                                 <div className="flex justify-between text-emerald-300 text-[8px]">
                                                     <span>Statutory Taxes &amp; VAT</span>
-                                                    <span className="font-mono ">+৳ {totalTax.toFixed(2)}</span>
+                                                    <span className="font-mono ">+{currencySymbol} {totalTax.toFixed(2)}</span>
                                                 </div>
                                             )}
                                             <div className="flex justify-between text-blue-100 text-[8px] pt-0.5 border-t border-blue-400/20">
                                                 <span>Total Payable</span>
-                                                <span className="font-mono  text-white">৳ {totalAmount.toFixed(2)}</span>
+                                                <span className="font-mono  text-white">{currencySymbol} {totalAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px]">
                                                 <span>Total Paid</span>
-                                                <span className="font-mono  text-emerald-300">৳ {paidAmount.toFixed(2)}</span>
+                                                <span className="font-mono  text-emerald-300">{currencySymbol} {paidAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px] ">
                                                 <span className="text-white">Current Balance Due</span>
-                                                <span className="font-mono text-rose-300 ">৳ {dueAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-rose-300 ">{currencySymbol} {dueAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px] pt-1 border-t border-blue-400/20 ">
                                                 <span className="text-white">Payment Amount</span>
-                                                <span className="font-mono text-emerald-300 text-[8px]">৳ {paymentAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-emerald-300 text-[8px]">{currencySymbol} {paymentAmount.toFixed(2)}</span>
                                             </div>
                                             {/* Quick Pay Buttons */}
                                             {dueAmount > 0 && (
@@ -1923,14 +1932,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         onClick={() => setPaymentAmount(dueAmount)}
                                                         className="flex-1 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded text-[8px]  text-emerald-200 transition-colors cursor-pointer text-center"
                                                     >
-                                                        Pay Full Due (৳{dueAmount.toFixed(0)})
+                                                        Pay Full Due ({currencySymbol}{dueAmount.toFixed(0)})
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setPaymentAmount(Math.round(dueAmount / 2))}
                                                         className="py-1 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 rounded text-[8px]  text-blue-200 transition-colors cursor-pointer text-center"
                                                     >
-                                                        50% (৳{Math.round(dueAmount / 2)})
+                                                        50% ({currencySymbol}{Math.round(dueAmount / 2)})
                                                     </button>
                                                 </div>
                                             )}
@@ -2660,7 +2669,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         {booking.arrivalDate || bookingAny.checkIn} → {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
                                                     </td>
                                                     <td className="p-2.5 text-right font-mono font-bold">
-                                                        ৳ {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
+                                                        {currencySymbol} {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -2670,15 +2679,15 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                 <div className="flex justify-between">
                                                     <span className="text-slate-600">Total Billed:</span>
-                                                    <span className="font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-emerald-700 font-semibold">
                                                     <span>Advance Deposited:</span>
-                                                    <span className="font-mono">৳ {Number(booking.paidAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-rose-700 font-bold border-t border-slate-200 pt-1">
                                                     <span>Payable at Check-In:</span>
-                                                    <span className="font-mono">৳ {Number(booking.dueAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {Number(booking.dueAmount || 0).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -2719,7 +2728,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Folio & Account</span>
                                                 <p className="text-sm font-bold font-mono text-slate-900">{booking.folioNumber || `FOL-${activeSubBookingNo}-1`}</p>
                                                 <p className="text-xs text-slate-700">Billing Status: <span className="font-bold text-blue-700">{activeStatus}</span></p>
-                                                <p className="text-xs text-slate-700">Currency: BDT (৳)</p>
+                                                <p className="text-xs text-slate-700">Currency: {currencySymbol}</p>
                                             </div>
                                         </div>
 
@@ -2739,7 +2748,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         <div className="text-[10px] text-slate-500">Room {activeRoomNum} — {activeRatePlan}</div>
                                                     </td>
                                                     <td className="p-2.5 text-center font-mono text-[11px]">{booking.arrivalDate || bookingAny.checkIn}</td>
-                                                    <td className="p-2.5 text-right font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</td>
+                                                    <td className="p-2.5 text-right font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</td>
                                                     <td className="p-2.5 text-right font-mono text-slate-400">—</td>
                                                 </tr>
                                                 {Number(booking.paidAmount || 0) > 0 && (
@@ -2750,7 +2759,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </td>
                                                         <td className="p-2.5 text-center font-mono text-[11px]">{operatingSystemDate}</td>
                                                         <td className="p-2.5 text-right font-mono text-slate-400">—</td>
-                                                        <td className="p-2.5 text-right font-mono font-bold text-emerald-700">৳ {Number(booking.paidAmount || 0).toLocaleString()}</td>
+                                                        <td className="p-2.5 text-right font-mono font-bold text-emerald-700">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</td>
                                                     </tr>
                                                 )}
                                             </tbody>
@@ -2760,15 +2769,15 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                 <div className="flex justify-between">
                                                     <span className="text-slate-600">Total Charges:</span>
-                                                    <span className="font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-emerald-700 font-semibold">
                                                     <span>Total Credits (Paid):</span>
-                                                    <span className="font-mono font-bold">৳ {Number(booking.paidAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono font-bold">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-slate-900 font-black border-t border-slate-300 pt-1.5 text-sm">
                                                     <span>Balance Outstanding:</span>
-                                                    <span className="font-mono text-rose-700">৳ {Number(booking.dueAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono text-rose-700">{currencySymbol} {Number(booking.dueAmount || 0).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -2865,10 +2874,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                 {rm.effectiveNights}
                                                             </td>
                                                             <td className="p-2 text-right font-mono text-slate-700">
-                                                                ৳ {rm.effectiveRate.toLocaleString()}
+                                                                {currencySymbol} {rm.effectiveRate.toLocaleString()}
                                                             </td>
                                                             <td className="p-2 text-right font-mono font-bold text-slate-900">
-                                                                ৳ {rm.effectiveBase.toLocaleString()}
+                                                                {currencySymbol} {rm.effectiveBase.toLocaleString()}
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -2888,27 +2897,27 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="w-72 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                                                 <div className="flex justify-between">
                                                     <span className="text-slate-600">Total Room Tariff:</span>
-                                                    <span className="font-mono font-bold">৳ {groupFinancials.totalBase.toLocaleString()}</span>
+                                                    <span className="font-mono font-bold">{currencySymbol} {groupFinancials.totalBase.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-slate-600">
                                                     <span>Service Charge (10%):</span>
-                                                    <span className="font-mono">৳ {groupFinancials.serviceCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {groupFinancials.serviceCharge.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-slate-600">
                                                     <span>VAT / Tax (15%):</span>
-                                                    <span className="font-mono">৳ {groupFinancials.vatAmount.toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {groupFinancials.vatAmount.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between font-bold text-slate-900 border-t border-slate-300 pt-1">
                                                     <span>Master Gross Amount:</span>
-                                                    <span className="font-mono">৳ {groupFinancials.grandTotal.toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {groupFinancials.grandTotal.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-emerald-700 font-semibold">
                                                     <span>Master Paid / Deposit:</span>
-                                                    <span className="font-mono">৳ {groupFinancials.paidAmount.toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {groupFinancials.paidAmount.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between text-rose-700 font-black border-t border-slate-300 pt-1 text-sm">
                                                     <span>Balance Outstanding:</span>
-                                                    <span className="font-mono">৳ {groupFinancials.dueAmount.toLocaleString()}</span>
+                                                    <span className="font-mono">{currencySymbol} {groupFinancials.dueAmount.toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -2992,7 +3001,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <td className="p-2 font-medium text-slate-800">{rm.guestName || booking.guestName}</td>
                                                             <td className="p-2 text-center font-mono text-[11px]">{rm.effectivePax}</td>
                                                             <td className="p-2 text-right font-mono font-bold text-slate-900">
-                                                                ৳ {rm.effectiveRate.toLocaleString()}
+                                                                {currencySymbol} {rm.effectiveRate.toLocaleString()}
                                                             </td>
                                                         </tr>
                                                     ))}
