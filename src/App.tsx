@@ -118,6 +118,8 @@ function App() {
     } catch {
       localStorage.removeItem('devnotation_toolbar_pos_v2');
     }
+    // Flush stale Devnotation update cache so live version is reflected
+    localStorage.removeItem('devnotation_update_check_v1');
   }, []);
 
   // Sync session across multiple browser tabs
