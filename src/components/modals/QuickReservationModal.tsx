@@ -72,7 +72,12 @@ import {
     getTaxConfigurations,
     type TaxCalculationResult
 } from '../../utils/taxCalculationEngine';
-import { useReservationBookingEngine } from '../../hooks/useReservationBookingEngine';
+import {
+    useReservationBookingEngine,
+    splitMultiRoomRow,
+    addNewRoomRowHelper,
+    validatePreBookingFlight
+} from '../../hooks/useReservationBookingEngine';
 import { toast } from '../../context/ToastContext';
 
 export interface QuickReservationModalProps {
@@ -858,42 +863,20 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             toast.error('Overbooking Prevented: No more available rooms in inventory for the selected dates!');
             return;
         }
-        const nextId = roomsList.length > 0 ? Math.max(...roomsList.map(r => r.id)) + 1 : 1;
-        const usedRooms = new Set<string>();
-        roomsList.forEach(r => {
-            if (r.assignedRooms && r.assignedRooms.length > 0) {
-                r.assignedRooms.forEach(rn => usedRooms.add(rn));
-            } else if (r.roomNumber) {
-                usedRooms.add(r.roomNumber);
-            }
-        });
-        const freeRoom =
-            liveAvailabilityReport.availableRooms.find(r =>
-                (r.roomTypeName === 'Deluxe Double' || r.roomTypeName.includes('Deluxe')) && !usedRooms.has(r.number)
-            ) || liveAvailabilityReport.availableRooms.find(r => !usedRooms.has(r.number));
-
-        if (!freeRoom) {
+        const result = addNewRoomRowHelper(
+            roomsList,
+            liveAvailabilityReport.availableRooms,
+            checkInDate,
+            checkOutDate,
+            nights,
+            availableRatePlans[0]?.name || 'Standard Rate',
+            calculateRoomRate
+        );
+        if (!result) {
             toast.error('Overbooking Prevented: All available rooms are already assigned in this form!');
             return;
         }
-
-        const defPlan = availableRatePlans[0]?.name || '';
-        const defRate = calculateTariffForRatePlan(defPlan, freeRoom.roomTypeName || 'Deluxe Double', freeRoom.baseRate || 3000, 2, 0, availableRatePlans);
-
-        setRoomsList([
-            ...roomsList,
-            {
-                id: nextId,
-                roomType: freeRoom.roomTypeName || 'Deluxe Double',
-                noOfRooms: 1,
-                ratePlan: defPlan,
-                roomNumber: freeRoom.number,
-                assignedRooms: [freeRoom.number],
-                adults: 2,
-                children: 0,
-                rate: defRate
-            }
-        ]);
+        setRoomsList(result.updatedList);
     };
 
     const handleRemoveRoom = (id: number) => {
@@ -903,38 +886,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Front Desk Split Action: Split multi-room group row into individual 1-room rows
     const handleSplitRowIntoRooms = (rowId: number) => {
-        const targetRow = roomsList.find(r => r.id === rowId);
-        if (!targetRow || targetRow.noOfRooms <= 1) return;
-
-        const count = targetRow.noOfRooms;
-        const assigned = targetRow.assignedRooms && targetRow.assignedRooms.length === count
-            ? targetRow.assignedRooms
-            : getAutoAssignedRoomsForRow(targetRow);
-
-        const targetIndex = roomsList.findIndex(r => r.id === rowId);
-        let maxId = Math.max(...roomsList.map(r => r.id));
-
-        const newRows: RoomItem[] = assigned.map((roomNum, idx) => {
-            const dateConf = targetRow.roomDatesMap?.[roomNum];
-            return {
-                ...targetRow,
-                id: idx === 0 ? targetRow.id : ++maxId,
-                noOfRooms: 1,
-                roomNumber: roomNum,
-                assignedRooms: [roomNum],
-                adults: Math.max(1, Math.round(targetRow.adults / count)) || 1,
-                children: 0,
-                checkInDate: dateConf?.checkIn || targetRow.checkInDate || checkInDate,
-                checkOutDate: dateConf?.checkOut || targetRow.checkOutDate || checkOutDate,
-                nights: dateConf?.nights || targetRow.nights || nights,
-                roomDatesMap: undefined
-            };
-        });
-
-        const updatedList = [...roomsList];
-        updatedList.splice(targetIndex, 1, ...newRows);
-        setRoomsList(updatedList);
-        toast.success(`Split into ${count} individual room rows (${assigned.join(', ')})!`);
+        const result = splitMultiRoomRow(roomsList, rowId, getAutoAssignedRoomsForRow);
+        if (result) {
+            setRoomsList(result.updatedList);
+            toast.success(`Split into ${result.count} individual room rows (${result.assigned.join(', ')})!`);
+        }
     };
 
     const handleRoomFieldChange = <K extends keyof RoomItem>(id: number, field: K, value: RoomItem[K]) => {
@@ -1125,8 +1081,22 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Submit reservation action
     const handleCompleteReservation = (requestedStatus: 'hold' | 'confirmed' | 'reserved' | 'stayover' | 'arrived') => {
-        if (requestedStatus === 'arrived' && checkInDate !== getOperatingSystemDate()) {
-            toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkInDate}.`);
+        // Shared Pre-Commit Validation Guard
+        const flightCheck = validatePreBookingFlight({
+            actionType: requestedStatus === 'arrived' ? 'checkin' : requestedStatus === 'hold' ? 'hold' : 'reserve',
+            checkIn: checkInDate,
+            operatingDate: getOperatingSystemDate(),
+            availableRatePlans,
+            roomsList,
+            nights,
+            guestName: name,
+            phone: mobile,
+            hasOverbookingError,
+            validateAllRestrictions: validateAllRoomRestrictions
+        });
+
+        if (!flightCheck.allowed) {
+            toast.error(flightCheck.error!);
             return;
         }
 
@@ -1136,23 +1106,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         if (!isArrived && !isHold) {
             const evaluated = determineBookingStatusFromPayment(totalPaid, finalPayable, netBaseAmount);
             status = evaluated.status;
-        }
-
-        if (availableRatePlans.length === 0) {
-            toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
-            return;
-        }
-
-        // Validate Rate Plan & Package Commercial Restrictions via Unified Booking Engine
-        const restrictionCheck = validateAllRoomRestrictions(roomsList, nights, checkInDate);
-        if (!restrictionCheck.isValid) {
-            toast.error(restrictionCheck.error || 'Stay parameters violate commercial policy.');
-            return;
-        }
-
-        if (hasOverbookingError) {
-            toast.error('Overbooking Prevented: Requested rooms exceed available inventory for the selected dates!');
-            return;
         }
 
         if (quickBlacklistAlert && !managerOverrideApproved) {
