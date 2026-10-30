@@ -758,10 +758,12 @@ export const getDynamicMealPlans = (): any[] => {
 /**
  * Dynamic Hotel Packages cache helper (synced with PostgreSQL/SQLite packages table)
  */
-export const getDynamicPackages = (): any[] => {
+export const getDynamicPackages = (propertyId?: number): any[] => {
+    const propId = propertyId || getActivePropertyId();
     try {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('hotel_packages_v2');
+            const scopedKey = `hotel_packages_prop_${propId}`;
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem('hotel_packages_v2') : null);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -774,10 +776,12 @@ export const getDynamicPackages = (): any[] => {
 /**
  * Dynamic Rate Plans cache helper (synced with PostgreSQL/SQLite rate_plans table)
  */
-export const getDynamicRatePlans = (): any[] => {
+export const getDynamicRatePlans = (propertyId?: number): any[] => {
+    const propId = propertyId || getActivePropertyId();
     try {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            const scopedKey = `hotel_rate_plans_prop_${propId}`;
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem('hotel_rate_plans_v1') : null);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -785,6 +789,51 @@ export const getDynamicRatePlans = (): any[] => {
         }
     } catch {}
     return [];
+};
+
+/**
+ * Proactively synchronize Dynamic Rate Plans and Packages directly from the backend PostgreSQL database
+ */
+export const syncRatePlansAndPackagesFromDB = async (
+    targetPropertyId?: number
+): Promise<{ ratePlans: any[]; packages: any[] }> => {
+    const propId = targetPropertyId || getActivePropertyId();
+    if (typeof window === 'undefined') {
+        return { ratePlans: getDynamicRatePlans(propId), packages: getDynamicPackages(propId) };
+    }
+    try {
+        const API_BASE = getApiBaseUrl();
+        const [plansRes, pkgsRes] = await Promise.all([
+            fetch(`${API_BASE}/api/rates/plans?propertyId=${propId}`).then(r => r.json()).catch(() => null),
+            fetch(`${API_BASE}/api/rates/packages?propertyId=${propId}`).then(r => r.json()).catch(() => null)
+        ]);
+
+        let plans: any[] = [];
+        if (plansRes && plansRes.success && Array.isArray(plansRes.data)) {
+            plans = plansRes.data;
+            localStorage.setItem(`hotel_rate_plans_prop_${propId}`, JSON.stringify(plans));
+            if (propId === 1) {
+                localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(plans));
+            }
+        } else {
+            plans = getDynamicRatePlans(propId);
+        }
+
+        let pkgs: any[] = [];
+        if (pkgsRes && pkgsRes.success && Array.isArray(pkgsRes.data)) {
+            pkgs = pkgsRes.data;
+            localStorage.setItem(`hotel_packages_prop_${propId}`, JSON.stringify(pkgs));
+            if (propId === 1) {
+                localStorage.setItem('hotel_packages_v2', JSON.stringify(pkgs));
+            }
+        } else {
+            pkgs = getDynamicPackages(propId);
+        }
+
+        return { ratePlans: plans, packages: pkgs };
+    } catch {
+        return { ratePlans: getDynamicRatePlans(propId), packages: getDynamicPackages(propId) };
+    }
 };
 
 /**

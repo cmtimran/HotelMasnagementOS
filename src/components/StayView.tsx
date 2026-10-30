@@ -52,6 +52,7 @@ import {
     validateAndCommitReservation,
     syncReservationsFromDB,
     syncRoomTypesAndRoomsFromDB,
+    syncRatePlansAndPackagesFromDB,
     getStandardDailyRateForRoom,
     resolveReservationDailyBaseRate,
     getRoomTypeCapacity,
@@ -954,7 +955,8 @@ export const StayView: React.FC = () => {
         Promise.all([
             syncRoomTypesAndRoomsFromDB(),
             syncReservationsFromDB(),
-            syncConnectingSuitesFromDB(activePropertyId)
+            syncConnectingSuitesFromDB(activePropertyId),
+            syncRatePlansAndPackagesFromDB(activePropertyId)
         ]).then(() => {
             setRoomsVersion(v => v + 1);
             syncStoredReservationsRef.current();

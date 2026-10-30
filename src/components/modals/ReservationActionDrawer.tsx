@@ -52,7 +52,8 @@ import {
     isRoomUnassigned,
     getDynamicRoomTypes,
     getDynamicRatePlans,
-    getDynamicPackages
+    getDynamicPackages,
+    syncRatePlansAndPackagesFromDB
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
@@ -182,7 +183,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [moveFromDate, setMoveFromDate] = useState<string>('');
     const [moveToDate, setToDate] = useState<string>('');
     const [moveRoomType, setMoveRoomType] = useState<string>('All');
-    const [moveRateType, setMoveRateType] = useState<string>('Direct');
+    const [moveRateType, setMoveRateType] = useState<string>('BAR');
     const [upgradeBillingMode, setUpgradeBillingMode] = useState<'complimentary' | 'charge'>('complimentary');
 
     // 3. Add Payment Form States
@@ -235,6 +236,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [linkTargetResNo, setLinkTargetResNo] = useState<string>('');
     const [isLinking, setIsLinking] = useState(false);
     const [isIssuingKeycard, setIsIssuingKeycard] = useState(false);
+    const [ratesVersion, setRatesVersion] = useState(0);
+
+    // Proactively sync rate plans & packages dynamically from database
+    useEffect(() => {
+        syncRatePlansAndPackagesFromDB().then(() => {
+            setRatesVersion(v => v + 1);
+        }).catch(() => {});
+    }, []);
 
     // Hydrate form states when booking loads
     useEffect(() => {
@@ -261,7 +270,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(initialTargetRoom));
             const targetRoomType = targetRoomObj?.type || booking.roomType || 'All';
             setMoveRoomType(targetRoomType);
-            setMoveRateType(booking.ratePlan || 'Direct');
+            const initialPlan = (booking.ratePlan && booking.ratePlan !== 'Direct' && booking.ratePlan !== 'Summer Vacation')
+                ? booking.ratePlan
+                : 'BAR';
+            setMoveRateType(initialPlan);
             setUpgradeBillingMode('complimentary');
             const isGuestInHouse = booking.status === 'IN-HOUSE' || booking.status === 'ARRIVED' || booking.status === 'STAYOVER';
             // For in-house guests, room move is strictly locked to take effect from System Date onwards
@@ -462,20 +474,35 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         const pkgs = getDynamicPackages();
         const result: Array<{ label: string; value: string; isPackage?: boolean }> = [];
 
-        if (booking?.ratePlan && !plans.some(p => p.name === booking.ratePlan || p.code === booking.ratePlan)) {
-            result.push({ label: `🏷️ ${booking.ratePlan}`, value: booking.ratePlan });
-        }
+        // Map active rate plans from database
         plans.forEach(p => {
-            result.push({ label: `🏷️ ${p.name || p.code}`, value: p.name || p.code });
+            const planName = p.name || p.shortCode || p.code;
+            if (planName && planName !== 'Direct' && planName !== 'Summer Vacation' && !result.some(r => r.value === planName)) {
+                result.push({ label: `🏷️ ${planName}`, value: planName });
+            }
         });
+
+        // Add booking's current rate plan if valid and unique
+        const currentPlan = booking?.ratePlan;
+        if (currentPlan && currentPlan !== 'Direct' && currentPlan !== 'Summer Vacation') {
+            if (!result.some(r => r.value.toLowerCase() === currentPlan.toLowerCase())) {
+                result.unshift({ label: `🏷️ ${currentPlan}`, value: currentPlan });
+            }
+        }
+
+        // Map active hotel packages
         pkgs.forEach(pkg => {
-            result.push({ label: `🎁 ${pkg.name || pkg.code}`, value: pkg.name || pkg.code, isPackage: true });
+            const pkgName = pkg.name || pkg.shortCode || pkg.code;
+            if (pkgName && !result.some(r => r.value === pkgName)) {
+                result.push({ label: `🎁 ${pkgName}`, value: pkgName, isPackage: true });
+            }
         });
+
         if (result.length === 0) {
-            result.push({ label: '🏷️ Direct BAR', value: 'Direct' });
+            result.push({ label: '🏷️ Standard Rate', value: 'Standard Rate' });
         }
         return result;
-    }, [booking?.ratePlan]);
+    }, [booking?.ratePlan, ratesVersion]);
 
     // Comprehensive Room Move & Upgrade Analysis Engine
     const roomMoveAnalysis = useMemo(() => {
@@ -530,8 +557,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     if (!isOpen || !booking || !activeRoom) return null;
 
     const activeRoomNum = String(activeRoom.roomNumber || booking.roomNumber);
-    const activeRoomType = activeRoom.roomType || booking.roomType || 'Winter Rate Plan';
-    const activeRatePlan = activeRoom.ratePlan || booking.ratePlan || 'Summer Vacation';
+    const activeRoomType = activeRoom.roomType || booking.roomType || (dynamicRoomTypes[0] || 'Standard');
+    const rawActivePlan = activeRoom.ratePlan || booking.ratePlan;
+    const activeRatePlan = (rawActivePlan && rawActivePlan !== 'Direct' && rawActivePlan !== 'Summer Vacation')
+        ? rawActivePlan
+        : (dynamicRatePlansAndPackages[0]?.value || 'Standard Rate');
     const activeSubBookingNo = activeRoom.reservationNumber || activeRoom.subBookingNumber || booking.subBookingNumber || booking.reservationNumber;
     const activeStatus = (activeRoom.status || booking.status || 'CONFIRMED').toUpperCase();
     const isCurrentActiveInHouse = activeStatus === 'IN-HOUSE' || activeStatus === 'ARRIVED' || activeStatus === 'STAYOVER';
