@@ -853,8 +853,8 @@ export const AddReservation: React.FC = () => {
 
     const {
         availableRatePlans,
+        availablePackages,
         calculateRoomRate,
-        getApplicablePackagesForRoomType,
         validateAllRoomRestrictions,
         getOfferValue,
         resolveOfferSelection,
@@ -1138,6 +1138,30 @@ export const AddReservation: React.FC = () => {
                 nights
             });
 
+            let newRoomType = r.roomType;
+            let newRoomNumber = r.roomNumber;
+            let newAssignedRooms = r.assignedRooms;
+
+            if (resolved.roomTypeChanged && resolved.targetRoomType) {
+                newRoomType = resolved.targetRoomType;
+                const otherUsed = new Set<string>();
+                prev.filter(other => other.id !== rowId).forEach(other => {
+                    if (other.assignedRooms && other.assignedRooms.length > 0) {
+                        other.assignedRooms.forEach(rn => otherUsed.add(rn));
+                    } else if (other.roomNumber) {
+                        otherUsed.add(other.roomNumber);
+                    }
+                });
+                const matchingFreeRooms = liveAvailabilityReport.availableRooms.filter(
+                    rn => isMatchingRoomType(rn.roomTypeName, newRoomType) && !otherUsed.has(rn.number)
+                );
+                if (matchingFreeRooms.length > 0) {
+                    newRoomNumber = matchingFreeRooms[0].number;
+                    newAssignedRooms = [matchingFreeRooms[0].number];
+                }
+                toast.info(`Room category updated to "${newRoomType}" for ${resolved.packageName}`);
+            }
+
             if (resolved.offerType === 'rate_plan') {
                 const restriction = validateRatePlanRestrictions(resolved.ratePlan, nights, checkIn, availableRatePlans);
                 if (!restriction.allowed) {
@@ -1152,6 +1176,9 @@ export const AddReservation: React.FC = () => {
 
             return {
                 ...r,
+                roomType: newRoomType,
+                roomNumber: newRoomNumber,
+                assignedRooms: newAssignedRooms,
                 ratePlan: resolved.ratePlan,
                 packageId: resolved.packageId,
                 packageName: resolved.packageName,
@@ -2585,7 +2612,6 @@ export const AddReservation: React.FC = () => {
                                                     </td>
                                                     <td className="p-1.5">
                                                         {(() => {
-                                                            const applicablePkgs = getApplicablePackagesForRoomType(row.roomType);
                                                             const currentOfferVal = getOfferValue(row);
 
                                                             return (
@@ -2611,13 +2637,22 @@ export const AddReservation: React.FC = () => {
                                                                         )}
                                                                     </optgroup>
 
-                                                                    {applicablePkgs.length > 0 && (
+                                                                    {availablePackages.filter(p => !p.status || p.status === 'Active').length > 0 && (
                                                                         <optgroup label="── 🎁 Bundled Packages ──">
-                                                                            {applicablePkgs.map(p => (
-                                                                                <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
-                                                                                    🎁 {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
-                                                                                </option>
-                                                                            ))}
+                                                                            {availablePackages
+                                                                                .filter(p => !p.status || p.status === 'Active')
+                                                                                .map(p => {
+                                                                                    const applicable = p.roomConfig?.applicableRoomTypes;
+                                                                                    const isApplicable = !applicable || !Array.isArray(applicable) || applicable.length === 0 || applicable.some((t: string) => t.toLowerCase() === 'all' || t.toLowerCase() === row.roomType.toLowerCase());
+                                                                                    const roomTypeNote = (!isApplicable && applicable && applicable.length > 0) ? ` (${applicable[0]})` : '';
+                                                                                    const surchargeText = p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : '';
+                                                                                    return (
+                                                                                        <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
+                                                                                            🎁 {p.name}{roomTypeNote}{surchargeText}
+                                                                                        </option>
+                                                                                    );
+                                                                                })
+                                                                            }
                                                                         </optgroup>
                                                                     )}
                                                                 </select>

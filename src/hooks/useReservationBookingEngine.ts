@@ -7,6 +7,7 @@ import {
     getRoomTypeCapacity,
     getStandardDailyRateForRoom,
     getActivePropertyId,
+    subscribeToPMSEvents,
     type RatePlanRestrictionResult
 } from '../utils/roomInventoryEngine';
 import {
@@ -82,8 +83,8 @@ export const useReservationBookingEngine = () => {
 
     const [isLoading, setIsLoading] = useState(false);
 
-    // Sync Rate Plans & Packages dynamically from PostgreSQL Database
-    useEffect(() => {
+    // Sync Rate Plans & Packages dynamically from PostgreSQL Database & Local Storage
+    const reloadOffers = useCallback(() => {
         const propId = getActivePropertyId();
         setIsLoading(true);
 
@@ -115,6 +116,30 @@ export const useReservationBookingEngine = () => {
             setIsLoading(false);
         });
     }, []);
+
+    useEffect(() => {
+        reloadOffers();
+
+        // Subscribe to PMS events (e.g., when a package or rate plan is created or modified)
+        const unsubscribe = subscribeToPMSEvents((msg) => {
+            if (msg.type === 'INVENTORY_REFRESH') {
+                reloadOffers();
+            }
+        });
+
+        // Cross-tab storage synchronization
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'hotel_packages_v2' || e.key === 'hotel_rate_plans_v1') {
+                reloadOffers();
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [reloadOffers]);
 
     // Helper: Find package by ID
     const getPackageById = useCallback((packageId?: number | string) => {
@@ -335,13 +360,24 @@ export const useReservationBookingEngine = () => {
             const pkgId = offerKey.replace(/^pkg:/, '');
             const pkg = getPackageById(pkgId);
             const defaultBasePlan = availableRatePlans[0]?.name || 'Standard Rate';
+
+            // Check if package requires a specific room category
+            const applicable = pkg?.roomConfig?.applicableRoomTypes;
+            const hasRoomTypeRestriction = applicable && Array.isArray(applicable) && applicable.length > 0 && !applicable.some((t: string) => t.toLowerCase() === 'all');
+            const isCurrentTypeApplicable = !hasRoomTypeRestriction || applicable.some((t: string) => t.toLowerCase() === roomType.toLowerCase());
+
+            const targetRoomType = (!isCurrentTypeApplicable && hasRoomTypeRestriction) ? applicable[0] : roomType;
+            const effectiveCanonicalRate = (targetRoomType.toLowerCase() !== roomType.toLowerCase() || !baseRate || baseRate <= 0)
+                ? getStandardDailyRateForRoom(undefined, targetRoomType)
+                : baseRate;
+
             const rate = calculateRoomRate({
-                roomType,
+                roomType: targetRoomType,
                 ratePlan: defaultBasePlan,
                 packageId: pkgId,
                 adults,
                 children,
-                baseRate: canonicalRate,
+                baseRate: effectiveCanonicalRate,
                 nights
             });
             return {
@@ -350,7 +386,9 @@ export const useReservationBookingEngine = () => {
                 ratePlan: pkg?.name || defaultBasePlan,
                 packageId: pkg?.id || pkgId,
                 packageName: pkg?.name,
-                rate
+                rate,
+                targetRoomType,
+                roomTypeChanged: targetRoomType.toLowerCase() !== roomType.toLowerCase()
             };
         } else {
             const planName = offerKey.startsWith('plan:') ? offerKey.replace(/^plan:/, '') : offerKey;
@@ -369,7 +407,9 @@ export const useReservationBookingEngine = () => {
                 ratePlan: planName,
                 packageId: undefined,
                 packageName: undefined,
-                rate
+                rate,
+                targetRoomType: roomType,
+                roomTypeChanged: false
             };
         }
     }, [availableRatePlans, getPackageById, calculateRoomRate]);

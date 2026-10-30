@@ -162,9 +162,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     const {
         availableRatePlans,
+        availablePackages,
         calculateRoomRate,
         getPackageById,
-        getApplicablePackagesForRoomType,
         validateAllRoomRestrictions,
         getOfferValue,
         resolveOfferSelection,
@@ -660,6 +660,20 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 nights
             });
 
+            let newRoomType = r.roomType;
+            let newRoomNumber = r.roomNumber;
+            let newAssignedRooms = r.assignedRooms;
+
+            if (resolved.roomTypeChanged && resolved.targetRoomType) {
+                newRoomType = resolved.targetRoomType;
+                const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomType: newRoomType, roomsCount: r.roomsCount });
+                if (autoAssigned.length > 0) {
+                    newRoomNumber = autoAssigned[0];
+                    newAssignedRooms = autoAssigned;
+                }
+                toast.info(`Room category updated to "${newRoomType}" for ${resolved.packageName}`);
+            }
+
             if (resolved.offerType === 'rate_plan') {
                 const restriction = validateRatePlanRestrictions(resolved.ratePlan, nights, checkIn, availableRatePlans);
                 if (!restriction.allowed) {
@@ -674,6 +688,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
             return {
                 ...r,
+                roomType: newRoomType,
+                roomNumber: newRoomNumber,
+                assignedRooms: newAssignedRooms,
                 ratePlan: resolved.ratePlan,
                 packageId: resolved.packageId,
                 packageName: resolved.packageName,
@@ -1662,7 +1679,6 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         </td>
                                                         <td className="p-3">
                                                             {(() => {
-                                                                const applicablePkgs = getApplicablePackagesForRoomType(row.roomType);
                                                                 const currentOfferVal = getOfferValue(row);
 
                                                                 return (
@@ -1688,13 +1704,22 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                             )}
                                                                         </optgroup>
 
-                                                                        {applicablePkgs.length > 0 && (
+                                                                        {availablePackages.filter(p => !p.status || p.status === 'Active').length > 0 && (
                                                                             <optgroup label="── 🎁 Bundled Packages ──">
-                                                                                {applicablePkgs.map(p => (
-                                                                                    <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
-                                                                                        🎁 {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
-                                                                                    </option>
-                                                                                ))}
+                                                                                {availablePackages
+                                                                                    .filter(p => !p.status || p.status === 'Active')
+                                                                                    .map(p => {
+                                                                                        const applicable = p.roomConfig?.applicableRoomTypes;
+                                                                                        const isApplicable = !applicable || !Array.isArray(applicable) || applicable.length === 0 || applicable.some((t: string) => t.toLowerCase() === 'all' || t.toLowerCase() === row.roomType.toLowerCase());
+                                                                                        const roomTypeNote = (!isApplicable && applicable && applicable.length > 0) ? ` (${applicable[0]})` : '';
+                                                                                        const surchargeText = p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : '';
+                                                                                        return (
+                                                                                            <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
+                                                                                                🎁 {p.name}{roomTypeNote}{surchargeText}
+                                                                                            </option>
+                                                                                        );
+                                                                                    })
+                                                                                }
                                                                             </optgroup>
                                                                         )}
                                                                     </select>
