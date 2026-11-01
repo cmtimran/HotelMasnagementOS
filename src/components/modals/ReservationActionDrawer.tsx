@@ -32,7 +32,10 @@ import {
     Key,
     ArrowRight,
     Sparkles,
-    TrendingUp
+    TrendingUp,
+    CheckCircle2,
+    RotateCcw,
+    Undo2
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
@@ -68,6 +71,10 @@ export type DrawerMode =
     | 'cancel'
     | 'void'
     | 'hold'
+    | 'confirm_hold'
+    | 'release_hold'
+    | 'reinstate'
+    | 'undo_checkin'
     | 'unassign'
     | 'ungroup'
     | 'link_group'
@@ -100,6 +107,10 @@ export interface ReservationActionDrawerProps {
     onConfirmCancel?: (bookingId: string, fee: number, refund: number, reason: string) => void;
     onConfirmVoid?: (bookingId: string, reason: string) => void;
     onConfirmHold?: (bookingId: string, startDate: string, endDate: string, reason: string) => void;
+    onConfirmHoldBooking?: (bookingId: string, depositAmount?: number, paymentMethod?: string, notes?: string) => void;
+    onReleaseHeldRoom?: (bookingId: string, reason?: string) => void;
+    onReinstateReservation?: (bookingId: string) => void;
+    onUndoCheckIn?: (reservationNumber: string) => void;
     onConfirmUnassign?: (bookingId: string, roomNumber: string) => void;
     onConfirmUngroup?: (bookingId: string, selectedRooms: string[]) => void;
     onConfirmChangeOwner?: (bookingId: string, newOwner: string) => void;
@@ -127,6 +138,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     onConfirmCancel,
     onConfirmVoid,
     onConfirmHold,
+    onConfirmHoldBooking,
+    onReleaseHeldRoom,
+    onReinstateReservation,
+    onUndoCheckIn,
     onConfirmUnassign,
     onConfirmUngroup,
     onConfirmChangeOwner,
@@ -218,6 +233,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [holdStartDate, setHoldStartDate] = useState<string>('');
     const [holdEndDate, setHoldEndDate] = useState<string>('');
     const [holdReason, setHoldReason] = useState<string>('');
+    const [confirmHoldDeposit, setConfirmHoldDeposit] = useState<number>(0);
+    const [confirmHoldMethod, setConfirmHoldMethod] = useState<string>('Cash');
+    const [confirmHoldNotes, setConfirmHoldNotes] = useState<string>('');
+    const [releaseHoldReason, setReleaseHoldReason] = useState<string>('Cut-off time reached / Expired');
 
     // 10. Unassign Room Form States
     const [unassignRoom, setUnassignRoom] = useState<string>('');
@@ -308,6 +327,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setHoldStartDate(arr);
             setHoldEndDate(dep);
             setHoldReason('');
+
+            setConfirmHoldDeposit(booking.depositRequired || 0);
+            setConfirmHoldMethod('Cash');
+            setConfirmHoldNotes('');
+            setReleaseHoldReason('Cut-off time reached / Expired');
 
             setUnassignRoom(booking.roomNumber);
             setSelectedUngroupRooms([booking.roomNumber]);
@@ -478,7 +502,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         plans.forEach(p => {
             const planName = p.name || p.shortCode || p.code;
             if (planName && planName !== 'Direct' && planName !== 'Summer Vacation' && !result.some(r => r.value === planName)) {
-                result.push({ label: `🏷️ ${planName}`, value: planName });
+                result.push({ label: `ðŸ·ï¸ ${planName}`, value: planName });
             }
         });
 
@@ -486,7 +510,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         const currentPlan = booking?.ratePlan;
         if (currentPlan && currentPlan !== 'Direct' && currentPlan !== 'Summer Vacation') {
             if (!result.some(r => r.value.toLowerCase() === currentPlan.toLowerCase())) {
-                result.unshift({ label: `🏷️ ${currentPlan}`, value: currentPlan });
+                result.unshift({ label: `ðŸ·ï¸ ${currentPlan}`, value: currentPlan });
             }
         }
 
@@ -494,12 +518,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         pkgs.forEach(pkg => {
             const pkgName = pkg.name || pkg.shortCode || pkg.code;
             if (pkgName && !result.some(r => r.value === pkgName)) {
-                result.push({ label: `🎁 ${pkgName}`, value: pkgName, isPackage: true });
+                result.push({ label: `ðŸŽ ${pkgName}`, value: pkgName, isPackage: true });
             }
         });
 
         if (result.length === 0) {
-            result.push({ label: '🏷️ Standard Rate', value: 'Standard Rate' });
+            result.push({ label: 'ðŸ·ï¸ Standard Rate', value: 'Standard Rate' });
         }
         return result;
     }, [booking?.ratePlan, ratesVersion]);
@@ -877,6 +901,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             case 'hold':
                 if (onConfirmHold) onConfirmHold(booking.id, holdStartDate, holdEndDate, holdReason);
                 break;
+            case 'confirm_hold':
+                if (onConfirmHoldBooking) onConfirmHoldBooking(booking.id, confirmHoldDeposit, confirmHoldMethod, confirmHoldNotes);
+                break;
+            case 'release_hold':
+                if (onReleaseHeldRoom) onReleaseHeldRoom(booking.id, releaseHoldReason);
+                break;
+            case 'reinstate':
+                if (onReinstateReservation) onReinstateReservation(booking.id);
+                break;
+            case 'undo_checkin':
+                if (onUndoCheckIn) onUndoCheckIn(booking.reservationNumber || booking.id);
+                break;
             case 'unassign':
                 if (onConfirmUnassign) onConfirmUnassign(booking.id, unassignRoom);
                 break;
@@ -915,6 +951,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 return { title: 'Void Reservation', buttonText: 'Confirm Void', buttonIcon: <CircleSlash size={13} />, buttonClass: 'bg-[#c62828] hover:bg-red-700' };
             case 'hold':
                 return { title: 'Reservation Hold', buttonText: 'Confirm Hold', buttonIcon: <CircleSlash size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+            case 'confirm_hold':
+                return { title: 'Confirm Hold', buttonText: 'Confirm Reservation', buttonIcon: <CheckCircle2 size={13} />, buttonClass: 'bg-emerald-600 hover:bg-emerald-700 font-bold' };
+            case 'release_hold':
+                return { title: 'Release Held Room', buttonText: 'Release Room Block', buttonIcon: <CircleSlash size={13} />, buttonClass: 'bg-rose-600 hover:bg-rose-700 font-bold' };
+            case 'reinstate':
+                return { title: 'Reinstate Reservation', buttonText: 'Restore to Confirmed', buttonIcon: <RotateCcw size={13} />, buttonClass: 'bg-emerald-600 hover:bg-emerald-700 font-bold' };
+            case 'undo_checkin':
+                return { title: 'Undo Check-In', buttonText: 'Reverse Check-In', buttonIcon: <Undo2 size={13} />, buttonClass: 'bg-amber-600 hover:bg-amber-700 font-bold' };
             case 'unassign':
                 return { title: 'Unassign Room', buttonText: 'Submit', buttonIcon: <DoorClosed size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'link_group':
@@ -930,24 +974,210 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     const modeMeta = getModeMeta();
 
-    // Standard Options List (matching media_1792542819332_c56d27e8.png)
-    const optionsList = [
-        { key: 'payment', label: 'Add Payment', icon: CreditCard },
-        { key: 'amend', label: 'Amend Stay', icon: Calendar },
-        { key: 'move', label: 'Room Move', icon: DoorOpen },
-        { key: 'split', label: 'Room Split', icon: GitFork },
-        { key: 'stop_move', label: 'Stop Room Move', icon: Hand },
-        { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
-        { key: 'cancel', label: 'Cancel Reservation', icon: CalendarX },
-        { key: 'hold', label: 'Reservation Hold', icon: CircleSlash },
-        { key: 'unassign', label: 'Unassign', icon: DoorClosed },
-        { key: 'void', label: 'Void Reservation', icon: CircleSlash },
-        ...(!isConnectingSuite ? [
-            { key: 'link_group', label: 'Link to Group', icon: LinkIcon },
-            { key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw },
-            { key: 'change_owner', label: 'Change Group Owner', icon: Crown }
-        ] : [])
-    ];
+    // Dynamic Status-Driven Categorized Options List (matching Yanolja Cloud / eZee / Wings PMS standards)
+    const groupedOptions = useMemo(() => {
+        if (!booking) return [];
+
+        const s = activeStatus;
+        const isHold = s === 'HOLD' || s === 'TENTATIVE';
+        const isInHouse = s === 'IN-HOUSE' || s === 'ARRIVED' || s === 'STAYOVER';
+        const isCheckedOut = s === 'CHECKED-OUT' || s === 'COMPLETED' || s === 'DEPARTED';
+        const isCancelled = s === 'CANCELLED';
+        const isVoid = s === 'VOID' || s === 'VOIDED';
+
+        if (booking.isPast || isVoid) {
+            return [];
+        }
+
+        const groups: Array<{
+            title: string;
+            items: Array<{
+                key: DrawerMode;
+                label: string;
+                icon: React.ElementType;
+                badge?: string;
+                badgeColor?: string;
+                isDanger?: boolean;
+                isSpecial?: boolean;
+            }>;
+        }> = [];
+
+        // ==========================================
+        // 1. CHECKED-OUT
+        // ==========================================
+        if (isCheckedOut) {
+            groups.push({
+                title: 'Financial Reconciliation',
+                items: [
+                    { key: 'payment', label: 'Settle / Refund Folio', icon: CreditCard, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700' }
+                ]
+            });
+            return groups;
+        }
+
+        // ==========================================
+        // 2. CANCELLED
+        // ==========================================
+        if (isCancelled) {
+            groups.push({
+                title: 'Financial',
+                items: [
+                    { key: 'payment', label: 'Settle / Refund Cancellation Fee', icon: CreditCard }
+                ]
+            });
+            groups.push({
+                title: 'Lifecycle',
+                items: [
+                    { key: 'reinstate', label: 'Reinstate Reservation', icon: RotateCcw, badge: 'Restore', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
+                ]
+            });
+            return groups;
+        }
+
+        // ==========================================
+        // 3. IN-HOUSE
+        // ==========================================
+        if (isInHouse) {
+            groups.push({
+                title: 'Financial Operations',
+                items: [
+                    { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard }
+                ]
+            });
+
+            groups.push({
+                title: 'Room & Stay Operations',
+                items: [
+                    { key: 'amend', label: 'Amend Stay (Extend/Shorten)', icon: Calendar },
+                    { key: 'move', label: 'Room Move & Upgrade', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
+                    { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
+                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand },
+                    { key: 'add_booking', label: 'Add Companion Room', icon: CalendarPlus }
+                ]
+            });
+
+            const groupItems: Array<any> = [];
+            if (!isConnectingSuite) {
+                if (booking.isGroup || booking.groupCode) {
+                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                    if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
+                        groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
+                    }
+                } else {
+                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+                }
+            }
+            if (groupItems.length > 0) {
+                groups.push({ title: 'Group Management', items: groupItems });
+            }
+
+            groups.push({
+                title: 'Exceptions',
+                items: [
+                    { key: 'undo_checkin', label: 'Undo Check-In', icon: Undo2, badge: 'Reverse', badgeColor: 'bg-amber-100 text-amber-800' }
+                ]
+            });
+
+            return groups;
+        }
+
+        // ==========================================
+        // 4. HOLD / TENTATIVE
+        // ==========================================
+        if (isHold) {
+            groups.push({
+                title: 'Financial Operations',
+                items: [
+                    { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard }
+                ]
+            });
+
+            groups.push({
+                title: 'Hold Resolution',
+                items: [
+                    { key: 'confirm_hold', label: 'Confirm Reservation (Release Hold)', icon: CheckCircle2, badge: 'Confirm', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
+                ]
+            });
+
+            groups.push({
+                title: 'Room & Stay Operations',
+                items: [
+                    { key: 'amend', label: 'Amend Dates & Pax', icon: Calendar },
+                    { key: 'move', label: 'Change Held Room', icon: DoorOpen },
+                    { key: 'unassign', label: 'Unassign Room', icon: DoorClosed },
+                    { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus }
+                ]
+            });
+
+            const groupItems: Array<any> = [];
+            if (!isConnectingSuite) {
+                if (booking.isGroup || booking.groupCode) {
+                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                } else {
+                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+                }
+            }
+            if (groupItems.length > 0) {
+                groups.push({ title: 'Group Management', items: groupItems });
+            }
+
+            groups.push({
+                title: 'Cancellation & Exception',
+                items: [
+                    { key: 'release_hold', label: 'Release / Cancel Held Room', icon: CircleSlash, isDanger: true },
+                    { key: 'void', label: 'Void Record', icon: CircleSlash, isDanger: true }
+                ]
+            });
+
+            return groups;
+        }
+
+        // ==========================================
+        // 5. CONFIRMED / ARRIVING
+        // ==========================================
+        groups.push({
+            title: 'Financial Operations',
+            items: [
+                { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard }
+            ]
+        });
+
+        groups.push({
+            title: 'Room & Stay Operations',
+            items: [
+                { key: 'amend', label: 'Amend Stay (Dates/Pax)', icon: Calendar },
+                { key: 'move', label: 'Assign / Change Room', icon: DoorOpen },
+                { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
+                { key: 'unassign', label: 'Unassign Room', icon: DoorClosed }
+            ]
+        });
+
+        const groupItems: Array<any> = [];
+        if (!isConnectingSuite) {
+            if (booking.isGroup || booking.groupCode) {
+                groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
+                    groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
+                }
+            } else {
+                groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+            }
+        }
+        if (groupItems.length > 0) {
+            groups.push({ title: 'Group Management', items: groupItems });
+        }
+
+        groups.push({
+            title: 'Lifecycle & Exceptions',
+            items: [
+                { key: 'hold', label: 'Place Reservation on Hold', icon: CircleSlash },
+                { key: 'cancel', label: 'Cancel Reservation', icon: CalendarX, isDanger: true },
+                { key: 'void', label: 'Void Reservation', icon: CircleSlash, isDanger: true }
+            ]
+        });
+
+        return groups;
+    }, [activeStatus, booking, isConnectingSuite]);
 
     const handleIssueKeycard = async () => {
         try {
@@ -1025,7 +1255,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         </span>
                         {isConnectingSuite && (
                             <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-indigo-50 text-indigo-800 border border-indigo-300 flex items-center gap-1" title="Interconnecting Suite Booking">
-                                🔗 Interconnecting Suite
+                                ðŸ”— Interconnecting Suite
                             </span>
                         )}
                     </div>
@@ -1083,29 +1313,73 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 )}
                             </button>
 
-                            {/* Dropdown Menu (all 12 PMS Actions matching screenshots) */}
+                            {/* Dropdown Menu (Status-Driven & Categorized) */}
                             {isOptionsOpen && (
-                                <div className="absolute right-5 top-full mt-1.5 w-54 bg-white rounded-md shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100 max-h-[350px] overflow-y-auto">
-                                    {optionsList.map(opt => {
-                                        const IconComponent = opt.icon;
-                                        const isActive = mode === opt.key;
-                                        return (
-                                            <button
-                                                key={opt.key}
-                                                type="button"
-                                                onClick={() => {
-                                                    setIsOptionsOpen(false);
-                                                    setMode(opt.key as DrawerMode);
-                                                }}
-                                                className={`w-full px-3.5 py-1.5 text-left text-[8px] font-medium hover:bg-gray-100 flex items-center gap-1 cursor-pointer transition-colors ${isActive ? 'bg-blue-50 text-blue-700 ' : 'text-gray-800'
-                                                    }`}
-                                            >
-                                                <IconComponent size={12} className={isActive ? 'text-blue-600' : 'text-gray-600'} />
-                                                <span className="truncate">{opt.label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-[100001]"
+                                        onClick={() => setIsOptionsOpen(false)}
+                                    />
+                                    <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-lg shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100 max-h-[400px] overflow-y-auto divide-y divide-gray-100">
+                                        {groupedOptions.map((grp) => (
+                                            <div key={grp.title} className="py-1">
+                                                <div className="px-3 py-1 text-[7.5px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50/70 select-none">
+                                                    {grp.title}
+                                                </div>
+                                                <div className="space-y-0.5 mt-0.5">
+                                                    {grp.items.map(opt => {
+                                                        const IconComponent = opt.icon;
+                                                        const isActive = mode === opt.key;
+                                                        return (
+                                                            <button
+                                                                key={opt.key}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setIsOptionsOpen(false);
+                                                                    setMode(opt.key);
+                                                                }}
+                                                                className={`w-full px-3 py-1.5 text-left text-[9px] font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                                                                    isActive
+                                                                        ? 'bg-blue-600 text-white font-bold'
+                                                                        : opt.isDanger
+                                                                        ? 'text-red-600 hover:bg-red-50 font-semibold'
+                                                                        : opt.isSpecial
+                                                                        ? 'text-emerald-700 hover:bg-emerald-50 font-semibold'
+                                                                        : 'text-gray-700 hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2 truncate">
+                                                                    <IconComponent
+                                                                        size={13}
+                                                                        className={`shrink-0 ${
+                                                                            isActive
+                                                                                ? 'text-white'
+                                                                                : opt.isDanger
+                                                                                ? 'text-red-500'
+                                                                                : opt.isSpecial
+                                                                                ? 'text-emerald-600'
+                                                                                : 'text-gray-500'
+                                                                        }`}
+                                                                    />
+                                                                    <span className="truncate">{opt.label}</span>
+                                                                </div>
+                                                                {opt.badge && (
+                                                                    <span className={`text-[7px] px-1.5 py-0.2 rounded font-bold shrink-0 ml-1.5 ${
+                                                                        isActive
+                                                                            ? 'bg-white/20 text-white'
+                                                                            : opt.badgeColor || 'bg-gray-100 text-gray-600'
+                                                                    }`}>
+                                                                        {opt.badge}
+                                                                    </span>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
@@ -1190,7 +1464,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <div className="min-w-0">
                                     <div className="text-[8px] uppercase  text-blue-200/80">ARRIVAL</div>
                                     <div className="text-[8px]  text-white truncate">{activeRoom.checkInDate || booking.arrivalDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono">🕒 16:00:00</div>
+                                    <div className="text-[8px] text-blue-200/70 font-mono">ðŸ•’ 16:00:00</div>
                                 </div>
                             </div>
 
@@ -1206,7 +1480,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <div className="min-w-0">
                                     <div className="text-[8px] uppercase  text-blue-200/80">DEPARTURE</div>
                                     <div className="text-[8px]  text-white truncate">{activeRoom.checkOutDate || departureDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono">🕒 12:00:00</div>
+                                    <div className="text-[8px] text-blue-200/70 font-mono">ðŸ•’ 12:00:00</div>
                                 </div>
                             </div>
                         </div>
@@ -1222,7 +1496,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <span>Room Details</span>
                                         {isConnectingSuite && (
                                             <span className="text-[7px] px-1 py-0.2 rounded bg-indigo-500/50 text-white font-bold border border-indigo-400/40">
-                                                🔗 Connected
+                                                ðŸ”— Connected
                                             </span>
                                         )}
                                     </div>
@@ -1415,9 +1689,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 {isConnectingSuite ? (
                                                     <>
                                                         <span className="px-1.5 py-0.5 rounded bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 text-[9px] font-extrabold flex items-center gap-1">
-                                                            🔗 Interconnecting Suite
+                                                            ðŸ”— Interconnecting Suite
                                                         </span>
-                                                        <span>(1 Booking • Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
+                                                        <span>(1 Booking â€¢ Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
                                                     </>
                                                 ) : (
                                                     `${activeRatePlan} (${resolvedGroupRooms.length})`
@@ -1425,7 +1699,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </h2>
                                             {isConnectingSuite ? (
                                                 <div className="text-[8.5px] font-medium text-emerald-300 mt-0.5 flex items-center gap-1">
-                                                    <span>🚪 Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
+                                                    <span>ðŸšª Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
                                                 </div>
                                             ) : booking.groupCode ? (
                                                 <div className="text-[8.5px] font-mono text-blue-200/90 mt-0.5">
@@ -1506,7 +1780,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[9px]">
                                                         {rm.isConnecting ? (
                                                             <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40 font-bold flex items-center gap-1">
-                                                                🔗 Rooms {rm.roomNumber}
+                                                                ðŸ”— Rooms {rm.roomNumber}
                                                             </span>
                                                         ) : (
                                                             <span className="px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-100 border border-blue-400/30 font-medium">
@@ -1868,7 +2142,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </span>
                                                     </div>
                                                     <div className="text-slate-300 text-[9px] mt-0.5">
-                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) • Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
+                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) â€¢ Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2000,7 +2274,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                     value={r.roomNumber}
                                                                     disabled={isBooked && !isCurrent}
                                                                 >
-                                                                    Room {r.roomNumber} • {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
+                                                                    Room {r.roomNumber} â€¢ {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
                                                                 </option>
                                                             );
                                                         });
@@ -2053,7 +2327,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                     : 'bg-white/10 text-slate-300 hover:bg-white/20'
                                                             }`}
                                                         >
-                                                            <span>✓ Complimentary (Free)</span>
+                                                            <span>âœ“ Complimentary (Free)</span>
                                                         </button>
                                                         <button
                                                             type="button"
@@ -2091,7 +2365,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="bg-blue-500/15 border border-blue-400/30 rounded-xl p-2.5 text-[9.5px] text-blue-200 flex items-center justify-between">
                                                 <div className="flex items-center gap-1.5 font-medium">
                                                     <RefreshCw size={12} className="text-blue-400" />
-                                                    <span>Lateral Transfer: Room {booking.roomNumber} ➔ Room {moveSelectedRoom}</span>
+                                                    <span>Lateral Transfer: Room {booking.roomNumber} âž” Room {moveSelectedRoom}</span>
                                                 </div>
                                                 <span className="text-[8px] bg-blue-400/20 text-blue-200 px-1.5 py-0.5 rounded font-medium">
                                                     Same Type ({roomMoveAnalysis.currentRoomType})
@@ -2525,7 +2799,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     className="w-full h-8 px-2.5 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none cursor-pointer appearance-none pr-6"
                                                 >
                                                     <option value={booking.roomNumber}>
-                                                        {booking.roomNumber} ({booking.roomType || 'Winter Rate Plan'})
+                                                        {booking.roomNumber} ({booking.roomType || 'Standard'})
                                                     </option>
                                                 </select>
                                                 <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-gray-600 pointer-events-none" />
@@ -2636,6 +2910,167 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MODE 14: CONFIRM HOLD (PROVISIONAL TO GUARANTEED CONFIRMED) */}
+                                {mode === 'confirm_hold' && (
+                                    <div className="space-y-3">
+                                        <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-xl p-3 space-y-1.5 text-emerald-100">
+                                            <div className="flex items-center gap-1.5 text-white font-bold text-[10.5px]">
+                                                <CheckCircle2 size={14} className="text-emerald-400" />
+                                                <span>Confirm & Guarantee Reservation</span>
+                                            </div>
+                                            <p className="text-[9px] leading-relaxed text-emerald-200">
+                                                This will release the provisional hold and convert reservation <strong className="text-white">{booking.reservationNumber}</strong> into a fully confirmed booking.
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-2.5 space-y-2 text-[9.5px]">
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Guest:</span>
+                                                <span className="font-bold text-white">{booking.guestName}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Room Assigned:</span>
+                                                <span className="font-bold text-white">Room {booking.roomNumber} ({booking.roomType})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Stay Dates:</span>
+                                                <span className="font-mono text-amber-300">{booking.arrivalDate} ➔ {booking.departureDate} ({booking.nights} nights)</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200 border-t border-white/10 pt-1.5">
+                                                <span>Total Tariff:</span>
+                                                <span className="font-mono font-bold text-emerald-300">{currencySymbol} {Number(totalAmount).toFixed(2)}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[9px] font-semibold text-blue-100">Advance Deposit ({currencySymbol})</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={confirmHoldDeposit}
+                                                    onChange={e => setConfirmHoldDeposit(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                    className="w-full h-8 px-2.5 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 font-mono outline-none"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[9px] font-semibold text-blue-100">Payment Method</label>
+                                                <select
+                                                    value={confirmHoldMethod}
+                                                    onChange={e => setConfirmHoldMethod(e.target.value)}
+                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none cursor-pointer"
+                                                >
+                                                    <option value="Cash">Cash</option>
+                                                    <option value="Credit Card">Credit Card</option>
+                                                    <option value="Debit Card">Debit Card</option>
+                                                    <option value="Bank Transfer">Bank Transfer</option>
+                                                    <option value="UPI / QR">UPI / QR Code</option>
+                                                    <option value="Online Gateway">Online Gateway</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-semibold text-blue-100">Confirmation Notes (Optional)</label>
+                                            <textarea
+                                                value={confirmHoldNotes}
+                                                onChange={e => setConfirmHoldNotes(e.target.value)}
+                                                rows={2}
+                                                placeholder="e.g. Deposit received, room block confirmed by guest."
+                                                className="w-full p-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MODE 15: RELEASE HELD ROOM */}
+                                {mode === 'release_hold' && (
+                                    <div className="space-y-3">
+                                        <div className="bg-rose-500/15 border border-rose-400/30 rounded-xl p-3 space-y-1.5 text-rose-100">
+                                            <div className="flex items-center gap-1.5 text-white font-bold text-[10.5px]">
+                                                <CircleSlash size={14} className="text-rose-400" />
+                                                <span>Release Held Room Block</span>
+                                            </div>
+                                            <p className="text-[9px] leading-relaxed text-rose-200">
+                                                Are you sure you want to release Room <strong className="text-white">{booking.roomNumber}</strong>? This will cancel the tentative hold and return the room to available inventory.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-semibold text-blue-100">Release Reason *</label>
+                                            <textarea
+                                                value={releaseHoldReason}
+                                                onChange={e => setReleaseHoldReason(e.target.value)}
+                                                rows={3}
+                                                placeholder="e.g. Cut-off time reached, guest did not provide guarantee deposit."
+                                                className="w-full p-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MODE 16: REINSTATE CANCELLED RESERVATION */}
+                                {mode === 'reinstate' && (
+                                    <div className="space-y-3">
+                                        <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-xl p-3 space-y-1.5 text-emerald-100">
+                                            <div className="flex items-center gap-1.5 text-white font-bold text-[10.5px]">
+                                                <RotateCcw size={14} className="text-emerald-400" />
+                                                <span>Reinstate Cancelled Reservation</span>
+                                            </div>
+                                            <p className="text-[9px] leading-relaxed text-emerald-200">
+                                                This will un-cancel reservation <strong className="text-white">{booking.reservationNumber}</strong> and restore it to Confirmed status.
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-2.5 space-y-1.5 text-[9.5px]">
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Guest Name:</span>
+                                                <span className="font-bold text-white">{booking.guestName}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Target Room:</span>
+                                                <span className="font-bold text-white">Room {booking.roomNumber} ({booking.roomType})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Stay Dates:</span>
+                                                <span className="font-mono text-emerald-300">{booking.arrivalDate} ➔ {booking.departureDate} ({booking.nights} nights)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MODE 17: UNDO CHECK-IN */}
+                                {mode === 'undo_checkin' && (
+                                    <div className="space-y-3">
+                                        <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 space-y-1.5 text-amber-100">
+                                            <div className="flex items-center gap-1.5 text-white font-bold text-[10.5px]">
+                                                <Undo2 size={14} className="text-amber-400" />
+                                                <span>Reverse Guest Check-In</span>
+                                            </div>
+                                            <p className="text-[9px] leading-relaxed text-amber-200">
+                                                Reverses the in-house check-in status back to <strong className="text-white">Confirmed</strong>. The guest will be moved back to the pre-arrival arrivals list.
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-2.5 space-y-1.5 text-[9.5px]">
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Guest:</span>
+                                                <span className="font-bold text-white">{booking.guestName}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Assigned Room:</span>
+                                                <span className="font-bold text-white">Room {booking.roomNumber} ({booking.roomType})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-200">
+                                                <span>Registration No:</span>
+                                                <span className="font-mono text-emerald-300">{activeRegNo || 'REG-PENDING'}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -2836,7 +3271,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -2853,13 +3288,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Personal Details</span>
                                                 <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
                                                 <p className="text-xs text-slate-700">Pax: {activeRoom.adults ?? booking.adults ?? 2} Adults, {activeRoom.children ?? booking.children ?? 0} Children</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
-                                                <p className="text-sm font-bold text-blue-700 font-mono">Room {activeRoomNum} — {activeRoomType}</p>
+                                                <p className="text-sm font-bold text-blue-700 font-mono">Room {activeRoomNum} â€” {activeRoomType}</p>
                                                 <p className="text-xs text-slate-700">Rate Plan: {activeRatePlan}</p>
                                                 <p className="text-xs text-slate-700 font-medium">Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)</p>
                                                 <p className="text-xs text-slate-700 font-medium">Check-Out: <span className="font-bold">{booking.departureDate || bookingAny.checkOut}</span> (12:00)</p>
@@ -2893,7 +3328,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -2909,8 +3344,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-blue-800 block">Lead Guest</span>
                                                 <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-blue-800 block">Booking Reference</span>
@@ -2937,7 +3372,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         <div className="text-[10px] text-slate-500">{activeRatePlan}</div>
                                                     </td>
                                                     <td className="p-2.5 text-center font-mono text-[11px]">
-                                                        {booking.arrivalDate || bookingAny.checkIn} → {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
+                                                        {booking.arrivalDate || bookingAny.checkIn} â†’ {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
                                                     </td>
                                                     <td className="p-2.5 text-right font-mono font-bold">
                                                         {currencySymbol} {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
@@ -2972,7 +3407,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3016,11 +3451,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <tr>
                                                     <td className="p-2.5">
                                                         <div className="font-semibold">Room Accommodation Tariff ({booking.nights || 1} Nights)</div>
-                                                        <div className="text-[10px] text-slate-500">Room {activeRoomNum} — {activeRatePlan}</div>
+                                                        <div className="text-[10px] text-slate-500">Room {activeRoomNum} â€” {activeRatePlan}</div>
                                                     </td>
                                                     <td className="p-2.5 text-center font-mono text-[11px]">{booking.arrivalDate || bookingAny.checkIn}</td>
                                                     <td className="p-2.5 text-right font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</td>
-                                                    <td className="p-2.5 text-right font-mono text-slate-400">—</td>
+                                                    <td className="p-2.5 text-right font-mono text-slate-400">â€”</td>
                                                 </tr>
                                                 {Number(booking.paidAmount || 0) > 0 && (
                                                     <tr>
@@ -3029,7 +3464,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <div className="text-[10px] text-emerald-600">Settled at Front Desk</div>
                                                         </td>
                                                         <td className="p-2.5 text-center font-mono text-[11px]">{operatingSystemDate}</td>
-                                                        <td className="p-2.5 text-right font-mono text-slate-400">—</td>
+                                                        <td className="p-2.5 text-right font-mono text-slate-400">â€”</td>
                                                         <td className="p-2.5 text-right font-mono font-bold text-emerald-700">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</td>
                                                     </tr>
                                                 )}
@@ -3071,7 +3506,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: accounts@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: accounts@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3091,8 +3526,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Billed To (Group / Corporate Account)</span>
                                                 <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
                                                 <p className="text-xs text-slate-700">Lead Contact: {booking.guestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
                                             </div>
                                             <div className="space-y-1 text-right">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Master Group Stay Details</span>
@@ -3162,7 +3597,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <p className="font-semibold text-slate-700 uppercase">Payment Instructions / Remittance:</p>
                                                 <p>Prime Bank Ltd, Gulshan Branch, Dhaka</p>
                                                 <p className="font-mono">Account: 1100-2233-4401 (BDT)</p>
-                                                <p className="font-mono">Routing No: 175272635 • Swift: PRBLBDDH</p>
+                                                <p className="font-mono">Routing No: 175272635 â€¢ Swift: PRBLBDDH</p>
                                             </div>
 
                                             <div className="w-72 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-lg border border-slate-200">
@@ -3211,7 +3646,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: reservations@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: reservations@grandpalace.com</p>
                                             </div>
                                             <div className="text-right">
                                                 <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
@@ -3230,8 +3665,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <span className="text-[10px] uppercase font-bold text-sky-800 block">Organizer / Corporate Entity</span>
                                                 <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
                                                 <p className="text-xs text-slate-700">Contact Person: {booking.guestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
                                             </div>
                                             <div className="space-y-1 text-right">
                                                 <span className="text-[10px] uppercase font-bold text-sky-800 block">Group Stay Period</span>
@@ -3241,7 +3676,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <p className="text-xs text-slate-800 font-medium">
                                                     Departure: <span className="font-bold font-mono">{booking.departureDate || bookingAny.checkOut}</span> (12:00)
                                                 </p>
-                                                <p className="text-xs text-slate-700">Duration: {origNights} Nights • Total Rooms: {groupFinancials.totalRooms}</p>
+                                                <p className="text-xs text-slate-700">Duration: {origNights} Nights â€¢ Total Rooms: {groupFinancials.totalRooms}</p>
                                                 <p className="text-xs text-slate-700 font-medium">Total Occupancy: {groupFinancials.totalPax} Guests</p>
                                             </div>
                                         </div>
@@ -3283,7 +3718,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 space-y-1 leading-relaxed">
                                             <p className="font-bold text-slate-700 uppercase">Group Check-In & Hotel Rules:</p>
                                             <p>1. Fast Check-in: Please present the Group Pre-Registration Sheet signed by the coordinator at reception.</p>
-                                            <p>2. Buffet breakfast is included for registered guests at The Palm Restaurant (06:30 AM – 10:30 AM).</p>
+                                            <p>2. Buffet breakfast is included for registered guests at The Palm Restaurant (06:30 AM â€“ 10:30 AM).</p>
                                             <p>3. Baggage handling and luggage tags will be coordinated at the concierge desk upon coach arrival.</p>
                                         </div>
 
@@ -3305,7 +3740,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Front Office Operations • Express Group Check-In</p>
+                                                <p className="text-[10px] text-slate-500">Front Office Operations â€¢ Express Group Check-In</p>
                                             </div>
                                             <div className="text-right">
                                                 <span className="inline-block px-2.5 py-1 rounded bg-emerald-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
@@ -3316,7 +3751,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 </div>
                                                 <div className="text-[10px] text-slate-500 mt-0.5">Arrival Date: {booking.arrivalDate || bookingAny.checkIn}</div>
                                                 <div className="text-[10px] text-emerald-800 font-bold font-mono">
-                                                    {groupFinancials.totalRooms} Rooms • {groupFinancials.totalPax} Guests
+                                                    {groupFinancials.totalRooms} Rooms â€¢ {groupFinancials.totalPax} Guests
                                                 </div>
                                             </div>
                                         </div>
@@ -3328,7 +3763,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </div>
                                             <div className="text-right">
                                                 <span className="text-[10px] uppercase font-bold text-emerald-800 block">Tour Escort / Lead</span>
-                                                <span className="font-semibold text-slate-800">{booking.guestName} ({booking.phone || bookingAny.mobile || '—'})</span>
+                                                <span className="font-semibold text-slate-800">{booking.guestName} ({booking.phone || bookingAny.mobile || 'â€”'})</span>
                                             </div>
                                         </div>
 
@@ -3367,7 +3802,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                 ________________
                                                             </td>
                                                             <td className="p-1.5 border-b border-dotted border-slate-400 text-center text-slate-300">
-                                                                ✕
+                                                                âœ•
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -3429,7 +3864,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </div>
                                                         <div className="space-y-1">
                                                             <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
-                                                            <p className="text-sm font-bold text-blue-700 font-mono">Room {rmNum} — {rm.roomType}</p>
+                                                            <p className="text-sm font-bold text-blue-700 font-mono">Room {rmNum} â€” {rm.roomType}</p>
                                                             <p className="text-xs text-slate-700">Rate Plan: {rm.ratePlan || 'Standard Rate'}</p>
                                                             <p className="text-xs text-slate-700 font-medium">
                                                                 Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)
@@ -3462,7 +3897,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <div className="hidden print:block page-break" style={{ pageBreakAfter: 'always', breakAfter: 'page', height: 0 }} />
                                                             <div className="block print:hidden my-6 border-b-2 border-dashed border-slate-300 relative text-center">
                                                                 <span className="bg-slate-100 px-3 text-[10px] font-mono text-slate-500 uppercase">
-                                                                    — Page Break for Room {rIdx + 1} of {groupFinancials.totalRooms} —
+                                                                    â€” Page Break for Room {rIdx + 1} of {groupFinancials.totalRooms} â€”
                                                                 </span>
                                                             </div>
                                                         </>

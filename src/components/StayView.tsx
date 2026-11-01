@@ -62,6 +62,8 @@ import {
     recordPaymentInDB,
     splitStayInDB,
     holdReservationInDB,
+    confirmHoldReservationInDB,
+    releaseHoldReservationInDB,
     voidReservationInDB,
     unassignRoomInDB,
     ungroupReservationInDB,
@@ -2100,6 +2102,125 @@ export const StayView: React.FC = () => {
         showToast(`Reservation ${target.reservationNumber} placed on HOLD until ${endDate}!`);
     };
 
+    const handleConfirmHoldBooking = async (bookingId: string, depositAmount: number = 0, paymentMethod: string = 'Cash', notes: string = '') => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (!target) return;
+
+        await confirmHoldReservationInDB(target.reservationNumber || bookingId, depositAmount, paymentMethod, notes);
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'confirmed',
+                paidAmount: (res.paidAmount || 0) + depositAmount,
+                dueAmount: Math.max(0, (res.totalAmount || 0) - ((res.paidAmount || 0) + depositAmount)),
+                holdUntil: undefined,
+                holdStartDate: undefined,
+                holdReason: undefined
+            };
+            stored[resIdx] = updated;
+            saveStoredReservations(stored);
+
+            try {
+                const existingHolds = JSON.parse(localStorage.getItem('hotel_holds_v2') || '[]');
+                const filteredHolds = existingHolds.filter((h: any) => h.reservationNumber !== target.reservationNumber);
+                localStorage.setItem('hotel_holds_v2', JSON.stringify(filteredHolds));
+            } catch {}
+
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
+        toast.success(`✨ Reservation ${target.reservationNumber} successfully Confirmed & Released from Hold!`);
+        setIsActionDrawerOpen(false);
+        syncStoredReservations();
+        await syncReservationsFromDB();
+    };
+
+    const handleReleaseHeldRoom = async (bookingId: string, reason: string = 'Released by front desk') => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (!target) return;
+
+        await releaseHoldReservationInDB(target.reservationNumber || bookingId, reason);
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'cancelled',
+                cancellationReason: `Hold Released: ${reason}`,
+                cancelledAt: new Date().toISOString()
+            };
+            stored[resIdx] = updated;
+            saveStoredReservations(stored);
+
+            try {
+                const existingHolds = JSON.parse(localStorage.getItem('hotel_holds_v2') || '[]');
+                const filteredHolds = existingHolds.filter((h: any) => h.reservationNumber !== target.reservationNumber);
+                localStorage.setItem('hotel_holds_v2', JSON.stringify(filteredHolds));
+            } catch {}
+
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.filter(b => b.id !== bookingId));
+        toast.success(`Room hold for ${target.reservationNumber} released. Room is now available!`);
+        setIsActionDrawerOpen(false);
+        syncStoredReservations();
+    };
+
+    const handleReinstateReservation = async (bookingId: string) => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (!target) return;
+
+        await updateReservationStatusInDB(target.reservationNumber, 'CONFIRMED');
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'confirmed',
+                cancelledAt: undefined,
+                cancellationFee: undefined,
+                refundAmount: undefined
+            };
+            stored[resIdx] = updated;
+            saveStoredReservations(stored);
+
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
+        toast.success(`✨ Reservation ${target.reservationNumber} reinstated to Confirmed status!`);
+        setIsActionDrawerOpen(false);
+        syncStoredReservations();
+        await syncReservationsFromDB();
+    };
+
+    const handleUndoCheckIn = async (reservationNumber: string) => {
+        try {
+            await updateReservationStatusInDB(reservationNumber, 'CONFIRMED');
+            setBookings(prev => prev.map(b => (b.reservationNumber === reservationNumber || b.id.includes(reservationNumber) || reservationNumber.startsWith(b.reservationNumber)) ? {
+                ...b,
+                status: 'confirmed'
+            } : b));
+            toast.success(`Check-in reversed for ${reservationNumber}. Status restored to Confirmed!`);
+            setIsActionDrawerOpen(false);
+            syncStoredReservations();
+            await syncReservationsFromDB();
+            syncStoredReservations();
+        } catch {
+            toast.error('Failed to undo check-in');
+        }
+    };
+
     const handleConfirmUnassign = (bookingId: string, roomNum: string) => {
         const target = bookings.find(b => b.id === bookingId);
         if (!target) return;
@@ -4126,6 +4247,10 @@ export const StayView: React.FC = () => {
                 onConfirmCancel={handleConfirmCancel}
                 onConfirmVoid={handleConfirmVoid}
                 onConfirmHold={handleConfirmHold}
+                onConfirmHoldBooking={handleConfirmHoldBooking}
+                onReleaseHeldRoom={handleReleaseHeldRoom}
+                onReinstateReservation={handleReinstateReservation}
+                onUndoCheckIn={handleUndoCheckIn}
                 onConfirmUnassign={handleConfirmUnassign}
                 onConfirmUngroup={handleConfirmUngroup}
                 onConfirmChangeOwner={handleConfirmChangeOwner}
