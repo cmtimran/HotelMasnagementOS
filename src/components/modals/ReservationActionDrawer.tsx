@@ -104,7 +104,7 @@ export interface ReservationActionDrawerProps {
     onSavePayment?: (bookingId: string, method: string, amount: number, remarks: string) => void;
     onSaveRoomSplit?: (bookingId: string, targetRoomNumber: string, fromDate: string, toDate: string) => void;
     onStopRoomMove?: (bookingId: string, allowRoomMove: boolean) => void;
-    onProceedNewBooking?: (bookingId: string, ownerFolio: string, groupOwner: string) => void;
+    onProceedNewBooking?: (bookingId: string, ownerFolio: string, groupOwner: string, sourceBooking?: AmendBookingData) => void;
     onConfirmCancel?: (bookingId: string, fee: number, refund: number, reason: string) => void;
     onConfirmVoid?: (bookingId: string, reason: string) => void;
     onConfirmHold?: (bookingId: string, startDate: string, endDate: string, reason: string) => void;
@@ -1097,7 +1097,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 if (onStopRoomMove) onStopRoomMove(booking.id, allowRoomMove);
                 break;
             case 'add_booking':
-                if (onProceedNewBooking) onProceedNewBooking(booking.id, newBookingFolio, newBookingGroupOwner);
+                if (onProceedNewBooking) onProceedNewBooking(booking.id, newBookingFolio, newBookingGroupOwner, booking);
                 break;
             case 'cancel':
                 if (onConfirmCancel) onConfirmCancel(booking.id, cancelFee, cancelRefund, cancelReason);

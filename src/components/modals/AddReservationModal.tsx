@@ -185,28 +185,45 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
         if (editingReservation) {
             setStep(1);
-            if (editingReservation.checkIn) setCheckIn(editingReservation.checkIn);
-            if (editingReservation.checkOut) setCheckOut(editingReservation.checkOut);
+            if (editingReservation.checkIn || editingReservation.arrivalDate) setCheckIn(editingReservation.checkIn || editingReservation.arrivalDate);
+            if (editingReservation.checkOut || editingReservation.departureDate) setCheckOut(editingReservation.checkOut || editingReservation.departureDate);
             if (editingReservation.nights) setNights(Number(editingReservation.nights) || 1);
             if (editingReservation.guestName) {
                 const cleanName = editingReservation.guestName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '');
                 setGuestName(cleanName);
+                const matchSal = (editingReservation.guestName || '').match(/^(Mr|Mrs|Ms|Dr|Prof)\b/i);
+                if (matchSal) {
+                    setSalutation(matchSal[1].charAt(0).toUpperCase() + matchSal[1].slice(1).toLowerCase());
+                }
             }
+            if (editingReservation.salutation) setSalutation(editingReservation.salutation);
             if (editingReservation.phone) setPhone(editingReservation.phone);
             if (editingReservation.mobile) setMobile(editingReservation.mobile);
+            else if (editingReservation.phone) setMobile(editingReservation.phone);
             if (editingReservation.email) setEmail(editingReservation.email);
             if (editingReservation.vip) setVipStatus(editingReservation.vip);
+            if (editingReservation.vipTier) setVipStatus(editingReservation.vipTier);
+            if (editingReservation.nationality) setNationality(editingReservation.nationality);
+            if (editingReservation.companyName) setCompanyName(editingReservation.companyName);
+            if (editingReservation.address || editingReservation.streetAddress) {
+                setStreetAddress(editingReservation.address || editingReservation.streetAddress);
+            }
+            if (editingReservation.city || editingReservation.homeCity) {
+                setHomeCity(editingReservation.city || editingReservation.homeCity);
+            }
             if (editingReservation.source) setBusinessSource(editingReservation.source);
             if (editingReservation.agent) setBusinessAgent(editingReservation.agent);
             if (editingReservation.purpose) setPurposeOfVisit(editingReservation.purpose);
             if (editingReservation.idType) setIdType(editingReservation.idType);
+            if (editingReservation.taxApplicable !== undefined) setTaxApplicable(editingReservation.taxApplicable);
+            if (editingReservation.taxConfigId) setSelectedTaxConfigId(editingReservation.taxConfigId);
             if (editingReservation.specialRequests) {
                 setRemarksMap(prev => ({ ...prev, Guest: editingReservation.specialRequests }));
             }
 
-            const defaultPlan = availableRatePlans[0]?.name || '';
+            const defaultPlan = availableRatePlans[0]?.name || 'Standard Rate';
 
-            if (editingReservation.roomsList && Array.isArray(editingReservation.roomsList) && editingReservation.roomsList.length > 0) {
+            if (editingReservation.roomsList && Array.isArray(editingReservation.roomsList) && editingReservation.roomsList.length > 0 && !editingReservation.isNewBookingTemplate) {
                 setRoomsList(editingReservation.roomsList.map((r: any, idx: number) => {
                     const cleanRm = String(r.roomNumber || '101');
                     const canonical = getCanonicalRooms().find(c => c.number === cleanRm);
@@ -229,7 +246,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                         pickup: r.pickup
                     };
                 }));
-            } else if (editingReservation.allocatedRooms && editingReservation.allocatedRooms.length > 0) {
+            } else if (editingReservation.allocatedRooms && editingReservation.allocatedRooms.length > 0 && !editingReservation.isNewBookingTemplate) {
                 setRoomsList(editingReservation.allocatedRooms.map((rm: string, idx: number) => {
                     const canonical = getCanonicalRooms().find(c => c.number === rm);
                     return {
@@ -251,26 +268,32 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             } else if (editingReservation.roomNumber) {
                 const rm = String(editingReservation.roomNumber);
                 const canonical = getCanonicalRooms().find(c => c.number === rm);
+                const targetRoomType = editingReservation.roomType || canonical?.roomTypeName || 'Deluxe Double';
+                const targetPlan = editingReservation.ratePlan || defaultPlan;
+                const dynamicTariff = calculateTariffForRatePlan(targetRoomType, targetPlan, editingReservation.checkIn || checkIn, editingReservation.checkOut || checkOut);
+                const effectiveRate = dynamicTariff > 0 ? dynamicTariff : (canonical?.baseRate || 3000);
                 setRoomsList([
                     {
                         id: 1,
-                        roomType: editingReservation.roomType || canonical?.roomTypeName || 'Deluxe Double',
+                        roomType: targetRoomType,
                         roomsCount: 1,
-                        ratePlan: editingReservation.ratePlan || defaultPlan,
+                        ratePlan: targetPlan,
                         roomNumber: rm,
                         assignedRooms: [rm],
                         adults: Number(editingReservation.adults) || 2,
                         children: Number(editingReservation.children) || 0,
-                        rate: canonical?.baseRate || 3000,
+                        rate: effectiveRate,
                         isAssign: true,
-                        checkInDate: editingReservation.checkIn,
-                        checkOutDate: editingReservation.checkOut,
-                        nights: editingReservation.nights || 1
+                        checkInDate: editingReservation.checkIn || checkIn,
+                        checkOutDate: editingReservation.checkOut || checkOut,
+                        nights: editingReservation.nights || nights || 1
                     }
                 ]);
             }
-            if (editingReservation.paidAmount !== undefined) {
+            if (editingReservation.paidAmount !== undefined && !editingReservation.isNewBookingTemplate) {
                 setPaymentRows([{ id: 1, method: 'Cash', amount: editingReservation.paidAmount }]);
+            } else if (editingReservation.isNewBookingTemplate) {
+                setPaymentRows([{ id: 1, method: 'Cash', amount: 0 }]);
             }
         } else {
             // Fresh Reservation from StayView or Header
@@ -990,8 +1013,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             return;
         }
 
-        const reservationNumber = editingReservation?.reservationNumber || generateMasterReservationNumber();
-        const reservationId = editingReservation?.id || Date.now();
+        const isTemplate = Boolean(editingReservation?.isNewBookingTemplate);
+        const reservationNumber = (!isTemplate && editingReservation?.reservationNumber) || generateMasterReservationNumber();
+        const reservationId = (!isTemplate && editingReservation?.id) || Date.now();
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
         const usedRoomsAcrossBooking = new Set<string>();
@@ -1048,16 +1072,16 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             }
         }
 
-        const isGroup = allocatedRoomNumbers.length > 1;
+        const isGroup = allocatedRoomNumbers.length > 1 || Boolean(editingReservation?.groupCode);
         const groupCode = isGroup ? (editingReservation?.groupCode || generateGroupCode()) : (editingReservation?.groupCode || undefined);
         const paymentEval = determineBookingStatusFromPayment(totalPaid, finalPayable, netBaseAmount);
         const statusVal = actionType === 'checkin' 
             ? 'in-house' 
             : actionType === 'hold' 
                 ? 'hold' 
-                : (editingReservation ? (totalPaid > 0 ? 'confirmed' : editingReservation.status) : paymentEval.status);
-        const regNo = statusVal === 'in-house' ? (editingReservation?.registrationNumber || generateRegistrationNumber(reservationNumber)) : undefined;
-        const folioNo = editingReservation?.folioNumber || generateFolioNumber(reservationNumber);
+                : (editingReservation && !isTemplate ? (totalPaid > 0 ? 'confirmed' : editingReservation.status) : paymentEval.status);
+        const regNo = statusVal === 'in-house' ? ((!isTemplate && editingReservation?.registrationNumber) || generateRegistrationNumber(reservationNumber)) : undefined;
+        const folioNo = (!isTemplate && editingReservation?.folioNumber) || generateFolioNumber(reservationNumber);
 
         const assignedRoomsExpanded = roomsList.flatMap((r) => {
             const countNeeded = Number(r.roomsCount) || 1;
@@ -1103,6 +1127,8 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             id: reservationId,
             reservationNumber,
             groupCode,
+            ownerFolio: editingReservation?.ownerFolio,
+            groupOwner: editingReservation?.groupOwner,
             subBookingNumber: isGroup ? `${reservationNumber}-01` : `${reservationNumber}-01`,
             isGroup,
             registrationNumber: regNo,

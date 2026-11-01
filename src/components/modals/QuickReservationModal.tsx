@@ -83,6 +83,7 @@ import { toast } from '../../context/ToastContext';
 export interface QuickReservationModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onProceedToFullForm?: (formData: any) => void;
     roomInfo?: {
         room?: string;
         roomNumber?: string;
@@ -137,6 +138,7 @@ interface PaymentRow {
 export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     isOpen,
     onClose,
+    onProceedToFullForm,
     roomInfo,
     onReserve,
     onReservationCreated
@@ -2898,6 +2900,40 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                         >
                             Cancel
                         </button>
+                        {onProceedToFullForm && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onProceedToFullForm({
+                                        isNewBookingTemplate: true,
+                                        guestName: name,
+                                        phone: phone,
+                                        mobile: mobile || phone,
+                                        email: email,
+                                        vip: selectedVip,
+                                        vipTier: selectedVip,
+                                        source: businessSource,
+                                        agent: businessAgent,
+                                        idType: idType,
+                                        checkIn: checkInDate,
+                                        checkOut: checkOutDate,
+                                        arrivalDate: checkInDate,
+                                        departureDate: checkOutDate,
+                                        nights: nights,
+                                        roomType: roomsList[0]?.roomType,
+                                        ratePlan: roomsList[0]?.ratePlan,
+                                        roomNumber: roomsList[0]?.roomNumber,
+                                        adults: roomsList[0]?.adults,
+                                        children: roomsList[0]?.children
+                                    });
+                                }}
+                                className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                                title="Switch to Full Multi-Step Reservation Form"
+                            >
+                                <span>Proceed to Full Form</span>
+                                <ArrowRight size={12} />
+                            </button>
+                        )}
                         <button
                             type="button"
                             disabled={hasOverbookingError}

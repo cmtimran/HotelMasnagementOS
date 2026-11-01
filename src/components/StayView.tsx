@@ -57,6 +57,7 @@ import {
     resolveReservationDailyBaseRate,
     getRoomTypeCapacity,
     calculateTariffForRatePlan,
+    getAvailableRoomsForStay,
     amendStayInDB,
     moveRoomInDB,
     recordPaymentInDB,
@@ -1987,9 +1988,65 @@ export const StayView: React.FC = () => {
         showToast(`Room move status updated for ${target?.guestName || 'reservation'} (Allow: ${allow})`);
     };
 
-    const handleProceedNewBooking = () => {
+    const handleProceedNewBooking = (bookingId?: string, ownerFolio?: string, groupOwner?: string, drawerBooking?: any) => {
         setIsActionDrawerOpen(false);
-        setEditingReservation(null);
+        const source = drawerBooking || actionDrawerBooking || bookings.find(b => String(b.id) === String(bookingId) || b.reservationNumber === bookingId);
+
+        if (source) {
+            const checkIn = source.arrivalDate || source.checkIn || operatingDateStr;
+            const checkOut = source.departureDate || source.checkOut || (() => {
+                const bStart = new Date(checkIn || '2026-07-01');
+                bStart.setDate(bStart.getDate() + (source.nights || 1));
+                return bStart.toISOString().split('T')[0];
+            })();
+            const targetRoomType = source.roomType || 'Deluxe Double';
+            
+            // Genuine availability check to pre-assign a free room avoiding double-booking the original room
+            const availReport = getAvailableRoomsForStay(checkIn, checkOut, targetRoomType);
+            const availableRoom = availReport.availableRooms.find(r => r.number !== source.roomNumber)?.number ||
+                                 availReport.availableRooms[0]?.number ||
+                                 '';
+
+            const template: any = {
+                isNewBookingTemplate: true,
+                guestName: source.guestName,
+                salutation: source.salutation,
+                phone: source.phone || '',
+                mobile: source.mobile || source.phone || '',
+                email: source.email || '',
+                vip: source.vip || (source as any).vipTier || (source as any).vipStatus || '',
+                vipTier: source.vip || (source as any).vipTier || '',
+                source: source.source || 'Direct',
+                agent: source.agent || 'Direct',
+                purpose: (source as any).purpose || 'Business',
+                idType: (source as any).idType || 'National ID (NID)',
+                nationality: (source as any).nationality || 'Bangladeshi',
+                companyName: source.companyName || '',
+                address: (source as any).address || '',
+                city: (source as any).city || '',
+                checkIn: checkIn,
+                checkOut: checkOut,
+                arrivalDate: checkIn,
+                departureDate: checkOut,
+                nights: source.nights || 1,
+                roomType: targetRoomType,
+                ratePlan: source.ratePlan || '',
+                adults: Number((source as any).adults) || 2,
+                children: Number((source as any).children) || 0,
+                roomNumber: availableRoom || source.roomNumber,
+                allocatedRooms: [availableRoom || source.roomNumber],
+                groupCode: source.groupCode || source.reservationNumber,
+                ownerFolio: ownerFolio || source.folioNumber || `FN-${source.reservationNumber}`,
+                groupOwner: groupOwner || `${source.guestName} (${source.roomNumber})`,
+                taxApplicable: (source as any).taxApplicable !== false,
+                taxConfigId: (source as any).taxConfigId,
+                specialRequests: `Companion room linked to Folio: ${ownerFolio || source.folioNumber || source.reservationNumber} (Lead: ${source.guestName})`
+            };
+
+            setEditingReservation(template);
+        } else {
+            setEditingReservation(null);
+        }
         setIsAddReservationOpen(true);
     };
 
@@ -4185,6 +4242,11 @@ export const StayView: React.FC = () => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
                 }}
+                onProceedToFullForm={(quickData) => {
+                    setIsQuickReservationOpen(false);
+                    setSelectedRange(null);
+                    handleProceedNewBooking(undefined, undefined, undefined, quickData);
+                }}
                 roomInfo={quickReservationRoomInfo}
                 onReserve={(_newBooking) => {
                     setIsQuickReservationOpen(false);
@@ -4206,9 +4268,9 @@ export const StayView: React.FC = () => {
                     setSelectedRange(null);
                     setEditingReservation(null);
                 }}
-                initialRoom={selectedRange?.room || '101'}
-                initialStartDate={selectedRange ? days[selectedRange.startIndex]?.date : startDate}
-                initialEndDate={(() => {
+                initialRoom={editingReservation?.roomNumber || selectedRange?.room || '101'}
+                initialStartDate={editingReservation?.checkIn || (selectedRange ? days[selectedRange.startIndex]?.date : startDate)}
+                initialEndDate={editingReservation?.checkOut || (() => {
                     const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
                     const stayNights = selectedRange ? Math.max(1, selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
                     const baseStart = new Date(startIso || '2026-07-01');
