@@ -4242,11 +4242,6 @@ export const StayView: React.FC = () => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
                 }}
-                onProceedToFullForm={(quickData) => {
-                    setIsQuickReservationOpen(false);
-                    setSelectedRange(null);
-                    handleProceedNewBooking(undefined, undefined, undefined, quickData);
-                }}
                 roomInfo={quickReservationRoomInfo}
                 onReserve={(_newBooking) => {
                     setIsQuickReservationOpen(false);
