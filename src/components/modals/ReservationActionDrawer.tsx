@@ -578,6 +578,220 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         };
     }, [booking, allRooms, moveSelectedRoom, moveRoomType, moveToDate, moveFromDate]);
 
+    // Derived status and flags for hook execution order compliance
+    const activeStatus = ((activeRoom?.status || booking?.status) || 'CONFIRMED').toUpperCase();
+    const isConnectingSuite = Boolean(
+        booking?.isConnectingSuite ||
+        (booking?.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
+        (typeof booking?.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
+        (Array.isArray(booking?.allocatedRooms) && booking.allocatedRooms.length > 1)
+    );
+
+    // Dynamic Status-Driven Categorized Options List (matching Yanolja Cloud / eZee / Wings PMS standards)
+    const groupedOptions = useMemo(() => {
+        if (!booking) return [];
+
+        const s = activeStatus;
+        const isHold = s === 'HOLD' || s === 'TENTATIVE';
+        const isInHouse = s === 'IN-HOUSE' || s === 'ARRIVED' || s === 'STAYOVER';
+        const isCheckedOut = s === 'CHECKED-OUT' || s === 'COMPLETED' || s === 'DEPARTED';
+        const isCancelled = s === 'CANCELLED';
+        const isVoid = s === 'VOID' || s === 'VOIDED';
+
+        if (booking.isPast || isVoid) {
+            return [];
+        }
+
+        const groups: Array<{
+            title: string;
+            items: Array<{
+                key: DrawerMode;
+                label: string;
+                icon: React.ElementType;
+                badge?: string;
+                badgeColor?: string;
+                isDanger?: boolean;
+                isSpecial?: boolean;
+            }>;
+        }> = [];
+
+        // ==========================================
+        // 1. CHECKED-OUT
+        // ==========================================
+        if (isCheckedOut) {
+            groups.push({
+                title: 'Financial Reconciliation',
+                items: [
+                    { key: 'payment', label: 'Settle / Refund Folio', icon: CreditCard, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700' }
+                ]
+            });
+            return groups;
+        }
+
+        // ==========================================
+        // 2. CANCELLED
+        // ==========================================
+        if (isCancelled) {
+            groups.push({
+                title: 'Financial',
+                items: [
+                    { key: 'payment', label: 'Settle / Refund Cancellation Fee', icon: CreditCard }
+                ]
+            });
+            groups.push({
+                title: 'Lifecycle',
+                items: [
+                    { key: 'reinstate', label: 'Reinstate Reservation', icon: RotateCcw, badge: 'Restore', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
+                ]
+            });
+            return groups;
+        }
+
+        // ==========================================
+        // 3. IN-HOUSE
+        // ==========================================
+        if (isInHouse) {
+            groups.push({
+                title: 'Financial Operations',
+                items: [
+                    { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard }
+                ]
+            });
+
+            groups.push({
+                title: 'Room & Stay Operations',
+                items: [
+                    { key: 'amend', label: 'Amend Stay (Extend/Shorten)', icon: Calendar },
+                    { key: 'move', label: 'Room Move & Upgrade', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
+                    { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
+                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand },
+                    { key: 'add_booking', label: 'Add Companion Room', icon: CalendarPlus }
+                ]
+            });
+
+            const groupItems: Array<any> = [];
+            if (!isConnectingSuite) {
+                if (booking.isGroup || booking.groupCode) {
+                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                    if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
+                        groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
+                    }
+                } else {
+                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+                }
+            }
+            if (groupItems.length > 0) {
+                groups.push({ title: 'Group Management', items: groupItems });
+            }
+
+            groups.push({
+                title: 'Exceptions',
+                items: [
+                    { key: 'undo_checkin', label: 'Undo Check-In', icon: Undo2, badge: 'Reverse', badgeColor: 'bg-amber-100 text-amber-800' }
+                ]
+            });
+
+            return groups;
+        }
+
+        // ==========================================
+        // 4. HOLD / TENTATIVE
+        // ==========================================
+        if (isHold) {
+            groups.push({
+                title: 'Financial Operations',
+                items: [
+                    { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard }
+                ]
+            });
+
+            groups.push({
+                title: 'Hold Resolution',
+                items: [
+                    { key: 'confirm_hold', label: 'Confirm Reservation (Release Hold)', icon: CheckCircle2, badge: 'Confirm', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
+                ]
+            });
+
+            groups.push({
+                title: 'Room & Stay Operations',
+                items: [
+                    { key: 'amend', label: 'Amend Dates & Pax', icon: Calendar },
+                    { key: 'move', label: 'Change Held Room', icon: DoorOpen },
+                    { key: 'unassign', label: 'Unassign Room', icon: DoorClosed },
+                    { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus }
+                ]
+            });
+
+            const groupItems: Array<any> = [];
+            if (!isConnectingSuite) {
+                if (booking.isGroup || booking.groupCode) {
+                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                } else {
+                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+                }
+            }
+            if (groupItems.length > 0) {
+                groups.push({ title: 'Group Management', items: groupItems });
+            }
+
+            groups.push({
+                title: 'Cancellation & Exception',
+                items: [
+                    { key: 'release_hold', label: 'Release / Cancel Held Room', icon: CircleSlash, isDanger: true },
+                    { key: 'void', label: 'Void Record', icon: CircleSlash, isDanger: true }
+                ]
+            });
+
+            return groups;
+        }
+
+        // ==========================================
+        // 5. CONFIRMED / ARRIVING
+        // ==========================================
+        groups.push({
+            title: 'Financial Operations',
+            items: [
+                { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard }
+            ]
+        });
+
+        groups.push({
+            title: 'Room & Stay Operations',
+            items: [
+                { key: 'amend', label: 'Amend Stay (Dates/Pax)', icon: Calendar },
+                { key: 'move', label: 'Assign / Change Room', icon: DoorOpen },
+                { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
+                { key: 'unassign', label: 'Unassign Room', icon: DoorClosed }
+            ]
+        });
+
+        const groupItems: Array<any> = [];
+        if (!isConnectingSuite) {
+            if (booking.isGroup || booking.groupCode) {
+                groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
+                if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
+                    groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
+                }
+            } else {
+                groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
+            }
+        }
+        if (groupItems.length > 0) {
+            groups.push({ title: 'Group Management', items: groupItems });
+        }
+
+        groups.push({
+            title: 'Lifecycle & Exceptions',
+            items: [
+                { key: 'hold', label: 'Place Reservation on Hold', icon: CircleSlash },
+                { key: 'cancel', label: 'Cancel Reservation', icon: CalendarX, isDanger: true },
+                { key: 'void', label: 'Void Reservation', icon: CircleSlash, isDanger: true }
+            ]
+        });
+
+        return groups;
+    }, [activeStatus, booking, isConnectingSuite]);
+
     if (!isOpen || !booking || !activeRoom) return null;
 
     const activeRoomNum = String(activeRoom.roomNumber || booking.roomNumber);
@@ -587,7 +801,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         ? rawActivePlan
         : (dynamicRatePlansAndPackages[0]?.value || 'Standard Rate');
     const activeSubBookingNo = activeRoom.reservationNumber || activeRoom.subBookingNumber || booking.subBookingNumber || booking.reservationNumber;
-    const activeStatus = (activeRoom.status || booking.status || 'CONFIRMED').toUpperCase();
     const isCurrentActiveInHouse = activeStatus === 'IN-HOUSE' || activeStatus === 'ARRIVED' || activeStatus === 'STAYOVER';
     const isCurrentActiveConfirmed = activeStatus === 'CONFIRMED' || activeStatus === 'ARRIVING';
     const isCurrentActiveCheckedOut = activeStatus === 'CHECKED-OUT' || activeStatus === 'COMPLETED' || activeStatus === 'DEPARTED';
@@ -609,13 +822,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const origBase = booking.baseAmount !== undefined ? booking.baseAmount : Math.max(0, origTotal - origTax);
     const dailyBaseRate = Math.max(0, Math.round(origBase / Math.max(1, origNights)));
 
-    // Connecting Suite Detection
-    const isConnectingSuite = Boolean(
-        booking.isConnectingSuite ||
-        (booking.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
-        (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
-        (Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1)
-    );
 
     // Capacity & Occupancy Checks
     const baseCapacity = getRoomTypeCapacity(booking.roomType);
@@ -973,211 +1179,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     };
 
     const modeMeta = getModeMeta();
-
-    // Dynamic Status-Driven Categorized Options List (matching Yanolja Cloud / eZee / Wings PMS standards)
-    const groupedOptions = useMemo(() => {
-        if (!booking) return [];
-
-        const s = activeStatus;
-        const isHold = s === 'HOLD' || s === 'TENTATIVE';
-        const isInHouse = s === 'IN-HOUSE' || s === 'ARRIVED' || s === 'STAYOVER';
-        const isCheckedOut = s === 'CHECKED-OUT' || s === 'COMPLETED' || s === 'DEPARTED';
-        const isCancelled = s === 'CANCELLED';
-        const isVoid = s === 'VOID' || s === 'VOIDED';
-
-        if (booking.isPast || isVoid) {
-            return [];
-        }
-
-        const groups: Array<{
-            title: string;
-            items: Array<{
-                key: DrawerMode;
-                label: string;
-                icon: React.ElementType;
-                badge?: string;
-                badgeColor?: string;
-                isDanger?: boolean;
-                isSpecial?: boolean;
-            }>;
-        }> = [];
-
-        // ==========================================
-        // 1. CHECKED-OUT
-        // ==========================================
-        if (isCheckedOut) {
-            groups.push({
-                title: 'Financial Reconciliation',
-                items: [
-                    { key: 'payment', label: 'Settle / Refund Folio', icon: CreditCard, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700' }
-                ]
-            });
-            return groups;
-        }
-
-        // ==========================================
-        // 2. CANCELLED
-        // ==========================================
-        if (isCancelled) {
-            groups.push({
-                title: 'Financial',
-                items: [
-                    { key: 'payment', label: 'Settle / Refund Cancellation Fee', icon: CreditCard }
-                ]
-            });
-            groups.push({
-                title: 'Lifecycle',
-                items: [
-                    { key: 'reinstate', label: 'Reinstate Reservation', icon: RotateCcw, badge: 'Restore', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
-                ]
-            });
-            return groups;
-        }
-
-        // ==========================================
-        // 3. IN-HOUSE
-        // ==========================================
-        if (isInHouse) {
-            groups.push({
-                title: 'Financial Operations',
-                items: [
-                    { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard }
-                ]
-            });
-
-            groups.push({
-                title: 'Room & Stay Operations',
-                items: [
-                    { key: 'amend', label: 'Amend Stay (Extend/Shorten)', icon: Calendar },
-                    { key: 'move', label: 'Room Move & Upgrade', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
-                    { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
-                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand },
-                    { key: 'add_booking', label: 'Add Companion Room', icon: CalendarPlus }
-                ]
-            });
-
-            const groupItems: Array<any> = [];
-            if (!isConnectingSuite) {
-                if (booking.isGroup || booking.groupCode) {
-                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
-                    if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
-                        groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
-                    }
-                } else {
-                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
-                }
-            }
-            if (groupItems.length > 0) {
-                groups.push({ title: 'Group Management', items: groupItems });
-            }
-
-            groups.push({
-                title: 'Exceptions',
-                items: [
-                    { key: 'undo_checkin', label: 'Undo Check-In', icon: Undo2, badge: 'Reverse', badgeColor: 'bg-amber-100 text-amber-800' }
-                ]
-            });
-
-            return groups;
-        }
-
-        // ==========================================
-        // 4. HOLD / TENTATIVE
-        // ==========================================
-        if (isHold) {
-            groups.push({
-                title: 'Financial Operations',
-                items: [
-                    { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard }
-                ]
-            });
-
-            groups.push({
-                title: 'Hold Resolution',
-                items: [
-                    { key: 'confirm_hold', label: 'Confirm Reservation (Release Hold)', icon: CheckCircle2, badge: 'Confirm', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true }
-                ]
-            });
-
-            groups.push({
-                title: 'Room & Stay Operations',
-                items: [
-                    { key: 'amend', label: 'Amend Dates & Pax', icon: Calendar },
-                    { key: 'move', label: 'Change Held Room', icon: DoorOpen },
-                    { key: 'unassign', label: 'Unassign Room', icon: DoorClosed },
-                    { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus }
-                ]
-            });
-
-            const groupItems: Array<any> = [];
-            if (!isConnectingSuite) {
-                if (booking.isGroup || booking.groupCode) {
-                    groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
-                } else {
-                    groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
-                }
-            }
-            if (groupItems.length > 0) {
-                groups.push({ title: 'Group Management', items: groupItems });
-            }
-
-            groups.push({
-                title: 'Cancellation & Exception',
-                items: [
-                    { key: 'release_hold', label: 'Release / Cancel Held Room', icon: CircleSlash, isDanger: true },
-                    { key: 'void', label: 'Void Record', icon: CircleSlash, isDanger: true }
-                ]
-            });
-
-            return groups;
-        }
-
-        // ==========================================
-        // 5. CONFIRMED / ARRIVING
-        // ==========================================
-        groups.push({
-            title: 'Financial Operations',
-            items: [
-                { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard }
-            ]
-        });
-
-        groups.push({
-            title: 'Room & Stay Operations',
-            items: [
-                { key: 'amend', label: 'Amend Stay (Dates/Pax)', icon: Calendar },
-                { key: 'move', label: 'Assign / Change Room', icon: DoorOpen },
-                { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
-                { key: 'unassign', label: 'Unassign Room', icon: DoorClosed }
-            ]
-        });
-
-        const groupItems: Array<any> = [];
-        if (!isConnectingSuite) {
-            if (booking.isGroup || booking.groupCode) {
-                groupItems.push({ key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw });
-                if ((booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1)) {
-                    groupItems.push({ key: 'change_owner', label: 'Change Group Owner', icon: Crown });
-                }
-            } else {
-                groupItems.push({ key: 'link_group', label: 'Link to Group', icon: LinkIcon });
-            }
-        }
-        if (groupItems.length > 0) {
-            groups.push({ title: 'Group Management', items: groupItems });
-        }
-
-        groups.push({
-            title: 'Lifecycle & Exceptions',
-            items: [
-                { key: 'hold', label: 'Place Reservation on Hold', icon: CircleSlash },
-                { key: 'cancel', label: 'Cancel Reservation', icon: CalendarX, isDanger: true },
-                { key: 'void', label: 'Void Reservation', icon: CircleSlash, isDanger: true }
-            ]
-        });
-
-        return groups;
-    }, [activeStatus, booking, isConnectingSuite]);
 
     const handleIssueKeycard = async () => {
         try {
