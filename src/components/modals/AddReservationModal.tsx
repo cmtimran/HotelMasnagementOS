@@ -47,6 +47,7 @@ import {
     getDynamicRoomTypes,
     validateRatePlanRestrictions,
     getRoomTypeCapacity,
+    calculateTariffForRatePlan,
     generateMasterReservationNumber,
     generateGroupCode,
     generateSubBookingNumber,
@@ -270,8 +271,16 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 const canonical = getCanonicalRooms().find(c => c.number === rm);
                 const targetRoomType = editingReservation.roomType || canonical?.roomTypeName || 'Deluxe Double';
                 const targetPlan = editingReservation.ratePlan || defaultPlan;
-                const dynamicTariff = calculateTariffForRatePlan(targetRoomType, targetPlan, editingReservation.checkIn || checkIn, editingReservation.checkOut || checkOut);
-                const effectiveRate = dynamicTariff > 0 ? dynamicTariff : (canonical?.baseRate || 3000);
+                const canonicalBase = canonical?.baseRate || 3000;
+                const dynamicTariff = calculateTariffForRatePlan(
+                    targetPlan,
+                    targetRoomType,
+                    canonicalBase,
+                    Number(editingReservation.adults) || 2,
+                    Number(editingReservation.children) || 0,
+                    availableRatePlans
+                );
+                const effectiveRate = dynamicTariff > 0 ? dynamicTariff : canonicalBase;
                 setRoomsList([
                     {
                         id: 1,
