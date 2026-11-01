@@ -382,7 +382,7 @@ export const bookingService = {
         allocatedRooms: allocatedRoomNumbers.length > 0 ? allocatedRoomNumbers : [primaryRoom.room_number],
         roomType: resolvedRoomType,
         isConnectingSuite: isConnSuite,
-        ratePlan: r.corporate_name || r.source || 'Standard Plan',
+        ratePlan: r.corporate_name || (r.source && r.source !== 'Direct' ? r.source : 'BAR'),
         rateAmount: Number(r.total_amount) || 0,
         totalAmount: Number(r.total_amount) || 0,
         paidAmount: Number(r.paid_amount) || 0,
