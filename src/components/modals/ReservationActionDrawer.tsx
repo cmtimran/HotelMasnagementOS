@@ -35,7 +35,8 @@ import {
     TrendingUp,
     CheckCircle2,
     RotateCcw,
-    Undo2
+    Undo2,
+    Clock
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
@@ -502,7 +503,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         plans.forEach(p => {
             const planName = p.name || p.shortCode || p.code;
             if (planName && planName !== 'Direct' && planName !== 'Summer Vacation' && !result.some(r => r.value === planName)) {
-                result.push({ label: `ðŸ·ï¸ ${planName}`, value: planName });
+                result.push({ label: planName, value: planName });
             }
         });
 
@@ -510,7 +511,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         const currentPlan = booking?.ratePlan;
         if (currentPlan && currentPlan !== 'Direct' && currentPlan !== 'Summer Vacation') {
             if (!result.some(r => r.value.toLowerCase() === currentPlan.toLowerCase())) {
-                result.unshift({ label: `ðŸ·ï¸ ${currentPlan}`, value: currentPlan });
+                result.unshift({ label: currentPlan, value: currentPlan });
             }
         }
 
@@ -518,12 +519,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         pkgs.forEach(pkg => {
             const pkgName = pkg.name || pkg.shortCode || pkg.code;
             if (pkgName && !result.some(r => r.value === pkgName)) {
-                result.push({ label: `ðŸŽ ${pkgName}`, value: pkgName, isPackage: true });
+                result.push({ label: `${pkgName} (Package)`, value: pkgName, isPackage: true });
             }
         });
 
         if (result.length === 0) {
-            result.push({ label: 'ðŸ·ï¸ Standard Rate', value: 'Standard Rate' });
+            result.push({ label: 'Standard Rate', value: 'Standard Rate' });
         }
         return result;
     }, [booking?.ratePlan, ratesVersion]);
@@ -1256,7 +1257,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         </span>
                         {isConnectingSuite && (
                             <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-indigo-50 text-indigo-800 border border-indigo-300 flex items-center gap-1" title="Interconnecting Suite Booking">
-                                ðŸ”— Interconnecting Suite
+                                Interconnecting Suite
                             </span>
                         )}
                     </div>
@@ -1465,7 +1466,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <div className="min-w-0">
                                     <div className="text-[8px] uppercase  text-blue-200/80">ARRIVAL</div>
                                     <div className="text-[8px]  text-white truncate">{activeRoom.checkInDate || booking.arrivalDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono">ðŸ•’ 16:00:00</div>
+                                    <div className="text-[8px] text-blue-200/70 font-mono flex items-center gap-0.5"><Clock size={9} className="opacity-70" /><span>16:00:00</span></div>
                                 </div>
                             </div>
 
@@ -1481,7 +1482,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <div className="min-w-0">
                                     <div className="text-[8px] uppercase  text-blue-200/80">DEPARTURE</div>
                                     <div className="text-[8px]  text-white truncate">{activeRoom.checkOutDate || departureDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono">ðŸ•’ 12:00:00</div>
+                                    <div className="text-[8px] text-blue-200/70 font-mono flex items-center gap-0.5"><Clock size={9} className="opacity-70" /><span>12:00:00</span></div>
                                 </div>
                             </div>
                         </div>
@@ -1497,7 +1498,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <span>Room Details</span>
                                         {isConnectingSuite && (
                                             <span className="text-[7px] px-1 py-0.2 rounded bg-indigo-500/50 text-white font-bold border border-indigo-400/40">
-                                                ðŸ”— Connected
+                                                Connected
                                             </span>
                                         )}
                                     </div>
@@ -1690,9 +1691,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 {isConnectingSuite ? (
                                                     <>
                                                         <span className="px-1.5 py-0.5 rounded bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 text-[9px] font-extrabold flex items-center gap-1">
-                                                            ðŸ”— Interconnecting Suite
+                                                            Interconnecting Suite
                                                         </span>
-                                                        <span>(1 Booking â€¢ Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
+                                                        <span>(1 Booking • Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
                                                     </>
                                                 ) : (
                                                     `${activeRatePlan} (${resolvedGroupRooms.length})`
@@ -1700,7 +1701,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </h2>
                                             {isConnectingSuite ? (
                                                 <div className="text-[8.5px] font-medium text-emerald-300 mt-0.5 flex items-center gap-1">
-                                                    <span>ðŸšª Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
+                                                    <span>Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
                                                 </div>
                                             ) : booking.groupCode ? (
                                                 <div className="text-[8.5px] font-mono text-blue-200/90 mt-0.5">
@@ -1781,7 +1782,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[9px]">
                                                         {rm.isConnecting ? (
                                                             <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40 font-bold flex items-center gap-1">
-                                                                ðŸ”— Rooms {rm.roomNumber}
+                                                                Rooms {rm.roomNumber}
                                                             </span>
                                                         ) : (
                                                             <span className="px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-100 border border-blue-400/30 font-medium">
@@ -2143,7 +2144,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </span>
                                                     </div>
                                                     <div className="text-slate-300 text-[9px] mt-0.5">
-                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) â€¢ Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
+                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) • Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2275,7 +2276,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                     value={r.roomNumber}
                                                                     disabled={isBooked && !isCurrent}
                                                                 >
-                                                                    Room {r.roomNumber} â€¢ {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
+                                                                    Room {r.roomNumber} • {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
                                                                 </option>
                                                             );
                                                         });
@@ -2328,7 +2329,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                     : 'bg-white/10 text-slate-300 hover:bg-white/20'
                                                             }`}
                                                         >
-                                                            <span>âœ“ Complimentary (Free)</span>
+                                                            <span>✓ Complimentary (Free)</span>
                                                         </button>
                                                         <button
                                                             type="button"
@@ -2366,7 +2367,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="bg-blue-500/15 border border-blue-400/30 rounded-xl p-2.5 text-[9.5px] text-blue-200 flex items-center justify-between">
                                                 <div className="flex items-center gap-1.5 font-medium">
                                                     <RefreshCw size={12} className="text-blue-400" />
-                                                    <span>Lateral Transfer: Room {booking.roomNumber} âž” Room {moveSelectedRoom}</span>
+                                                    <span>Lateral Transfer: Room {booking.roomNumber} ➔ Room {moveSelectedRoom}</span>
                                                 </div>
                                                 <span className="text-[8px] bg-blue-400/20 text-blue-200 px-1.5 py-0.5 rounded font-medium">
                                                     Same Type ({roomMoveAnalysis.currentRoomType})
@@ -3272,7 +3273,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3289,13 +3290,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Personal Details</span>
                                                 <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
                                                 <p className="text-xs text-slate-700">Pax: {activeRoom.adults ?? booking.adults ?? 2} Adults, {activeRoom.children ?? booking.children ?? 0} Children</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
-                                                <p className="text-sm font-bold text-blue-700 font-mono">Room {activeRoomNum} â€” {activeRoomType}</p>
+                                                <p className="text-sm font-bold text-blue-700 font-mono">Room {activeRoomNum} — {activeRoomType}</p>
                                                 <p className="text-xs text-slate-700">Rate Plan: {activeRatePlan}</p>
                                                 <p className="text-xs text-slate-700 font-medium">Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)</p>
                                                 <p className="text-xs text-slate-700 font-medium">Check-Out: <span className="font-bold">{booking.departureDate || bookingAny.checkOut}</span> (12:00)</p>
@@ -3329,7 +3330,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3345,8 +3346,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-blue-800 block">Lead Guest</span>
                                                 <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
                                             </div>
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-blue-800 block">Booking Reference</span>
@@ -3373,7 +3374,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         <div className="text-[10px] text-slate-500">{activeRatePlan}</div>
                                                     </td>
                                                     <td className="p-2.5 text-center font-mono text-[11px]">
-                                                        {booking.arrivalDate || bookingAny.checkIn} â†’ {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
+                                                        {booking.arrivalDate || bookingAny.checkIn} → {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
                                                     </td>
                                                     <td className="p-2.5 text-right font-mono font-bold">
                                                         {currencySymbol} {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
@@ -3408,7 +3409,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3452,11 +3453,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <tr>
                                                     <td className="p-2.5">
                                                         <div className="font-semibold">Room Accommodation Tariff ({booking.nights || 1} Nights)</div>
-                                                        <div className="text-[10px] text-slate-500">Room {activeRoomNum} â€” {activeRatePlan}</div>
+                                                        <div className="text-[10px] text-slate-500">Room {activeRoomNum} — {activeRatePlan}</div>
                                                     </td>
                                                     <td className="p-2.5 text-center font-mono text-[11px]">{booking.arrivalDate || bookingAny.checkIn}</td>
                                                     <td className="p-2.5 text-right font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</td>
-                                                    <td className="p-2.5 text-right font-mono text-slate-400">â€”</td>
+                                                    <td className="p-2.5 text-right font-mono text-slate-400">—</td>
                                                 </tr>
                                                 {Number(booking.paidAmount || 0) > 0 && (
                                                     <tr>
@@ -3465,7 +3466,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <div className="text-[10px] text-emerald-600">Settled at Front Desk</div>
                                                         </td>
                                                         <td className="p-2.5 text-center font-mono text-[11px]">{operatingSystemDate}</td>
-                                                        <td className="p-2.5 text-right font-mono text-slate-400">â€”</td>
+                                                        <td className="p-2.5 text-right font-mono text-slate-400">—</td>
                                                         <td className="p-2.5 text-right font-mono font-bold text-emerald-700">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</td>
                                                     </tr>
                                                 )}
@@ -3507,7 +3508,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: accounts@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: accounts@grandpalace.com</p>
                                                 <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
                                             </div>
                                             <div className="text-right">
@@ -3527,8 +3528,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Billed To (Group / Corporate Account)</span>
                                                 <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
                                                 <p className="text-xs text-slate-700">Lead Contact: {booking.guestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
                                             </div>
                                             <div className="space-y-1 text-right">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Master Group Stay Details</span>
@@ -3598,7 +3599,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <p className="font-semibold text-slate-700 uppercase">Payment Instructions / Remittance:</p>
                                                 <p>Prime Bank Ltd, Gulshan Branch, Dhaka</p>
                                                 <p className="font-mono">Account: 1100-2233-4401 (BDT)</p>
-                                                <p className="font-mono">Routing No: 175272635 â€¢ Swift: PRBLBDDH</p>
+                                                <p className="font-mono">Routing No: 175272635 • Swift: PRBLBDDH</p>
                                             </div>
 
                                             <div className="w-72 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-lg border border-slate-200">
@@ -3647,7 +3648,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 â€¢ Email: reservations@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: reservations@grandpalace.com</p>
                                             </div>
                                             <div className="text-right">
                                                 <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
@@ -3666,8 +3667,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <span className="text-[10px] uppercase font-bold text-sky-800 block">Organizer / Corporate Entity</span>
                                                 <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
                                                 <p className="text-xs text-slate-700">Contact Person: {booking.guestName}</p>
-                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || 'â€”'}</p>
-                                                <p className="text-xs text-slate-700">Email: {booking.email || 'â€”'}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
                                             </div>
                                             <div className="space-y-1 text-right">
                                                 <span className="text-[10px] uppercase font-bold text-sky-800 block">Group Stay Period</span>
@@ -3677,7 +3678,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <p className="text-xs text-slate-800 font-medium">
                                                     Departure: <span className="font-bold font-mono">{booking.departureDate || bookingAny.checkOut}</span> (12:00)
                                                 </p>
-                                                <p className="text-xs text-slate-700">Duration: {origNights} Nights â€¢ Total Rooms: {groupFinancials.totalRooms}</p>
+                                                <p className="text-xs text-slate-700">Duration: {origNights} Nights • Total Rooms: {groupFinancials.totalRooms}</p>
                                                 <p className="text-xs text-slate-700 font-medium">Total Occupancy: {groupFinancials.totalPax} Guests</p>
                                             </div>
                                         </div>
@@ -3719,7 +3720,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 space-y-1 leading-relaxed">
                                             <p className="font-bold text-slate-700 uppercase">Group Check-In & Hotel Rules:</p>
                                             <p>1. Fast Check-in: Please present the Group Pre-Registration Sheet signed by the coordinator at reception.</p>
-                                            <p>2. Buffet breakfast is included for registered guests at The Palm Restaurant (06:30 AM â€“ 10:30 AM).</p>
+                                            <p>2. Buffet breakfast is included for registered guests at The Palm Restaurant (06:30 AM – 10:30 AM).</p>
                                             <p>3. Baggage handling and luggage tags will be coordinated at the concierge desk upon coach arrival.</p>
                                         </div>
 
@@ -3741,7 +3742,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             <div>
                                                 <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                                <p className="text-[10px] text-slate-500">Front Office Operations â€¢ Express Group Check-In</p>
+                                                <p className="text-[10px] text-slate-500">Front Office Operations • Express Group Check-In</p>
                                             </div>
                                             <div className="text-right">
                                                 <span className="inline-block px-2.5 py-1 rounded bg-emerald-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
@@ -3752,7 +3753,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 </div>
                                                 <div className="text-[10px] text-slate-500 mt-0.5">Arrival Date: {booking.arrivalDate || bookingAny.checkIn}</div>
                                                 <div className="text-[10px] text-emerald-800 font-bold font-mono">
-                                                    {groupFinancials.totalRooms} Rooms â€¢ {groupFinancials.totalPax} Guests
+                                                    {groupFinancials.totalRooms} Rooms • {groupFinancials.totalPax} Guests
                                                 </div>
                                             </div>
                                         </div>
@@ -3764,7 +3765,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </div>
                                             <div className="text-right">
                                                 <span className="text-[10px] uppercase font-bold text-emerald-800 block">Tour Escort / Lead</span>
-                                                <span className="font-semibold text-slate-800">{booking.guestName} ({booking.phone || bookingAny.mobile || 'â€”'})</span>
+                                                <span className="font-semibold text-slate-800">{booking.guestName} ({booking.phone || bookingAny.mobile || '—'})</span>
                                             </div>
                                         </div>
 
@@ -3803,7 +3804,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                 ________________
                                                             </td>
                                                             <td className="p-1.5 border-b border-dotted border-slate-400 text-center text-slate-300">
-                                                                âœ•
+                                                                ✕
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -3865,7 +3866,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </div>
                                                         <div className="space-y-1">
                                                             <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
-                                                            <p className="text-sm font-bold text-blue-700 font-mono">Room {rmNum} â€” {rm.roomType}</p>
+                                                            <p className="text-sm font-bold text-blue-700 font-mono">Room {rmNum} — {rm.roomType}</p>
                                                             <p className="text-xs text-slate-700">Rate Plan: {rm.ratePlan || 'Standard Rate'}</p>
                                                             <p className="text-xs text-slate-700 font-medium">
                                                                 Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)
@@ -3898,7 +3899,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <div className="hidden print:block page-break" style={{ pageBreakAfter: 'always', breakAfter: 'page', height: 0 }} />
                                                             <div className="block print:hidden my-6 border-b-2 border-dashed border-slate-300 relative text-center">
                                                                 <span className="bg-slate-100 px-3 text-[10px] font-mono text-slate-500 uppercase">
-                                                                    â€” Page Break for Room {rIdx + 1} of {groupFinancials.totalRooms} â€”
+                                                                    — Page Break for Room {rIdx + 1} of {groupFinancials.totalRooms} —
                                                                 </span>
                                                             </div>
                                                         </>

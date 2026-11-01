@@ -610,9 +610,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         return roomsList.find(r => r.id === serviceModalConfig.rowId);
     }, [roomsList, serviceModalConfig.rowId]);
 
-    if (!isOpen) return null;
-
-    // Calculations
+    // Calculations (hoisted before early return for React hook order compliance)
     const roomBaseTotal = roomsList.reduce((acc, r) => acc + (r.rate * r.roomsCount * nights), 0);
     const totalExtraBedCharge = roomsList.reduce((acc, r) => acc + getExtraBedTotal(r.servicesBundle?.extraBed || r.extraBed, nights), 0);
     const totalPickupArrivalCharge = roomsList.reduce((acc, r) => {
@@ -646,6 +644,8 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const finalPayable = taxCalculation.grandTotal;
     const totalPaid = paymentRows.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
     const totalDue = Math.max(0, finalPayable - totalPaid);
+
+    if (!isOpen) return null;
 
     // Unified Rate / Package Offer Change Handler
     const handleUnifiedOfferChange = (rowId: number, offerKey: string) => {

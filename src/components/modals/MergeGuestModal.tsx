@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     X, GitMerge, ShieldCheck, CheckCircle2,
     Phone, Mail, FileText
@@ -38,30 +38,47 @@ interface MergeGuestModalProps {
 export const MergeGuestModal: React.FC<MergeGuestModalProps> = ({
     isOpen,
     onClose,
-    candidateGuests,
+    candidateGuests = [],
     mergeReason,
     onMergeSuccess
 }) => {
-    if (!isOpen || candidateGuests.length < 2) return null;
-
-    // Pick highest stay count or first candidate as default primary
-    const defaultPrimaryId = [...candidateGuests].sort((a, b) => 
-        (Number(b.totalStays || 0) + Number(b.totalSpend || b.lifetimeSpendBDT || 0)) -
-        (Number(a.totalStays || 0) + Number(a.totalSpend || a.lifetimeSpendBDT || 0))
-    )[0]?.id || candidateGuests[0].id;
+    // Pick highest stay count or first candidate as default primary (computed unconditionally for hooks)
+    const defaultPrimaryId = useMemo(() => {
+        if (!candidateGuests || candidateGuests.length === 0) return 0;
+        return [...candidateGuests].sort((a, b) => 
+            (Number(b.totalStays || 0) + Number(b.totalSpend || b.lifetimeSpendBDT || 0)) -
+            (Number(a.totalStays || 0) + Number(a.totalSpend || a.lifetimeSpendBDT || 0))
+        )[0]?.id || candidateGuests[0]?.id || 0;
+    }, [candidateGuests]);
 
     const [primaryId, setPrimaryId] = useState<number>(defaultPrimaryId);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const primaryGuest = candidateGuests.find(g => g.id === primaryId) || candidateGuests[0];
-    const secondaryGuests = candidateGuests.filter(g => g.id !== primaryId);
+    const primaryGuest = (candidateGuests && candidateGuests.find(g => g.id === primaryId)) || (candidateGuests && candidateGuests[0]);
+    const secondaryGuests = candidateGuests ? candidateGuests.filter(g => g.id !== primaryId) : [];
 
     // Form fields to keep on primary
-    const [selectedName, setSelectedName] = useState(primaryGuest.name);
-    const [selectedPhone, setSelectedPhone] = useState(primaryGuest.phone);
-    const [selectedEmail, setSelectedEmail] = useState(primaryGuest.email || '');
-    const [selectedIdNumber, setSelectedIdNumber] = useState(primaryGuest.idNumber || '');
-    const [selectedVip, setSelectedVip] = useState(primaryGuest.vipTier || primaryGuest.vipStatus || 'Regular');
+    const [selectedName, setSelectedName] = useState(primaryGuest?.name || '');
+    const [selectedPhone, setSelectedPhone] = useState(primaryGuest?.phone || '');
+    const [selectedEmail, setSelectedEmail] = useState(primaryGuest?.email || '');
+    const [selectedIdNumber, setSelectedIdNumber] = useState(primaryGuest?.idNumber || '');
+    const [selectedVip, setSelectedVip] = useState(primaryGuest?.vipTier || primaryGuest?.vipStatus || 'Regular');
+
+    useEffect(() => {
+        if (candidateGuests && candidateGuests.length > 0) {
+            setPrimaryId(defaultPrimaryId);
+            const p = candidateGuests.find(g => g.id === defaultPrimaryId) || candidateGuests[0];
+            if (p) {
+                setSelectedName(p.name || '');
+                setSelectedPhone(p.phone || '');
+                setSelectedEmail(p.email || '');
+                setSelectedIdNumber(p.idNumber || '');
+                setSelectedVip(p.vipTier || p.vipStatus || 'Regular');
+            }
+        }
+    }, [candidateGuests, defaultPrimaryId]);
+
+    if (!isOpen || !candidateGuests || candidateGuests.length < 2) return null;
 
     const handleSelectPrimary = (id: number) => {
         setPrimaryId(id);
