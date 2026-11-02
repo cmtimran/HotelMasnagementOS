@@ -106,7 +106,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         ? Math.max(1, Math.round((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86400000))
                         : 1
                 ));
-                const dailyRate = booking.avgDailyRate || (booking.totalAmount ? Math.round(booking.totalAmount / nights) : 3000);
+                const dailyRate = booking.avgDailyRate || (booking.totalAmount ? Math.round(booking.totalAmount / nights) : 0);
                 const ratePlanName = booking.ratePlan || 'Standard Rate';
                 const adults = booking.adults ?? 1;
                 const children = booking.children ?? 0;
@@ -344,6 +344,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 {activeTab === 'booking' && (
                     <TabBookingDetails
                         folio={activeFolio}
+                        booking={booking}
                         onUpdateSuccess={fetchFolioData}
                     />
                 )}
@@ -351,6 +352,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 {activeTab === 'guest' && (
                     <TabGuestDetails
                         folio={activeFolio}
+                        booking={booking}
                         onUpdateSuccess={fetchFolioData}
                     />
                 )}
@@ -358,6 +360,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 {activeTab === 'charges' && (
                     <TabRoomCharges
                         folio={activeFolio}
+                        booking={booking}
                         onRefresh={fetchFolioData}
                     />
                 )}

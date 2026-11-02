@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Trash2, CheckCircle2 } from 'lucide-react';
 import type { FolioData } from '../folioTypes';
+import type { AmendBookingData } from '../../modals/AmendStayModal';
 
 interface GuestRow {
     id: string;
@@ -14,42 +15,53 @@ interface GuestRow {
 
 interface TabGuestDetailsProps {
     folio: FolioData | null;
+    booking?: AmendBookingData | null;
     onUpdateSuccess: () => void;
 }
 
 export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
     folio,
+    booking,
     onUpdateSuccess
 }) => {
     const [isGuestListActive, setIsGuestListActive] = useState(true);
-    const [selectedPackage, setSelectedPackage] = useState('WRP');
+    const [selectedPackage, setSelectedPackage] = useState('Standard Rate');
     const [guests, setGuests] = useState<GuestRow[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState('');
 
     useEffect(() => {
-        if (folio) {
-            const initialRoom = folio.rooms?.[0]?.room_number || folio.room_number || '505';
-            setSelectedPackage(folio.market_code || 'WRP');
+        if (folio || booking) {
+            const initialRoom = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || 'Unassigned';
+            setSelectedPackage(folio?.market_code || booking?.ratePlan || 'Standard Rate');
 
-            // Populate initial primary guest
+            const rawName = folio?.guest_name || booking?.guestName || '';
+            let salutation = 'Mr';
+            let cleanName = rawName;
+            const titleMatch = rawName.match(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i);
+            if (titleMatch) {
+                salutation = titleMatch[1];
+                cleanName = rawName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim();
+            }
+
+            // Populate initial primary guest dynamically from live folio/booking records
             setGuests([
                 {
                     id: '1',
                     roomNumber: initialRoom,
-                    salutation: 'Mr',
-                    guestName: folio.guest_name || 'Tonmoy',
-                    mobile: folio.guest_phone || '01626758447',
-                    email: folio.guest_email || 'tonmoy@gmail.com',
+                    salutation: salutation,
+                    guestName: cleanName,
+                    mobile: folio?.guest_phone || booking?.phone || '',
+                    email: folio?.guest_email || booking?.email || '',
                     isChargeable: true
                 }
             ]);
             setFeedbackMsg('');
         }
-    }, [folio]);
+    }, [folio, booking]);
 
     const handleAddSharer = () => {
-        const primaryRoom = folio?.rooms?.[0]?.room_number || folio?.room_number || '505';
+        const primaryRoom = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || 'Unassigned';
         setGuests(prev => [
             ...prev,
             {
@@ -84,11 +96,13 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
         }, 500);
     };
 
-    const roomOptions = folio?.rooms?.map(r => r.room_number) || [folio?.room_number || '505'];
+    const roomOptions = folio?.rooms?.map(r => r.room_number).filter(Boolean) || (
+        booking?.roomNumber ? [booking.roomNumber] : ['Unassigned']
+    );
 
     return (
-        <form onSubmit={handleSave} className="w-full flex gap-4 h-full min-h-[420px] select-none text-gray-800 text-xs py-1">
-            {/* LEFT SIDEBAR matching Screenshot bb2922b8.png */}
+        <form onSubmit={handleSave} className="w-full flex gap-3 h-full select-none text-gray-800 text-xs py-1 min-h-0 overflow-y-auto">
+            {/* LEFT SIDEBAR */}
             <div className="w-48 shrink-0 border-r border-gray-200/80 pr-3 space-y-3">
                 <div className="flex items-center justify-between">
                     <span className="font-bold text-gray-700 text-xs uppercase tracking-wide">Guest</span>
@@ -116,11 +130,11 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                 </div>
             </div>
 
-            {/* MAIN SECTION: Add Guest List Table matching bb2922b8.png */}
+            {/* MAIN SECTION: Add Guest List Table */}
             <div className="flex-1 flex flex-col justify-between min-w-0 space-y-3">
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-gray-800 tracking-wide">Add Guest List</h4>
+                        <h4 className="text-xs font-bold text-gray-800 tracking-wide uppercase">Add Guest List</h4>
                     </div>
 
                     {feedbackMsg && (
@@ -167,6 +181,7 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                                                 <option value="Mrs">Mrs</option>
                                                 <option value="Ms">Ms</option>
                                                 <option value="Dr">Dr</option>
+                                                <option value="Prof">Prof</option>
                                             </select>
                                         </td>
                                         <td className="py-1.5 px-2.5">
@@ -235,7 +250,7 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                     <button
                         type="submit"
                         disabled={isSaving}
-                        className="px-6 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        className="px-5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
                     >
                         <Save size={13} />
                         <span>{isSaving ? 'Saving...' : 'Save'}</span>

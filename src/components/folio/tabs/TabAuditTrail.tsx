@@ -31,7 +31,7 @@ export const TabAuditTrail: React.FC<TabAuditTrailProps> = ({ folio }) => {
                                 after_state: `Successfully Checked In / Folio ${folio.folio_number} created`,
                                 description: `Reservation No. ${folio.reservation_number} synced with master folio`,
                                 user_name: 'Front Desk Auditor',
-                                created_at: folio.check_in || '2026-06-30 16:46'
+                                created_at: folio.check_in ? `${folio.check_in} 00:00:00` : new Date().toISOString()
                             }
                         ]);
                     }
@@ -45,7 +45,7 @@ export const TabAuditTrail: React.FC<TabAuditTrailProps> = ({ folio }) => {
                             after_state: `Master Folio ${folio?.folio_number} active`,
                             description: `Reservation No. ${folio?.reservation_number} active`,
                             user_name: 'Front Desk Auditor',
-                            created_at: folio?.check_in || '2026-06-30 16:46'
+                            created_at: folio?.check_in ? `${folio.check_in} 00:00:00` : new Date().toISOString()
                         }
                     ]);
                 })
@@ -58,7 +58,7 @@ export const TabAuditTrail: React.FC<TabAuditTrailProps> = ({ folio }) => {
     const paginatedLogs = auditLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     return (
-        <div className="w-full flex flex-col justify-between h-full min-h-[440px] select-none text-gray-800 text-xs py-1 space-y-3">
+        <div className="w-full flex flex-col justify-between h-full select-none text-gray-800 text-xs py-1 space-y-3 min-h-0 overflow-y-auto">
             <div className="space-y-2">
                 <div className="flex items-center gap-1.5 text-gray-500 font-semibold text-[11px]">
                     <History size={13} />

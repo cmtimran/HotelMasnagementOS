@@ -137,7 +137,7 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
                                     disabled
                                     className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-700"
                                 >
-                                    <option>{activeSourceFolio?.room_number || 'Room 505'}</option>
+                                    <option>{activeSourceFolio?.room_number ? `Room ${activeSourceFolio.room_number}` : 'Room Unassigned'}</option>
                                 </select>
                             </div>
 
@@ -244,7 +244,7 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
                                     disabled
                                     className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-700"
                                 >
-                                    <option>{activeDestFolio?.room_number || activeSourceFolio?.room_number || 'Room 505'}</option>
+                                    <option>{(activeDestFolio?.room_number || activeSourceFolio?.room_number) ? `Room ${activeDestFolio?.room_number || activeSourceFolio?.room_number}` : 'Room Unassigned'}</option>
                                 </select>
                             </div>
 

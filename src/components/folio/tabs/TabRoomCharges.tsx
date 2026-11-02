@@ -2,28 +2,34 @@ import React, { useMemo } from 'react';
 import { DoorClosed, RefreshCw } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
 import type { FolioData } from '../folioTypes';
+import type { AmendBookingData } from '../../modals/AmendStayModal';
 
 interface TabRoomChargesProps {
     folio: FolioData | null;
+    booking?: AmendBookingData | null;
     onRefresh: () => void;
 }
 
 export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     folio,
+    booking,
     onRefresh
 }) => {
     const currency = useMemo(() => getCurrencySymbol(), []);
-    const ratePlanCode = folio?.market_code || 'WRP';
-    const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || '505';
-    const roomTypeName = folio?.rooms?.[0]?.room_type || folio?.room_type || 'Summer Vacation';
-    const adults = folio?.rooms?.[0]?.adults || 2;
-    const children = folio?.rooms?.[0]?.children || 1;
+    const ratePlanCode = folio?.market_code || booking?.ratePlan || 'Standard Rate';
+    const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || 'Unassigned';
+    const roomTypeName = folio?.rooms?.[0]?.room_type || folio?.room_type || booking?.roomType || 'Standard Suite';
+    const adults = (folio?.rooms?.[0]?.adults ?? booking?.adults) || 1;
+    const children = (folio?.rooms?.[0]?.children ?? booking?.children) || 0;
 
     // Filter room tariff charges from ledger or calculate nights from stay dates
     const roomChargesList = useMemo(() => {
         const tariffCharges = folio?.charges?.filter(
             c => !c.is_voided && (c.charge_code === 'ROOM_CHG' || c.revenue_head === 'Room Charges' || c.revenue_head === 'Room Tariff')
         ) || [];
+
+        const firstRoom = folio?.rooms?.[0];
+        const defaultRate = Number(firstRoom?.room_rate ?? booking?.avgDailyRate ?? (booking?.totalAmount && booking?.nights ? booking.totalAmount / booking.nights : 0));
 
         if (tariffCharges.length > 0) {
             return tariffCharges.map(c => ({
@@ -32,18 +38,17 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                 roomNumber: roomNumber,
                 rateType: roomTypeName,
                 pax: `${adults}/${children}`,
-                charge: Number(c.amount || 3000),
+                charge: Number(c.amount ?? defaultRate),
                 taxVat: Number(c.total_tax || 0),
-                netAmount: Number(c.total_amount || c.amount || 3000)
+                netAmount: Number(c.total_amount ?? c.amount ?? defaultRate)
             }));
         }
 
         // Dynamically compute nights from reservation room dates
-        const firstRoom = folio?.rooms?.[0];
-        const checkIn = new Date(firstRoom?.check_in_date || folio?.check_in || '2026-06-30');
-        const checkOut = new Date(firstRoom?.check_out_date || folio?.check_out || '2026-07-02');
+        const checkIn = new Date(firstRoom?.check_in_date || folio?.check_in || booking?.arrivalDate || new Date().toISOString().split('T')[0]);
+        const checkOut = new Date(firstRoom?.check_out_date || folio?.check_out || booking?.departureDate || new Date().toISOString().split('T')[0]);
         const nights = Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000));
-        const dailyRate = Number(firstRoom?.room_rate || 3000);
+        const dailyRate = defaultRate;
 
         const list = [];
         for (let i = 0; i < nights; i++) {
@@ -62,15 +67,15 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
             });
         }
         return list;
-    }, [folio?.charges, folio?.rooms, folio?.check_in, folio?.check_out, roomNumber, roomTypeName, adults, children]);
+    }, [folio?.charges, folio?.rooms, folio?.check_in, folio?.check_out, booking, roomNumber, roomTypeName, adults, children]);
 
     const totalCharges = roomChargesList.reduce((sum, item) => sum + item.charge, 0);
     const totalTaxVat = roomChargesList.reduce((sum, item) => sum + item.taxVat, 0);
     const netBalance = totalCharges + totalTaxVat;
 
     return (
-        <div className="w-full flex gap-3 h-full min-h-[440px] select-none text-gray-800 text-xs py-1">
-            {/* LEFT SIDEBAR matching Screenshot e47f96b1.png */}
+        <div className="w-full flex gap-3 h-full select-none text-gray-800 text-xs py-1 min-h-0 overflow-y-auto">
+            {/* LEFT SIDEBAR */}
             <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-3">
                 <div className="space-y-2">
                     <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">Rooms</div>
@@ -89,7 +94,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                     </div>
                 </div>
 
-                {/* Sidebar Bottom Summary matching e47f96b1.png */}
+                {/* Sidebar Bottom Summary */}
                 <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5 font-mono text-xs">
                     <div className="flex items-center justify-between text-gray-500">
                         <span className="font-sans text-[11px]">Total Charges:</span>
@@ -150,10 +155,10 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                     </div>
                 </div>
 
-                {/* Bottom Right Net Balance matching Screenshot e47f96b1.png */}
-                <div className="flex items-center justify-end pt-3 pb-1">
+                {/* Bottom Right Net Balance */}
+                <div className="flex items-center justify-end pt-2 pb-1 border-t border-gray-100">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs uppercase font-bold text-gray-600 tracking-wide">Net Balance</span>
+                        <span className="text-xs uppercase font-bold text-gray-600 tracking-wide font-sans">Net Balance</span>
                         <span className="text-base font-black text-rose-600 font-mono tracking-tight">
                             {currency} {netBalance.toFixed(2)}
                         </span>
