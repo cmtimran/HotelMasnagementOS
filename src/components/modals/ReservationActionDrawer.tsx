@@ -1368,10 +1368,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <Lock size={11} className="text-gray-400" />
                                         <span>Read Only</span>
                                     </>
-                                ) : mode === 'overview' ? (
+                                ) : (mode === 'overview' || mode === 'folio') ? (
                                     <>
                                         <Settings size={11} className="text-[#0e3592]" />
-                                        <span>Options</span>
+                                        <span>Actions</span>
                                         <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
                                     </>
                                 ) : (
@@ -1476,14 +1476,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden flex flex-col">
                         <DrawerFolioOperations
                             booking={booking}
-                            onOpenAddPayment={() => setMode('payment')}
-                            onOpenAmendStay={() => {
-                                setMode('amend');
-                                if (onEdit) onEdit(booking);
-                            }}
-                            onOpenRoomMove={() => setMode('move')}
                             onOpenRoomSplit={() => setMode('split')}
-                            onOpenCheckOut={() => onCheckOut && activeSubBookingNo && onCheckOut(activeSubBookingNo)}
                         />
                     </div>
                 ) : (

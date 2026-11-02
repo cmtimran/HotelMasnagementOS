@@ -5,16 +5,10 @@ import {
     Users,
     BedDouble,
     Printer,
-    Edit3,
     ChevronDown,
     Send,
     FileSpreadsheet,
-    FileText,
-    LogOut,
-    CreditCard,
-    ArrowRightLeft,
-    Scissors,
-    Percent
+    FileText
 } from 'lucide-react';
 import type { FolioData, FolioSubTab } from './folioTypes';
 import type { AmendBookingData } from '../modals/AmendStayModal';
@@ -24,12 +18,6 @@ interface HorizonSummaryBannerProps {
     booking?: AmendBookingData | null;
     activeTab: FolioSubTab;
     onSelectTab: (tab: FolioSubTab) => void;
-    onOpenAddPayment?: () => void;
-    onOpenCheckOut?: () => void;
-    onOpenAmendStay?: () => void;
-    onOpenRoomMove?: () => void;
-    onOpenSplitFolio?: () => void;
-    onOpenTaxExemption?: () => void;
     onPrintFolio?: () => void;
     onEmailFolio?: () => void;
     onExportExcel?: () => void;
@@ -41,19 +29,12 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     booking,
     activeTab,
     onSelectTab,
-    onOpenAddPayment,
-    onOpenCheckOut,
-    onOpenAmendStay,
-    onOpenRoomMove,
-    onOpenSplitFolio,
-    onOpenTaxExemption,
     onPrintFolio,
     onEmailFolio,
     onExportExcel,
     isLoading
 }) => {
     const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
-    const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
 
     const firstRoom = folio?.rooms?.[0];
     const rawArrival = firstRoom?.check_in_date || folio?.check_in || booking?.arrivalDate || '';
@@ -180,34 +161,18 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                     </div>
                 </div>
 
-                {/* Right Action Icons: Print & Edit */}
-                <div className="flex items-center gap-1 pl-2 flex-shrink-0 border-l border-slate-100 ml-2">
-                    {isLoading && (
-                        <span className="text-[9.5px] text-blue-600 font-medium flex items-center gap-1 animate-pulse mr-1">
+                {/* Live Syncing Indicator */}
+                {isLoading && (
+                    <div className="flex items-center gap-1 pl-2 flex-shrink-0 border-l border-slate-100 ml-2">
+                        <span className="text-[9.5px] text-blue-600 font-medium flex items-center gap-1 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                             <span className="hidden sm:inline">Syncing</span>
                         </span>
-                    )}
-                    <button
-                        type="button"
-                        onClick={onPrintFolio}
-                        title="Print Folio Document"
-                        className="w-6 h-6 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
-                    >
-                        <Printer size={12.5} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onOpenAmendStay}
-                        title="Edit Reservation (Amend Stay)"
-                        className="w-6 h-6 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
-                    >
-                        <Edit3 size={12.5} />
-                    </button>
-                </div>
+                    </div>
+                )}
             </div>
 
-            {/* Sub-Tabs Navigation Bar + Print/Send & More Options Dropdowns */}
+            {/* Sub-Tabs Navigation Bar + Print/Send Dropdown */}
             <div className="flex items-center justify-between border-b border-slate-200/80 px-0.5 pt-0.5">
                 {/* 5 Main Sub-Tabs */}
                 <div className="flex items-center gap-4 sm:gap-5">
@@ -233,16 +198,13 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                     ))}
                 </div>
 
-                {/* Right Action Menus: Print/Send & More Options */}
+                {/* Right Action Menu: Print/Send */}
                 <div className="flex items-center gap-1.5 pb-1">
                     {/* Print/Send Dropdown */}
                     <div className="relative">
                         <button
                             type="button"
-                            onClick={() => {
-                                setIsPrintMenuOpen(!isPrintMenuOpen);
-                                setIsMoreOptionsOpen(false);
-                            }}
+                            onClick={() => setIsPrintMenuOpen(!isPrintMenuOpen)}
                             className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <span>Print/ Send</span>
@@ -284,77 +246,6 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                                     >
                                         <FileText size={13} className="text-gray-400" />
                                         <span>Print Extra Charges Voucher</span>
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* More Options Dropdown */}
-                    <div className="relative">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsMoreOptionsOpen(!isMoreOptionsOpen);
-                                setIsPrintMenuOpen(false);
-                            }}
-                            className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                        >
-                            <span>More Options</span>
-                            <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreOptionsOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {isMoreOptionsOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setIsMoreOptionsOpen(false)} />
-                                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenCheckOut) onOpenCheckOut(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <LogOut size={13} className="text-emerald-600" />
-                                        <span>Check Out</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenAddPayment) onOpenAddPayment(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <CreditCard size={13} className="text-blue-600" />
-                                        <span>Add Payment</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenAmendStay) onOpenAmendStay(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <Edit3 size={13} className="text-amber-600" />
-                                        <span>Amend Stay</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenRoomMove) onOpenRoomMove(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <ArrowRightLeft size={13} className="text-purple-600" />
-                                        <span>Room Move</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenSplitFolio) onOpenSplitFolio(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <Scissors size={13} className="text-indigo-600" />
-                                        <span>Cut / Split Folio</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsMoreOptionsOpen(false); if (onOpenTaxExemption) onOpenTaxExemption(); }}
-                                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <Percent size={13} className="text-teal-600" />
-                                        <span>Tax Operation / Exemption</span>
                                     </button>
                                 </div>
                             </>

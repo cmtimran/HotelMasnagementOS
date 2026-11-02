@@ -90,10 +90,17 @@ export const ApplyDiscountModal: React.FC<ApplyDiscountModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100005] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm overflow-hidden flex flex-col text-gray-800">
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-[100004] bg-black/20 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                onClick={onClose}
+            />
+
+            {/* Slide-out Drawer Panel (Right Side) */}
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
                 {/* Header matching Screenshot 523da607.png */}
-                <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between">
+                <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <h3 className="text-xs font-bold tracking-wide">Apply Discount</h3>
                     <button
                         type="button"
@@ -104,122 +111,131 @@ export const ApplyDiscountModal: React.FC<ApplyDiscountModalProps> = ({
                     </button>
                 </div>
 
-                {/* Form Body */}
-                <form onSubmit={handleSubmit} className="p-3.5 space-y-2.5 text-xs">
-                    {errorMsg && (
-                        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1 rounded text-[11px]">
-                            {errorMsg}
+                {/* Form Body - Scrollable */}
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                        {errorMsg && (
+                            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded text-[11px]">
+                                {errorMsg}
+                            </div>
+                        )}
+
+                        {/* Folio Dropdown */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                <span className="text-rose-500 mr-0.5">*</span> Folio
+                            </label>
+                            <select
+                                value={selectedFolioId}
+                                onChange={(e) => setSelectedFolioId(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+                            >
+                                {folios.map((f) => (
+                                    <option key={f.id} value={f.id}>
+                                        {f.folio_number} {f.guest_name ? `- ${f.guest_name}` : ''}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                    )}
 
-                    {/* Folio Dropdown */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Folio
+                        {/* Discount Dropdown */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                <span className="text-rose-500 mr-0.5">*</span> Discount
+                            </label>
+                            <select
+                                value={discountType}
+                                onChange={(e) => setDiscountType(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+                            >
+                                <option value="Manager Discretion">Manager Discretion Discount</option>
+                                <option value="Corporate Partner">Corporate Partner Discount (10%)</option>
+                                <option value="Promotional Voucher">Promotional Voucher</option>
+                                <option value="VIP Guest">VIP Guest Courtesy</option>
+                                <option value="Service Recovery">Service Recovery Goodwill</option>
+                            </select>
+                        </div>
+
+                        {/* Revenue Head Dropdown */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                <span className="text-rose-500 mr-0.5">*</span> Revenue Head
+                            </label>
+                            <select
+                                value={selectedHead}
+                                onChange={(e) => setSelectedHead(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+                            >
+                                <option value="Room Charges">Room Charges</option>
+                                {revenueHeads.filter(h => h.name !== 'Room Charges').map((h) => (
+                                    <option key={h.id || h.code} value={h.name}>
+                                        {h.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Tax Applicable Checkbox */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-gray-700 font-medium">
+                            <input
+                                type="checkbox"
+                                checked={taxApplicable}
+                                onChange={(e) => setTaxApplicable(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Tax Applicable</span>
                         </label>
-                        <select
-                            value={selectedFolioId}
-                            onChange={(e) => setSelectedFolioId(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+
+                        {/* Discount Amount */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                <span className="text-rose-500 mr-0.5">*</span> Discount Amount
+                            </label>
+                            <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={discountAmount}
+                                onChange={(e) => setDiscountAmount(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono"
+                                placeholder="0.00"
+                            />
+                        </div>
+
+                        {/* Comment */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                Comment
+                            </label>
+                            <textarea
+                                rows={3}
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 resize-none"
+                                placeholder="Enter discount justification..."
+                            />
+                        </div>
+                    </div>
+
+                    {/* Pinned Action Buttons Footer */}
+                    <div className="p-3 border-t border-gray-200 flex items-center justify-end gap-2 bg-white flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-3.5 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs cursor-pointer transition-colors"
                         >
-                            {folios.map((f) => (
-                                <option key={f.id} value={f.id}>
-                                    {f.folio_number} {f.guest_name ? `- ${f.guest_name}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Discount Dropdown */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Discount
-                        </label>
-                        <select
-                            value={discountType}
-                            onChange={(e) => setDiscountType(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
-                        >
-                            <option value="Manager Discretion">Manager Discretion Discount</option>
-                            <option value="Corporate Partner">Corporate Partner Discount (10%)</option>
-                            <option value="Promotional Voucher">Promotional Voucher</option>
-                            <option value="VIP Guest">VIP Guest Courtesy</option>
-                            <option value="Service Recovery">Service Recovery Goodwill</option>
-                        </select>
-                    </div>
-
-                    {/* Revenue Head Dropdown */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Revenue Head
-                        </label>
-                        <select
-                            value={selectedHead}
-                            onChange={(e) => setSelectedHead(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
-                        >
-                            <option value="Room Charges">Room Charges</option>
-                            {revenueHeads.filter(h => h.name !== 'Room Charges').map((h) => (
-                                <option key={h.id || h.code} value={h.name}>
-                                    {h.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Tax Applicable Checkbox */}
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-gray-700 font-medium">
-                        <input
-                            type="checkbox"
-                            checked={taxApplicable}
-                            onChange={(e) => setTaxApplicable(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                        />
-                        <span>Tax Applicable</span>
-                    </label>
-
-                    {/* Discount Amount */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Discount Amount
-                        </label>
-                        <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={discountAmount}
-                            onChange={(e) => setDiscountAmount(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono"
-                            placeholder="0.00"
-                        />
-                    </div>
-
-                    {/* Comment */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            Comment
-                        </label>
-                        <textarea
-                            rows={3}
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 resize-none"
-                            placeholder="Enter discount justification..."
-                        />
-                    </div>
-
-                    {/* Action Button */}
-                    <div className="pt-2 border-t border-gray-100 flex justify-end">
+                            Cancel
+                        </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                            className="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors disabled:opacity-50"
                         >
                             {isSubmitting ? 'Applying...' : 'Apply Discount'}
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        </>
     );
 };

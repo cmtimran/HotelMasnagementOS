@@ -86,13 +86,14 @@ export const TabBookingDetails: React.FC<TabBookingDetailsProps> = ({
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!folio?.id) return;
+        const folioRef = folio?.id || folio?.reservation_number || booking?.reservationNumber || booking?.id;
+        if (!folioRef) return;
 
         setIsSaving(true);
         setSaveFeedback('');
 
         try {
-            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${folio.id}/booking-details`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${encodeURIComponent(String(folioRef))}/booking-details`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

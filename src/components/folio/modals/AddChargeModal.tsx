@@ -118,10 +118,17 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100005] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm overflow-hidden flex flex-col text-gray-800">
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-[100004] bg-black/20 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                onClick={onClose}
+            />
+
+            {/* Slide-out Drawer Panel (Right Side) */}
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
                 {/* Header matching Screenshot 681ab288.png */}
-                <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between">
+                <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <h3 className="text-xs font-bold tracking-wide">Add Charge</h3>
                     <button
                         type="button"
@@ -132,137 +139,139 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
                     </button>
                 </div>
 
-                {/* Form Body */}
-                <form onSubmit={handleSubmit} className="p-3.5 space-y-2.5 text-xs">
-                    {errorMsg && (
-                        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1 rounded text-[11px]">
-                            {errorMsg}
-                        </div>
-                    )}
+                {/* Form Body - Scrollable */}
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                        {errorMsg && (
+                            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded text-[11px]">
+                                {errorMsg}
+                            </div>
+                        )}
 
-                    {/* Apply to Group Checkbox */}
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-gray-600 font-medium">
-                        <input
-                            type="checkbox"
-                            checked={applyToGroup}
-                            onChange={(e) => setApplyToGroup(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                        />
-                        <span>Apply to Group</span>
-                    </label>
-
-                    {/* Folio Dropdown */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Folio
+                        {/* Apply to Group Checkbox */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-gray-600 font-medium">
+                            <input
+                                type="checkbox"
+                                checked={applyToGroup}
+                                onChange={(e) => setApplyToGroup(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Apply to Group</span>
                         </label>
-                        <select
-                            value={selectedFolioId}
-                            onChange={(e) => setSelectedFolioId(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            {folios.map((f) => (
-                                <option key={f.id} value={f.id}>
-                                    {f.folio_number} {f.guest_name ? `- ${f.guest_name}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
 
-                    {/* Revenue Head Dropdown */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            <span className="text-rose-500 mr-0.5">*</span> Revenue Head
-                        </label>
-                        <select
-                            value={selectedHead}
-                            onChange={(e) => setSelectedHead(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            {revenueHeads.map((h) => (
-                                <option key={h.id || h.code} value={h.name}>
-                                    {h.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Amount & Discount Inputs */}
-                    <div className="grid grid-cols-2 gap-2">
+                        {/* Folio Dropdown */}
                         <div>
                             <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                                <span className="text-rose-500 mr-0.5">*</span> Amount
+                                <span className="text-rose-500 mr-0.5">*</span> Folio
                             </label>
-                            <input
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                                placeholder="0.00"
+                            <select
+                                value={selectedFolioId}
+                                onChange={(e) => setSelectedFolioId(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                {folios.map((f) => (
+                                    <option key={f.id} value={f.id}>
+                                        {f.folio_number} {f.guest_name ? `- ${f.guest_name}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Revenue Head Dropdown */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                <span className="text-rose-500 mr-0.5">*</span> Revenue Head
+                            </label>
+                            <select
+                                value={selectedHead}
+                                onChange={(e) => setSelectedHead(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                {revenueHeads.map((h) => (
+                                    <option key={h.id || h.code} value={h.name}>
+                                        {h.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Amount & Discount Inputs */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                    <span className="text-rose-500 mr-0.5">*</span> Amount
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                    <span className="text-rose-500 mr-0.5">*</span> Discount
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={discount}
+                                    onChange={(e) => setDiscount(e.target.value)}
+                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                Description
+                            </label>
+                            <textarea
+                                rows={2.5}
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                placeholder="Enter charge particulars..."
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                                <span className="text-rose-500 mr-0.5">*</span> Discount
-                            </label>
+                        {/* Tax Applicable Checkbox */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-gray-700 font-medium">
                             <input
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={discount}
-                                onChange={(e) => setDiscount(e.target.value)}
-                                className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                                placeholder="0.00"
+                                type="checkbox"
+                                checked={taxApplicable}
+                                onChange={(e) => setTaxApplicable(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                             />
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            Description
+                            <span>Tax Applicable</span>
                         </label>
-                        <textarea
-                            rows={2}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                            placeholder="Enter charge particulars..."
-                        />
-                    </div>
 
-                    {/* Tax Applicable Checkbox */}
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-gray-700 font-medium">
-                        <input
-                            type="checkbox"
-                            checked={taxApplicable}
-                            onChange={(e) => setTaxApplicable(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                        />
-                        <span>Tax Applicable</span>
-                    </label>
-
-                    {/* Calculation Summary Card */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5 space-y-1 font-mono text-[11px]">
-                        <div className="flex items-center justify-between text-gray-500">
-                            <span>Amount:</span>
-                            <span>{numAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-gray-700 font-semibold border-b border-gray-200 pb-1">
-                            <span>Sub Total:</span>
-                            <span>{subTotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-rose-600 font-bold pt-0.5 text-xs">
-                            <span>Grand Total:</span>
-                            <span>{currency} {grandTotal.toFixed(2)}</span>
+                        {/* Calculation Summary Card */}
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-3 space-y-1 font-mono text-[11px]">
+                            <div className="flex items-center justify-between text-gray-500">
+                                <span>Amount:</span>
+                                <span>{numAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-700 font-semibold border-b border-gray-200 pb-1">
+                                <span>Sub Total:</span>
+                                <span>{subTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-rose-600 font-bold pt-0.5 text-xs">
+                                <span>Grand Total:</span>
+                                <span>{currency} {grandTotal.toFixed(2)}</span>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                    {/* Pinned Action Buttons Footer */}
+                    <div className="p-3 border-t border-gray-200 flex items-center justify-end gap-2 bg-white flex-shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
@@ -280,6 +289,6 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </>
     );
 };

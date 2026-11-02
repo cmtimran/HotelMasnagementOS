@@ -140,11 +140,11 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     }, [folio?.charges, folio?.payments]);
 
     return (
-        <div className="w-full flex gap-3 flex-1 min-h-0 select-none text-gray-800 overflow-hidden">
+        <div className="w-full flex gap-3 h-full flex-1 min-h-0 select-none text-gray-800 overflow-hidden">
             {/* LEFT SIDEBAR: Room / Folio Hierarchical Tree & Balance Summary */}
-            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-2.5 overflow-hidden">
+            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-2.5 overflow-hidden h-full">
                 {/* Tree View matching ff92009c.png */}
-                <div className="space-y-1 text-xs overflow-y-auto flex-1 min-h-0">
+                <div className="space-y-1 text-xs overflow-y-auto flex-1 min-h-0 pr-1">
                     <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                         Room/ Folio
                     </div>
@@ -189,8 +189,8 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     </div>
                 </div>
 
-                {/* Sidebar Bottom Summary Card matching ff92009c.png */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2 space-y-1 font-mono text-xs shrink-0 mt-1.5">
+                {/* Sidebar Bottom Summary Card (PINNED AT BOTTOM) */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2 space-y-1 font-mono text-xs shrink-0 mt-auto">
                     <div className="flex items-center justify-between text-gray-500 text-[11px]">
                         <span className="font-sans">Total Charges:</span>
                         <span className="font-semibold text-gray-800">{currency} {totalCharges.toFixed(2)}</span>
@@ -210,11 +210,11 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                 </div>
             </div>
 
-            {/* RIGHT MAIN: Action Bar + Transaction Ledger Grid */}
-            <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+            {/* RIGHT MAIN: Action Bar + Middle Scrolling Transaction Table + Pinned Bottom Due Amount */}
+            <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden h-full">
                 <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* Action Bar matching ff92009c.png */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 pb-1">
                         <button
                             type="button"
                             onClick={onOpenAddCharge}
@@ -290,10 +290,10 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         </button>
                     </div>
 
-                    {/* Transaction Ledger Table matching ff92009c.png */}
+                    {/* Transaction Ledger Table matching ff92009c.png - ONLY MIDDLE SCROLLS */}
                     <div className="border border-gray-200/90 rounded-lg overflow-y-auto flex-1 min-h-0 bg-white shadow-xs">
                         <table className="w-full text-left text-xs border-collapse">
-                            <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
+                            <thead className="bg-gray-50/95 backdrop-blur-xs border-b border-gray-200 text-gray-600 font-semibold text-[11px] sticky top-0 z-10 shadow-2xs">
                                 <tr>
                                     <th className="py-2 px-2 w-8 text-center"></th>
                                     <th className="py-2 px-2.5">Date</th>
@@ -430,10 +430,10 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     </div>
                 </div>
 
-                {/* Bottom Right Net Due Amount Footer matching ff92009c.png */}
-                <div className="flex items-center justify-end pt-1.5 pb-0.5 shrink-0">
+                {/* Bottom Right Net Due Amount Footer matching ff92009c.png - PINNED AT BOTTOM */}
+                <div className="flex items-center justify-end pt-2 pb-0.5 shrink-0 border-t border-gray-100 bg-white">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs uppercase font-bold text-gray-600 tracking-wide">Net Due Amount</span>
+                        <span className="text-xs uppercase font-bold text-gray-600 tracking-wide font-sans">Net Due Amount</span>
                         <span className="text-base font-black text-rose-600 font-mono tracking-tight">
                             {currency} {dueAmount.toFixed(2)}
                         </span>

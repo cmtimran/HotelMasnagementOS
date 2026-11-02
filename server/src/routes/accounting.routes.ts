@@ -60,21 +60,39 @@ router.get('/folios', async (req: Request, res: Response) => {
             params.push(propertyId);
         }
 
-        if (reservationIdParam) {
-            whereClause += ` AND (f.reservation_id::text = ? OR r.reservation_number = ?)`;
-            params.push(reservationIdParam, reservationIdParam);
+        if (reservationIdParam && reservationNoParam) {
+            const clean1 = reservationIdParam.replace(/^(res|fol)[-_~]/i, '');
+            const clean2 = reservationNoParam.replace(/^(res|fol)[-_~]/i, '');
+            whereClause += ` AND (f.reservation_id::text = ? OR UPPER(r.reservation_number) = UPPER(?) OR UPPER(r.reservation_number) = UPPER(?) OR r.reservation_number ILIKE ? OR r.reservation_number ILIKE ?)`;
+            params.push(reservationIdParam, reservationIdParam, reservationNoParam, `%${clean1}%`, `%${clean2}%`);
+        } else if (reservationIdParam) {
+            const clean = reservationIdParam.replace(/^(res|fol)[-_~]/i, '');
+            whereClause += ` AND (f.reservation_id::text = ? OR UPPER(r.reservation_number) = UPPER(?) OR r.reservation_number ILIKE ?)`;
+            params.push(reservationIdParam, reservationIdParam, `%${clean}%`);
         } else if (reservationNoParam) {
-            whereClause += ` AND r.reservation_number = ?`;
-            params.push(reservationNoParam);
+            const clean = reservationNoParam.replace(/^(res|fol)[-_~]/i, '');
+            whereClause += ` AND (UPPER(r.reservation_number) = UPPER(?) OR r.reservation_number ILIKE ?)`;
+            params.push(reservationNoParam, `%${clean}%`);
         }
 
         // If queried for a specific reservation and no folio exists yet, auto-create master folio & room charges!
         if (reservationIdParam || reservationNoParam) {
-            const resLookupSql = reservationIdParam
-                ? `SELECT r.*, g.first_name, g.last_name, g.phone, g.email FROM reservations r LEFT JOIN guests g ON g.id = r.booker_guest_id WHERE r.id::text = ? OR r.reservation_number = ? LIMIT 1`
-                : `SELECT r.*, g.first_name, g.last_name, g.phone, g.email FROM reservations r LEFT JOIN guests g ON g.id = r.booker_guest_id WHERE r.reservation_number = ? LIMIT 1`;
-            const resLookupParams = reservationIdParam ? [reservationIdParam, reservationIdParam] : [reservationNoParam];
-            const targetRes = await db.prepare(resLookupSql).get(...resLookupParams) as any;
+            const targetClean = (reservationNoParam || reservationIdParam || '').replace(/^(res|fol)[-_~]/i, '');
+            const targetRes = await db.prepare(`
+                SELECT r.*, g.first_name, g.last_name, g.phone, g.email 
+                FROM reservations r 
+                LEFT JOIN guests g ON g.id = r.booker_guest_id 
+                WHERE r.id::text = ? 
+                   OR UPPER(r.reservation_number) = UPPER(?) 
+                   OR UPPER(r.reservation_number) = UPPER(?)
+                   OR r.reservation_number ILIKE ?
+                LIMIT 1
+            `).get(
+                reservationIdParam || '',
+                reservationIdParam || '',
+                reservationNoParam || '',
+                `%${targetClean}%`
+            ) as any;
 
             if (targetRes) {
                 const existingFolio = await db.prepare(`SELECT id FROM folios WHERE reservation_id = ? LIMIT 1`).get(targetRes.id) as any;
@@ -933,31 +951,73 @@ async function findFolioByIdOrRef(rawId: any): Promise<any> {
     const strId = String(rawId).trim();
     if (!strId) return null;
 
+    const cleanId = strId.replace(/^(res|fol)[-_~]/i, '').trim();
+
+    // 1. Direct match by numeric folio id
     const numId = Number(strId);
     if (!isNaN(numId) && isFinite(numId)) {
         const byId = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(numId) as any;
         if (byId) return byId;
     }
 
-    // Lookup by folio_number, reservation_id::text, or r.reservation_number
+    // 2. Direct match by clean numeric folio id (e.g. if passed 'fol-5' -> 5)
+    const numClean = Number(cleanId);
+    if (!isNaN(numClean) && isFinite(numClean) && numClean > 0) {
+        const byCleanId = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(numClean) as any;
+        if (byCleanId) return byCleanId;
+    }
+
+    // 3. Match against folio_number, reservation_id, or reservation_number (case-insensitive & clean)
     const byRef = await db.prepare(`
         SELECT f.* FROM folios f
         LEFT JOIN reservations r ON r.id = f.reservation_id
-        WHERE f.folio_number = ? OR f.reservation_id::text = ? OR r.reservation_number = ?
+        WHERE f.folio_number ILIKE ? 
+           OR f.folio_number ILIKE ?
+           OR UPPER(r.reservation_number) = UPPER(?)
+           OR UPPER(r.reservation_number) = UPPER(?)
+           OR r.reservation_number ILIKE ?
+           OR f.reservation_id::text = ?
+           OR f.reservation_id::text = ?
+           OR (? != '' AND r.id::text = ?)
         LIMIT 1
-    `).get(strId, strId, strId) as any;
+    `).get(
+        `%${strId}%`,
+        `%${cleanId}%`,
+        strId,
+        cleanId,
+        `%${cleanId}%`,
+        strId,
+        cleanId,
+        !isNaN(numClean) && numClean > 0 ? String(numClean) : '',
+        !isNaN(numClean) && numClean > 0 ? String(numClean) : ''
+    ) as any;
     if (byRef) return byRef;
 
-    // Auto-create if reservation exists without a folio yet
+    // 4. Auto-create if reservation exists without a folio yet
     const targetRes = await db.prepare(`
         SELECT r.*, g.first_name, g.last_name, g.phone, g.email 
         FROM reservations r 
         LEFT JOIN guests g ON g.id = r.booker_guest_id 
-        WHERE r.id::text = ? OR r.reservation_number = ? 
+        WHERE UPPER(r.reservation_number) = UPPER(?) 
+           OR UPPER(r.reservation_number) = UPPER(?)
+           OR r.reservation_number ILIKE ?
+           OR r.id::text = ?
+           OR (? != '' AND r.id::text = ?)
         LIMIT 1
-    `).get(strId, strId) as any;
+    `).get(
+        strId,
+        cleanId,
+        `%${cleanId}%`,
+        strId,
+        !isNaN(numClean) && numClean > 0 ? String(numClean) : '',
+        !isNaN(numClean) && numClean > 0 ? String(numClean) : ''
+    ) as any;
 
     if (targetRes) {
+        // Double check if a folio exists for this reservation
+        const existing = await db.prepare(`SELECT * FROM folios WHERE reservation_id = ? LIMIT 1`).get(targetRes.id) as any;
+        if (existing) return existing;
+
         const guestName = [targetRes.first_name, targetRes.last_name].filter(Boolean).join(' ') || 'Valued Guest';
         const genFolioNo = `FN~${targetRes.reservation_number || targetRes.id} - ${guestName}`;
         const created = await db.prepare(`
@@ -965,6 +1025,7 @@ async function findFolioByIdOrRef(rawId: any): Promise<any> {
                 reservation_id, guest_id, folio_number, folio_type, status, balance,
                 bill_to, business_source, generate_invoice_on_checkout
             ) VALUES (?, ?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, TRUE)
+            RETURNING id
         `).run(targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct');
 
         const newId = created.lastInsertRowid;

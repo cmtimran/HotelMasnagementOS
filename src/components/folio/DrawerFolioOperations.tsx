@@ -23,19 +23,11 @@ import { VoidModal } from './modals/VoidModal';
 interface DrawerFolioOperationsProps {
     booking: AmendBookingData | null;
     onClose?: () => void;
-    onOpenAddPayment?: () => void;
-    onOpenCheckOut?: () => void;
-    onOpenAmendStay?: () => void;
-    onOpenRoomMove?: () => void;
     onOpenRoomSplit?: () => void;
 }
 
 export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     booking,
-    onOpenAddPayment,
-    onOpenCheckOut,
-    onOpenAmendStay,
-    onOpenRoomMove,
     onOpenRoomSplit
 }) => {
     const [folios, setFolios] = useState<FolioData[]>([]);
@@ -293,19 +285,13 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 activeTab={activeTab}
                 isLoading={isLoading}
                 onSelectTab={setActiveTab}
-                onOpenAddPayment={onOpenAddPayment}
-                onOpenCheckOut={onOpenCheckOut}
-                onOpenAmendStay={onOpenAmendStay}
-                onOpenRoomMove={onOpenRoomMove}
-                onOpenSplitFolio={onOpenRoomSplit || (() => setIsSplitFolioOpen(true))}
-                onOpenTaxExemption={() => setIsTaxExemptionOpen(true)}
                 onPrintFolio={handlePrintFolio}
                 onEmailFolio={handleEmailFolio}
                 onExportExcel={handleExportExcel}
             />
 
             {/* 2. Active Tab Body */}
-            <div className="flex-1 bg-white border border-gray-200/90 rounded-xl p-3.5 shadow-xs overflow-y-auto min-h-0">
+            <div className="flex-1 bg-white border border-gray-200/90 rounded-xl p-3 shadow-xs overflow-hidden min-h-0 flex flex-col">
                 {activeTab === 'operations' && (
                     <TabFolioOperations
                         folio={activeFolio}
@@ -317,7 +303,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         onOpenAddDiscount={() => setIsApplyDiscountOpen(true)}
                         onOpenAdjustments={() => setIsAdjustmentsOpen(true)}
                         onOpenTransfer={() => setIsTransferOpen(true)}
-                        onOpenSplitFolio={() => setIsSplitFolioOpen(true)}
+                        onOpenSplitFolio={onOpenRoomSplit || (() => setIsSplitFolioOpen(true))}
                         onOpenVoid={(type, id, desc, amt) => {
                             setVoidModalState({
                                 isOpen: true,

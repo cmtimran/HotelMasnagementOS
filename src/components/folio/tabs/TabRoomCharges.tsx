@@ -168,10 +168,10 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     const netBalance = totalCharges + totalTaxVat;
 
     return (
-        <div className="relative w-full flex gap-3 h-full select-none text-gray-800 text-xs py-1 min-h-0 overflow-hidden">
+        <div className="relative w-full flex gap-3 h-full select-none text-gray-800 text-xs min-h-0 overflow-hidden">
             {/* LEFT SIDEBAR */}
-            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-3">
-                <div className="space-y-2">
+            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-3 h-full overflow-hidden">
+                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
                     <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">Rooms</div>
 
                     {/* Rate Group Accordion Header */}
@@ -188,8 +188,8 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                     </div>
                 </div>
 
-                {/* Sidebar Bottom Summary */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5 font-mono text-xs">
+                {/* Sidebar Bottom Summary (PINNED AT BOTTOM) */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5 font-mono text-xs shrink-0 mt-auto">
                     <div className="flex items-center justify-between text-gray-500">
                         <span className="font-sans text-[11px]">Total Charges:</span>
                         <span className="font-semibold text-gray-800">{currency} {totalCharges.toFixed(2)}</span>
@@ -206,9 +206,9 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
             </div>
 
             {/* MAIN RIGHT: Update Details button & Night-by-night table */}
-            <div className="flex-1 flex flex-col justify-between min-w-0 space-y-2.5 overflow-y-auto">
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+            <div className="flex-1 flex flex-col justify-between min-w-0 h-full overflow-hidden">
+                <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between shrink-0 pb-1">
                         <button
                             type="button"
                             onClick={() => handleOpenUpdateDetails()}
@@ -226,9 +226,10 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                         )}
                     </div>
 
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+                    {/* Middle Night-by-night table (SCROLLS INDEPENDENTLY) */}
+                    <div className="border border-gray-200 rounded-lg overflow-y-auto flex-1 min-h-0 bg-white shadow-xs">
                         <table className="w-full text-left text-xs border-collapse">
-                            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
+                            <thead className="bg-gray-50/95 backdrop-blur-xs border-b border-gray-200 text-gray-600 font-semibold text-[11px] sticky top-0 z-10 shadow-2xs">
                                 <tr>
                                     <th className="py-2 px-3">Stay</th>
                                     <th className="py-2 px-2.5">Room</th>
@@ -261,8 +262,8 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                     </div>
                 </div>
 
-                {/* Bottom Right Net Balance */}
-                <div className="flex items-center justify-end pt-2 pb-1 border-t border-gray-100 flex-shrink-0">
+                {/* Bottom Right Net Balance (PINNED AT BOTTOM) */}
+                <div className="flex items-center justify-end pt-2 pb-0.5 border-t border-gray-100 shrink-0 bg-white">
                     <div className="flex items-center gap-2">
                         <span className="text-xs uppercase font-bold text-gray-600 tracking-wide font-sans">Net Balance</span>
                         <span className="text-base font-black text-rose-600 font-mono tracking-tight">
