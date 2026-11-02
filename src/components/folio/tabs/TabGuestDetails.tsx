@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Save, Trash2, CheckCircle2 } from 'lucide-react';
 import type { FolioData } from '../folioTypes';
 
 interface GuestRow {
@@ -121,14 +121,6 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-gray-800 tracking-wide">Add Guest List</h4>
-                        <button
-                            type="button"
-                            onClick={handleAddSharer}
-                            className="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center gap-1 cursor-pointer"
-                        >
-                            <Plus size={13} />
-                            <span>Add Sharer (+ Share)</span>
-                        </button>
                     </div>
 
                     {feedbackMsg && (
