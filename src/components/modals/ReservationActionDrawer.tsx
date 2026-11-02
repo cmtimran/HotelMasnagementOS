@@ -32,7 +32,6 @@ import {
     Key,
     ArrowRight,
     Sparkles,
-    TrendingUp,
     CheckCircle2,
     RotateCcw,
     Undo2,
@@ -107,7 +106,15 @@ export interface ReservationActionDrawerProps {
     onProceedNewBooking?: (bookingId: string, ownerFolio: string, groupOwner: string, sourceBooking?: AmendBookingData) => void;
     onConfirmCancel?: (bookingId: string, fee: number, refund: number, reason: string) => void;
     onConfirmVoid?: (bookingId: string, reason: string) => void;
-    onConfirmHold?: (bookingId: string, startDate: string, endDate: string, reason: string) => void;
+    onConfirmHold?: (
+        bookingId: string,
+        startDate: string,
+        endDate: string,
+        reason: string,
+        holdUntilTime?: string,
+        holdTier?: string,
+        depositRequired?: number
+    ) => void;
     onConfirmHoldBooking?: (bookingId: string, depositAmount?: number, paymentMethod?: string, notes?: string) => void;
     onReleaseHeldRoom?: (bookingId: string, reason?: string) => void;
     onReinstateReservation?: (bookingId: string) => void;
@@ -233,6 +240,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // 9. Reservation Hold Form States
     const [holdStartDate, setHoldStartDate] = useState<string>('');
     const [holdEndDate, setHoldEndDate] = useState<string>('');
+    const [holdUntilTime, setHoldUntilTime] = useState<string>('18:00:00');
+    const [holdTier, setHoldTier] = useState<'courtesy' | 'corporate' | 'vip'>('courtesy');
+    const [holdPreset, setHoldPreset] = useState<string>('6pm');
     const [holdReason, setHoldReason] = useState<string>('');
     const [confirmHoldDeposit, setConfirmHoldDeposit] = useState<number>(0);
     const [confirmHoldMethod, setConfirmHoldMethod] = useState<string>('Cash');
@@ -327,6 +337,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
             setHoldStartDate(arr);
             setHoldEndDate(dep);
+            setHoldUntilTime('18:00:00');
+            setHoldTier('courtesy');
+            setHoldPreset('6pm');
             setHoldReason('');
 
             setConfirmHoldDeposit(booking.depositRequired || 0);
@@ -1118,7 +1131,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 if (onConfirmVoid) onConfirmVoid(booking.id, voidReason);
                 break;
             case 'hold':
-                if (onConfirmHold) onConfirmHold(booking.id, holdStartDate, holdEndDate, holdReason);
+                if (onConfirmHold) onConfirmHold(booking.id, holdStartDate, holdEndDate, holdReason, holdUntilTime, holdTier, Math.round(Number(totalAmount) * 0.3));
                 break;
             case 'confirm_hold':
                 if (onConfirmHoldBooking) onConfirmHoldBooking(booking.id, confirmHoldDeposit, confirmHoldMethod, confirmHoldNotes);
@@ -2761,36 +2774,225 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 {/* MODE 9: RESERVATION HOLD (09-reservation-hold-modal.png) */}
                                 {mode === 'hold' && (
                                     <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Hold Start Date *</label>
+                                        {/* 1. Unified Hold Date Range */}
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[9.5px] font-bold text-blue-100 flex items-center gap-1">
+                                                    <span className="text-rose-400">*</span> Hold Date Range
+                                                </label>
+                                                <span className="text-[8px] text-blue-200/70">Inventory blocked during this period</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                                                <Calendar size={13} className="text-blue-600 shrink-0" />
                                                 <input
                                                     type="date"
                                                     value={holdStartDate}
                                                     onChange={e => setHoldStartDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none"
+                                                    className="w-28 bg-transparent text-[9.5px] font-mono font-semibold text-slate-900 outline-none cursor-pointer"
                                                 />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Hold End Date *</label>
+                                                <ArrowRight size={12} className="text-slate-400 shrink-0" />
                                                 <input
                                                     type="date"
+                                                    min={holdStartDate}
                                                     value={holdEndDate}
-                                                    onChange={e => setHoldEndDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none"
+                                                    onChange={e => {
+                                                        setHoldEndDate(e.target.value);
+                                                        setHoldPreset('custom');
+                                                    }}
+                                                    className="w-28 bg-transparent text-[9.5px] font-mono font-semibold text-slate-900 outline-none cursor-pointer"
                                                 />
+                                                <div className="flex-1" />
+                                                {(holdStartDate !== booking.arrivalDate || holdEndDate !== booking.departureDate) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHoldStartDate(booking.arrivalDate);
+                                                            setHoldEndDate(booking.departureDate);
+                                                        }}
+                                                        className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 cursor-pointer"
+                                                        title="Reset Date Range"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
+                                        {/* 2. Cut-Off Release Time with Presets */}
+                                        <div className="space-y-1">
+                                            <label className="text-[9.5px] font-bold text-blue-100 flex items-center gap-1">
+                                                <span className="text-rose-400">*</span> Cut-Off Release Time
+                                            </label>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <div className="flex items-center gap-1 bg-white border border-blue-300 rounded px-2 py-1 w-28">
+                                                    <Clock size={12} className="text-slate-500 shrink-0" />
+                                                    <input
+                                                        type="time"
+                                                        step="1"
+                                                        value={holdUntilTime}
+                                                        onChange={e => {
+                                                            setHoldUntilTime(e.target.value);
+                                                            setHoldPreset('custom');
+                                                        }}
+                                                        className="w-full bg-transparent text-[9.5px] font-mono font-bold text-slate-900 outline-none cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHoldPreset('6pm');
+                                                            setHoldUntilTime('18:00:00');
+                                                        }}
+                                                        className={`px-2 py-1 rounded text-[8.5px] font-semibold transition-all cursor-pointer ${
+                                                            holdPreset === '6pm'
+                                                                ? 'bg-blue-500 text-white font-bold shadow-2xs'
+                                                                : 'bg-white/10 text-blue-100 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        6:00 PM Release
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHoldPreset('4pm');
+                                                            setHoldUntilTime('16:00:00');
+                                                        }}
+                                                        className={`px-2 py-1 rounded text-[8.5px] font-semibold transition-all cursor-pointer ${
+                                                            holdPreset === '4pm'
+                                                                ? 'bg-blue-500 text-white font-bold shadow-2xs'
+                                                                : 'bg-white/10 text-blue-100 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        4:00 PM
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHoldPreset('24h');
+                                                            const now = new Date();
+                                                            const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                                                            setHoldEndDate(tomorrow.toISOString().slice(0, 10));
+                                                            setHoldUntilTime(tomorrow.toTimeString().slice(0, 8));
+                                                        }}
+                                                        className={`px-2 py-1 rounded text-[8.5px] font-semibold transition-all cursor-pointer ${
+                                                            holdPreset === '24h'
+                                                                ? 'bg-blue-500 text-white font-bold shadow-2xs'
+                                                                : 'bg-white/10 text-blue-100 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        24h Window
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHoldPreset('48h_prior');
+                                                            const inDate = new Date(booking.arrivalDate);
+                                                            const prior = new Date(inDate.getTime() - 48 * 60 * 60 * 1000);
+                                                            setHoldEndDate(prior.toISOString().slice(0, 10));
+                                                            setHoldUntilTime('18:00:00');
+                                                        }}
+                                                        className={`px-2 py-1 rounded text-[8.5px] font-semibold transition-all cursor-pointer ${
+                                                            holdPreset === '48h_prior'
+                                                                ? 'bg-blue-500 text-white font-bold shadow-2xs'
+                                                                : 'bg-white/10 text-blue-100 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        48h Prior
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. Guarantee Tier */}
+                                        <div className="space-y-1">
+                                            <label className="text-[9.5px] font-bold text-blue-100">Hold Guarantee Tier</label>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                <label className={`rounded p-1.5 flex flex-col gap-0.5 cursor-pointer border transition-all ${
+                                                    holdTier === 'courtesy'
+                                                        ? 'bg-amber-500/30 border-amber-400 text-white'
+                                                        : 'bg-white/10 border-white/10 text-blue-100 hover:bg-white/15'
+                                                }`}>
+                                                    <div className="flex items-center justify-between text-[9px] font-bold">
+                                                        <span>Courtesy FIT</span>
+                                                        <input
+                                                            type="radio"
+                                                            name="drawerHoldTier"
+                                                            checked={holdTier === 'courtesy'}
+                                                            onChange={() => setHoldTier('courtesy')}
+                                                            className="accent-amber-500"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[7.5px] text-blue-200/80 leading-tight">Auto-release at cut-off</span>
+                                                </label>
+                                                <label className={`rounded p-1.5 flex flex-col gap-0.5 cursor-pointer border transition-all ${
+                                                    holdTier === 'corporate'
+                                                        ? 'bg-blue-500/30 border-blue-400 text-white'
+                                                        : 'bg-white/10 border-white/10 text-blue-100 hover:bg-white/15'
+                                                }`}>
+                                                    <div className="flex items-center justify-between text-[9px] font-bold">
+                                                        <span>Corporate</span>
+                                                        <input
+                                                            type="radio"
+                                                            name="drawerHoldTier"
+                                                            checked={holdTier === 'corporate'}
+                                                            onChange={() => setHoldTier('corporate')}
+                                                            className="accent-blue-500"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[7.5px] text-blue-200/80 leading-tight">Sales desk PO pending</span>
+                                                </label>
+                                                <label className={`rounded p-1.5 flex flex-col gap-0.5 cursor-pointer border transition-all ${
+                                                    holdTier === 'vip'
+                                                        ? 'bg-purple-500/30 border-purple-400 text-white'
+                                                        : 'bg-white/10 border-white/10 text-blue-100 hover:bg-white/15'
+                                                }`}>
+                                                    <div className="flex items-center justify-between text-[9px] font-bold">
+                                                        <span>VIP Block</span>
+                                                        <input
+                                                            type="radio"
+                                                            name="drawerHoldTier"
+                                                            checked={holdTier === 'vip'}
+                                                            onChange={() => setHoldTier('vip')}
+                                                            className="accent-purple-500"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[7.5px] text-blue-200/80 leading-tight">Protected. No auto drop</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* 4. Reason and Quick Pills */}
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[8px] font-semibold text-blue-100">Hold Reason *</label>
+                                            <label className="text-[9.5px] font-semibold text-blue-100">Hold Reason *</label>
                                             <textarea
                                                 value={holdReason}
                                                 onChange={e => setHoldReason(e.target.value)}
-                                                rows={3}
-                                                placeholder="e.g., Waiting for guest confirmation."
-                                                className="w-full p-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900 outline-none"
+                                                rows={2}
+                                                placeholder="Enter hold reason (e.g. Waiting for guest deposit confirmation)"
+                                                className="w-full p-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none leading-relaxed resize-none"
                                             />
+                                            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                                                {[
+                                                    'Awaiting bKash / Bank Deposit',
+                                                    'Corporate PO Pending',
+                                                    'Delayed Flight Transit',
+                                                    'VIP Courtesy Block'
+                                                ].map(r => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={() => setHoldReason(r)}
+                                                        className={`px-1.5 py-0.5 rounded text-[8px] transition-colors cursor-pointer border ${
+                                                            holdReason === r
+                                                                ? 'bg-amber-400 text-slate-900 font-bold border-amber-300'
+                                                                : 'bg-white/10 text-blue-200 border-white/15 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        {r}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

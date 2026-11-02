@@ -12,6 +12,7 @@ import {
     getOperatingSystemDate,
     confirmHoldReservationInDB,
     releaseHoldReservationInDB,
+    holdReservationInDB,
     getDynamicRoomTypes,
     getAvailableRoomsForStay,
     validateAndCommitReservation,
@@ -36,6 +37,8 @@ export interface HoldItem {
     estimatedAmount: number;
     depositRequiredBDT?: number;
     paidAmount?: number;
+    holdUntilTime?: string;
+    holdTier?: string;
 }
 
 export const ReservationHold: React.FC = () => {
@@ -77,7 +80,8 @@ export const ReservationHold: React.FC = () => {
             if (isHold || isReserved || (r.holdUntil && isConfirmed)) {
                 const checkIn = r.checkIn || r.checkInDate || operatingDate;
                 const checkOut = r.checkOut || r.checkOutDate || operatingDate;
-                const holdDeadline = r.holdUntil ? r.holdUntil.slice(0, 10) : checkIn;
+                const holdDeadline = r.holdUntil ? r.holdUntil.slice(0, 10) : (r.holdEndDate || checkIn);
+                const holdTime = r.holdUntilTime || (r.holdUntil && r.holdUntil.includes('T') ? r.holdUntil.split('T')[1].slice(0, 5) : '18:00');
                 const isExpired = isHold && holdDeadline < operatingDate;
 
                 items.push({
@@ -88,6 +92,8 @@ export const ReservationHold: React.FC = () => {
                     status: isExpired ? 'Expired' : isHold ? 'Hold' : isReserved ? 'Reserved' : 'Confirmed',
                     holdStartDate: r.holdStartDate || r.createdAt?.slice(0, 10) || checkIn,
                     holdEndDate: holdDeadline,
+                    holdUntilTime: holdTime,
+                    holdTier: r.holdTier || r.holdType,
                     reason: r.holdReason || r.specialRequests || (isReserved ? 'Unpaid reservation awaiting guarantee' : 'Tentative hold block'),
                     reservationDate: r.createdAt ? r.createdAt.slice(0, 10) : operatingDate,
                     checkInDate: checkIn,
@@ -206,6 +212,14 @@ export const ReservationHold: React.FC = () => {
             });
             localStorage.setItem('hotel_holds_v2', JSON.stringify(parsed));
         } catch {}
+
+        // Persist to DB via API
+        holdReservationInDB(resNo, form.holdStartDate, form.holdEndDate, form.reason, {
+            holdUntil: `${form.holdEndDate}T18:00:00`,
+            holdType: 'SIX_PM_RELEASE',
+            depositRequired: form.depositRequiredBDT,
+            autoRelease: true
+        });
 
         setReservationsVersion(v => v + 1);
         showToast(`Hold block ${resNo} created successfully! Room ${assignedRoom} held until ${form.holdEndDate}.`);
@@ -468,13 +482,18 @@ export const ReservationHold: React.FC = () => {
                                                     <>
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="text-amber-900 font-semibold text-xs">{h.holdEndDate}</span>
+                                                            <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 px-1 py-0.2 rounded">
+                                                                {h.holdUntilTime || '18:00'}
+                                                            </span>
                                                             {isExpiring && (
                                                                 <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 text-[9px] animate-pulse font-bold">
                                                                     Expires Today!
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <span className="text-[10px] text-slate-400 block mt-0.5">Auto-release at 18:00</span>
+                                                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                                                            {h.holdTier ? `${h.holdTier.toUpperCase()} • ` : ''}Cut-off at {h.holdUntilTime || '18:00'}
+                                                        </span>
                                                     </>
                                                 ) : isReserved ? (
                                                     <div>

@@ -38,6 +38,7 @@ import { getCanonicalGuestProfiles } from '../utils/guestProfileEngine';
 import { ChildAgeSelector } from './common/ChildAgeSelector';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './modals/MultiRoomSelectorModal';
+import { HoldTillModal, type HoldTillPayload } from './modals/HoldTillModal';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -66,6 +67,7 @@ import {
     getAllStoredReservations,
     saveStoredReservations,
     updateReservationInDB,
+    holdReservationInDB,
     getStoredConnectingSuites,
     syncConnectingSuitesFromDB,
     getRoomSmokingPolicy,
@@ -480,6 +482,9 @@ export const AddReservation: React.FC = () => {
         requiredCount: 1,
         isAutoMode: false
     });
+
+    // Hold Till Enterprise Modal State
+    const [isHoldTillModalOpen, setIsHoldTillModalOpen] = useState(false);
 
     // ==========================================
     // EDIT MODE & PRE-POPULATION STATE
@@ -1377,7 +1382,7 @@ export const AddReservation: React.FC = () => {
     };
 
     // Save Reservation with Atomic Pre-Commit Validation Guard
-    const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+    const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold', holdPayload?: HoldTillPayload) => {
         if (actionType === 'checkin' && checkIn !== getOperatingSystemDate()) {
             toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkIn}.`);
             return;
@@ -1532,9 +1537,16 @@ export const AddReservation: React.FC = () => {
             children: mainRoom.children,
             status: statusVal,
             isGuaranteed: totalPaid > 0,
-            holdType: statusVal === 'hold' ? 'SIX_PM_RELEASE' : undefined,
-            holdUntil: statusVal === 'hold' ? calculateHoldCutoffTimestamp('SIX_PM_RELEASE', checkIn) : undefined,
-            holdReason: statusVal === 'hold' ? (remarksMap['Guest'] || 'Tentative hold from Add Reservation') : undefined,
+            holdType: statusVal === 'hold' ? (holdPayload ? (holdPayload.holdTier === 'vip' ? 'VIP_PROTECTED' : (holdPayload.holdUntilTime === '18:00:00' ? 'SIX_PM_RELEASE' : 'CUSTOM_CUTOFF')) : 'SIX_PM_RELEASE') : undefined,
+            holdUntil: statusVal === 'hold' ? (holdPayload ? holdPayload.holdUntilISO : calculateHoldCutoffTimestamp('SIX_PM_RELEASE', checkIn)) : undefined,
+            holdStartDate: statusVal === 'hold' ? (holdPayload?.holdStartDate || checkIn) : undefined,
+            holdEndDate: statusVal === 'hold' ? (holdPayload?.holdEndDate || checkIn) : undefined,
+            holdUntilTime: statusVal === 'hold' ? (holdPayload?.holdUntilTime || '18:00:00') : undefined,
+            holdTier: statusVal === 'hold' ? (holdPayload?.holdTier || 'courtesy') : undefined,
+            holdReason: statusVal === 'hold' ? (holdPayload?.holdReason || (remarksMap['Guest'] || 'Tentative hold from Add Reservation')) : undefined,
+            depositRequired: statusVal === 'hold' ? (holdPayload?.depositRequired || 0) : undefined,
+            noAutoRelease: statusVal === 'hold' ? (holdPayload?.noAutoRelease || false) : undefined,
+            autoRelease: statusVal === 'hold' ? (!holdPayload?.noAutoRelease) : undefined,
             totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
             dueAmount: actionType === 'hold' ? finalPayable : totalDue,
@@ -1671,7 +1683,7 @@ export const AddReservation: React.FC = () => {
             }
         }
 
-        // If hold, also push to holds list
+        // If hold, also push to holds list and Database
         if (actionType === 'hold') {
             try {
                 const holdsExisting = localStorage.getItem('hotel_holds_v2');
@@ -1681,19 +1693,36 @@ export const AddReservation: React.FC = () => {
                     reservationNumber,
                     guestName: newReservation.guestName,
                     status: 'Hold',
-                    holdStartDate: checkIn,
-                    holdEndDate: checkOut,
-                    reason: remarksMap['Guest'] || 'Tentative booking on hold',
+                    holdStartDate: holdPayload?.holdStartDate || checkIn,
+                    holdEndDate: holdPayload?.holdEndDate || checkIn,
+                    holdUntilTime: holdPayload?.holdUntilTime || '18:00:00',
+                    holdTier: holdPayload?.holdTier || 'courtesy',
+                    reason: holdPayload?.holdReason || remarksMap['Guest'] || 'Tentative booking on hold',
                     reservationDate: new Date().toISOString().split('T')[0],
                     checkInDate: checkIn,
                     checkOutDate: checkOut,
                     roomType: mainRoom.roomType,
-                    estimatedAmount: finalPayable
+                    estimatedAmount: finalPayable,
+                    depositRequiredBDT: holdPayload?.depositRequired || 0
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(holdsList));
             } catch (e) {
                 console.error(e);
             }
+
+            // Push to DB via PMS API
+            holdReservationInDB(
+                reservationNumber,
+                holdPayload?.holdStartDate || checkIn,
+                holdPayload?.holdEndDate || checkIn,
+                holdPayload?.holdReason || remarksMap['Guest'] || 'Tentative booking on hold',
+                {
+                    holdUntil: holdPayload ? holdPayload.holdUntilISO : `${checkIn}T18:00:00`,
+                    holdType: holdPayload ? (holdPayload.holdTier === 'vip' ? 'VIP_PROTECTED' : (holdPayload.holdUntilTime === '18:00:00' ? 'SIX_PM_RELEASE' : 'CUSTOM_CUTOFF')) : 'SIX_PM_RELEASE',
+                    depositRequired: holdPayload?.depositRequired || 0,
+                    autoRelease: !holdPayload?.noAutoRelease
+                }
+            );
         }
 
         // Synchronize and persist guest profile in hotel_guest_profiles_v2
@@ -4272,7 +4301,34 @@ export const AddReservation: React.FC = () => {
                                     <>
                                         <button
                                             type="button"
-                                            onClick={() => handleFinalizeBooking('hold')}
+                                            onClick={() => {
+                                                const flightCheck = validatePreBookingFlight({
+                                                    actionType: 'hold',
+                                                    checkIn,
+                                                    operatingDate: getOperatingSystemDate(),
+                                                    availableRatePlans,
+                                                    roomsList,
+                                                    nights,
+                                                    guestName,
+                                                    phone: mobile || phone,
+                                                    hasOverbookingError,
+                                                    validateAllRestrictions: validateAllRoomRestrictions
+                                                });
+
+                                                if (!flightCheck.allowed) {
+                                                    toast.error(flightCheck.error!);
+                                                    if (flightCheck.stepRequired) setStep(flightCheck.stepRequired as 1 | 2 | 3);
+                                                    return;
+                                                }
+
+                                                if (activeBlacklistAlert && !managerOverrideApproved) {
+                                                    toast.error('❌ Booking Blocked: Guest is on the Blacklist. Duty Manager Override is required.');
+                                                    setStep(2);
+                                                    return;
+                                                }
+
+                                                setIsHoldTillModalOpen(true);
+                                            }}
                                             className="h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
                                         >
                                             Hold Till
@@ -4448,6 +4504,27 @@ export const AddReservation: React.FC = () => {
                         return taken;
                     })()}
                     isAutoMode={multiRoomModal.isAutoMode}
+                />
+            )}
+
+            {/* Enterprise Hold Till Modal */}
+            {isHoldTillModalOpen && (
+                <HoldTillModal
+                    isOpen={isHoldTillModalOpen}
+                    onClose={() => setIsHoldTillModalOpen(false)}
+                    reservationNumber={editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`}
+                    guestName={`${salutation} ${guestName}`.trim() || 'Valued Guest'}
+                    roomNumber={roomsList[0]?.roomNumber}
+                    roomType={roomsList[0]?.roomType}
+                    checkInDate={checkIn}
+                    checkOutDate={checkOut}
+                    totalAmount={finalPayable}
+                    depositRequired={Math.round(finalPayable * 0.3)}
+                    initialReason={remarksMap['Guest'] || 'Awaiting advance deposit transfer / payment confirmation.'}
+                    onConfirmHold={(payload) => {
+                        setIsHoldTillModalOpen(false);
+                        handleFinalizeBooking('hold', payload);
+                    }}
                 />
             )}
         </div>

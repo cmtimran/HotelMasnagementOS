@@ -32,6 +32,7 @@ export interface AmendBookingData {
     reservationNumber: string;
     groupCode?: string;
     subBookingNumber?: string;
+    isGroup?: boolean;
     registrationNumber?: string;
     registeredAt?: string;
     folioNumber?: string;
@@ -72,6 +73,11 @@ export interface AmendBookingData {
     adults?: number;
     children?: number;
     childrenAges?: number[];
+    holdUntil?: string;
+    holdUntilTime?: string;
+    holdTier?: string;
+    holdReason?: string;
+    depositRequired?: number;
 }
 
 interface AmendStayModalProps {

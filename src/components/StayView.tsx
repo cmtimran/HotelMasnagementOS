@@ -130,6 +130,10 @@ interface TimelineBooking {
     taxApplicable?: boolean;
     adults?: number;
     children?: number;
+    holdUntil?: string;
+    holdUntilTime?: string;
+    holdTier?: string;
+    holdReason?: string;
 }
 
 export interface RoomNode {
@@ -829,7 +833,11 @@ export const StayView: React.FC = () => {
                         taxConfigCode: taxCode,
                         taxApplicable: isTaxApp,
                         adults: Number(res.adults !== undefined ? res.adults : 2),
-                        children: Number(res.children !== undefined ? res.children : 0)
+                        children: Number(res.children !== undefined ? res.children : 0),
+                        holdUntil: res.holdUntil,
+                        holdUntilTime: res.holdUntilTime,
+                        holdTier: res.holdTier || res.holdType,
+                        holdReason: res.holdReason
                     });
                 });
                 continue;
@@ -882,7 +890,11 @@ export const StayView: React.FC = () => {
                         taxConfigCode: taxCode,
                         taxApplicable: isTaxApp,
                         adults: rAdults,
-                        children: rChildren
+                        children: rChildren,
+                        holdUntil: res.holdUntil,
+                        holdUntilTime: res.holdUntilTime,
+                        holdTier: res.holdTier || res.holdType,
+                        holdReason: res.holdReason
                     });
                 });
             } else {
@@ -931,7 +943,11 @@ export const StayView: React.FC = () => {
                     taxConfigCode: taxCode,
                     taxApplicable: isTaxApp,
                     adults: rAdults,
-                    children: rChildren
+                    children: rChildren,
+                    holdUntil: res.holdUntil,
+                    holdUntilTime: res.holdUntilTime,
+                    holdTier: res.holdTier || res.holdType,
+                    holdReason: res.holdReason
                 });
             }
         }
@@ -1421,7 +1437,12 @@ export const StayView: React.FC = () => {
             source: originalRes?.source,
             adults: resolvedAdults,
             children: resolvedChildren,
-            childrenAges: resolvedChildrenAges
+            childrenAges: resolvedChildrenAges,
+            holdUntil: originalRes?.holdUntil || booking.holdUntil,
+            holdUntilTime: originalRes?.holdUntilTime || booking.holdUntilTime,
+            holdTier: originalRes?.holdTier || originalRes?.holdType || booking.holdTier,
+            holdReason: originalRes?.holdReason || booking.holdReason,
+            depositRequired: originalRes?.depositRequired
         };
     };
 
@@ -1564,7 +1585,12 @@ export const StayView: React.FC = () => {
             source: originalRes?.source,
             adults: resolvedAdults,
             children: resolvedChildren,
-            childrenAges: resolvedChildrenAges
+            childrenAges: resolvedChildrenAges,
+            holdUntil: originalRes?.holdUntil || booking.holdUntil,
+            holdUntilTime: originalRes?.holdUntilTime || booking.holdUntilTime,
+            holdTier: originalRes?.holdTier || originalRes?.holdType || booking.holdTier,
+            holdReason: originalRes?.holdReason || booking.holdReason,
+            depositRequired: originalRes?.depositRequired
         };
 
         setActionDrawerBooking(bData);
@@ -2111,18 +2137,38 @@ export const StayView: React.FC = () => {
         showToast(`Reservation ${target.reservationNumber} voided: "${reason || 'No reason specified'}"`);
     };
 
-    const handleConfirmHold = (bookingId: string, _startDate: string, endDate: string, reason: string = '') => {
+    const handleConfirmHold = (
+        bookingId: string,
+        startDate: string,
+        endDate: string,
+        reason: string = '',
+        holdUntilTime: string = '18:00:00',
+        holdTier: string = 'courtesy',
+        depositRequired?: number
+    ) => {
         const target = bookings.find(b => b.id === bookingId);
         if (!target) return;
 
         const stored = getAllStoredReservations();
         const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        const cleanTime = holdUntilTime.length === 5 ? `${holdUntilTime}:00` : holdUntilTime;
+        const holdUntilISO = `${endDate}T${cleanTime}`;
+
         if (resIdx !== -1) {
             const res = stored[resIdx];
             const updated = {
                 ...res,
                 status: 'hold',
-                holdUntil: endDate
+                holdStartDate: startDate || res.checkIn,
+                holdEndDate: endDate,
+                holdUntilTime: cleanTime,
+                holdTier,
+                holdType: holdTier === 'vip' ? 'VIP_PROTECTED' : (cleanTime === '18:00:00' ? 'SIX_PM_RELEASE' : 'CUSTOM_CUTOFF'),
+                holdUntil: holdUntilISO,
+                holdReason: reason || 'Tentative booking held from StayView',
+                depositRequired: depositRequired || Math.round((res.totalAmount || 0) * 0.3),
+                noAutoRelease: holdTier === 'vip',
+                autoRelease: holdTier !== 'vip'
             };
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
@@ -2135,28 +2181,48 @@ export const StayView: React.FC = () => {
                     reservationNumber: target.reservationNumber,
                     guestName: target.guestName,
                     status: 'Hold',
-                    holdStartDate: res.checkIn,
+                    holdStartDate: startDate || res.checkIn,
                     holdEndDate: endDate,
+                    holdUntilTime: cleanTime,
+                    holdTier,
                     reason: reason || 'Tentative booking held from StayView',
                     reservationDate: new Date().toISOString().split('T')[0],
                     checkInDate: res.checkIn,
                     checkOutDate: endDate,
                     roomType: res.roomType,
-                    estimatedAmount: res.totalAmount
+                    estimatedAmount: res.totalAmount,
+                    depositRequiredBDT: depositRequired || Math.round((res.totalAmount || 0) * 0.3)
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(existingHolds));
             } catch { }
 
             // Persist to Database via API
-            holdReservationInDB(target.reservationNumber, res.checkIn, endDate, reason);
+            holdReservationInDB(target.reservationNumber, startDate || res.checkIn, endDate, reason, {
+                holdUntil: holdUntilISO,
+                holdType: holdTier === 'vip' ? 'VIP_PROTECTED' : (cleanTime === '18:00:00' ? 'SIX_PM_RELEASE' : 'CUSTOM_CUTOFF'),
+                depositRequired: depositRequired || Math.round((res.totalAmount || 0) * 0.3),
+                autoRelease: holdTier !== 'vip'
+            });
 
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
         } else {
-            holdReservationInDB(target.reservationNumber || bookingId, undefined, endDate, reason);
+            holdReservationInDB(target.reservationNumber || bookingId, startDate, endDate, reason, {
+                holdUntil: holdUntilISO,
+                holdType: holdTier === 'vip' ? 'VIP_PROTECTED' : (cleanTime === '18:00:00' ? 'SIX_PM_RELEASE' : 'CUSTOM_CUTOFF'),
+                depositRequired: depositRequired || 0,
+                autoRelease: holdTier !== 'vip'
+            });
         }
 
-        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'hold' } : b));
-        showToast(`Reservation ${target.reservationNumber} placed on HOLD until ${endDate}!`);
+        setBookings(prev => prev.map(b => b.id === bookingId ? {
+            ...b,
+            status: 'hold',
+            holdUntil: holdUntilISO,
+            holdUntilTime: cleanTime,
+            holdTier,
+            holdReason: reason
+        } : b));
+        showToast(`Reservation ${target.reservationNumber} placed on HOLD until ${endDate} at ${cleanTime}!`);
     };
 
     const handleConfirmHoldBooking = async (bookingId: string, depositAmount: number = 0, paymentMethod: string = 'Cash', notes: string = '') => {
@@ -2792,7 +2858,7 @@ export const StayView: React.FC = () => {
             case 'stayover': return 'bg-teal-600 text-white';
             case 'due-out': return 'bg-orange-500 text-white';
             case 'checked-out': return 'bg-slate-600 text-white';
-            case 'hold': return 'bg-amber-600 text-white border border-amber-500';
+            case 'hold': return 'bg-[repeating-linear-gradient(45deg,#d97706,#d97706_8px,#b45309_8px,#b45309_16px)] text-white border border-amber-300 shadow-xs';
             case 'day-use': return 'bg-indigo-600 text-white';
             case 'out-of-order': return 'bg-red-600 text-white';
             default: return 'bg-blue-600 text-white';
@@ -3678,10 +3744,11 @@ export const StayView: React.FC = () => {
                                                                             )}
                                                                             {booking.status === 'hold' && (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
-                                                                                    title="Tentative Hold Booking"
+                                                                                    className="px-1 py-0.2 rounded-full bg-amber-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0 gap-0.5 text-[8px] font-bold"
+                                                                                    title={`Tentative Hold${booking.holdTier ? ` (${booking.holdTier.toUpperCase()})` : ''}: Cut-off ${booking.holdUntil || '18:00:00'}${booking.holdReason ? ` - ${booking.holdReason}` : ''}`}
                                                                                 >
-                                                                                    <Clock size={9} className="stroke-[2.5]" />
+                                                                                    <Clock size={8} className="stroke-[2.5]" />
+                                                                                    <span>{booking.holdUntilTime ? booking.holdUntilTime.slice(0, 5) : 'HOLD'}</span>
                                                                                 </span>
                                                                             )}
                                                                             {booking.status === 'reserved' && (
@@ -4498,6 +4565,32 @@ export const StayView: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Hold Details Strip if on HOLD */}
+                        {((hoveredBooking.enriched?.status || hoveredBooking.booking?.status || '').toUpperCase() === 'HOLD') && (
+                            <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-2 text-amber-200 text-[9.5px] space-y-1">
+                                <div className="flex items-center justify-between font-bold text-amber-300">
+                                    <span className="flex items-center gap-1">
+                                        <Clock size={11} className="text-amber-400" />
+                                        <span>Provisional Hold Cut-Off</span>
+                                    </span>
+                                    <span className="font-mono text-[9px] bg-amber-500/30 px-1.5 py-0.5 rounded text-amber-100">
+                                        {hoveredBooking.enriched?.holdUntilTime || hoveredBooking.booking?.holdUntilTime || '18:00:00'}
+                                    </span>
+                                </div>
+                                <div className="text-[8.5px] text-amber-200/90 leading-tight">
+                                    Release Deadline: <strong className="text-white font-mono">{hoveredBooking.enriched?.holdUntil || hoveredBooking.booking?.holdUntil || hoveredBooking.enriched?.departureDate}</strong>
+                                    {hoveredBooking.enriched?.holdTier && (
+                                        <span> | Tier: <strong className="text-white capitalize">{hoveredBooking.enriched.holdTier}</strong></span>
+                                    )}
+                                </div>
+                                {(hoveredBooking.enriched?.holdReason || hoveredBooking.booking?.holdReason) && (
+                                    <div className="text-[8px] text-amber-100/70 truncate italic">
+                                        "{hoveredBooking.enriched?.holdReason || hoveredBooking.booking?.holdReason}"
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Micro Quick Hint */}
                         <div className="pt-1.5 flex items-center justify-between text-[8.5px] text-slate-400 border-t border-slate-800/80">
