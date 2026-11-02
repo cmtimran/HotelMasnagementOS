@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DoorClosed, RefreshCw, X, CheckCircle2 } from 'lucide-react';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { getCurrencySymbol, getActiveCurrencyCode } from '../../../utils/currencyUtils';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import { broadcastPMSEvent } from '../../../utils/roomInventoryEngine';
 import type { FolioData } from '../folioTypes';
@@ -30,7 +30,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     const [modalAdults, setModalAdults] = useState(adults);
     const [modalChildren, setModalChildren] = useState(children);
     const [isComplimentary, setIsComplimentary] = useState(false);
-    const [modalCurrency, setModalCurrency] = useState('USD');
+    const [modalCurrency, setModalCurrency] = useState(getActiveCurrencyCode() || 'USD');
     const [modalRate, setModalRate] = useState('0');
     const [ratesInclusiveTax, setRatesInclusiveTax] = useState(false);
     const [scope, setScope] = useState<'SELECTED_DATES' | 'WHOLE_STAY'>('SELECTED_DATES');
@@ -117,7 +117,8 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
 
     const handleApplyUpdateDetails = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!folio?.id) {
+        const folioRef = folio?.id || folio?.reservation_number || booking?.reservationNumber || booking?.id;
+        if (!folioRef) {
             setErrorMsg('No active folio found to update');
             return;
         }
@@ -127,7 +128,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
 
         try {
             const numRate = parseFloat(modalRate) || 0;
-            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${folio.id}/room-charges`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${encodeURIComponent(String(folioRef))}/room-charges`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -148,7 +149,9 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                 setFeedbackMsg('Room charges updated successfully!');
                 setIsUpdateModalOpen(false);
                 onRefresh();
-                broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: folio.id });
+                if (folio?.id) {
+                    broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: folio.id });
+                }
                 setTimeout(() => setFeedbackMsg(''), 4000);
             } else {
                 setErrorMsg(data?.error || 'Failed to update room charges');

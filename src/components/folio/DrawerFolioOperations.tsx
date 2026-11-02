@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import { subscribeToPMSEvents } from '../../utils/roomInventoryEngine';
 import type { AmendBookingData } from '../modals/AmendStayModal';
@@ -32,7 +32,6 @@ interface DrawerFolioOperationsProps {
 
 export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     booking,
-    onClose,
     onOpenAddPayment,
     onOpenCheckOut,
     onOpenAmendStay,
@@ -82,13 +81,25 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
             const data = await response.json();
 
             if (data?.success && Array.isArray(data.data) && data.data.length > 0) {
-                const enriched = data.data.map((f: any) => ({
-                    ...f,
-                    market_code: f.market_code || booking.ratePlan || 'Standard Rate',
-                    guest_name: f.guest_name || booking.guestName || 'Valued Guest',
-                    room_number: f.room_number || booking.roomNumber || 'Unassigned',
-                    room_type: f.room_type || booking.roomType || 'Standard Suite'
-                }));
+                const enriched = data.data.map((f: any) => {
+                    const rawGName = f.guest_name || booking.guestName || 'Valued Guest';
+                    const cleanGName = rawGName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim() || rawGName;
+                    const resNum = f.reservation_number || booking.reservationNumber || 'RES';
+
+                    let folioNum = f.folio_number || `FN~${resNum} - ${cleanGName}`;
+                    if (folioNum.endsWith(' - Mr') || folioNum.endsWith(' - Mr.') || folioNum === `FN~${resNum} -`) {
+                        folioNum = `FN~${resNum} - ${cleanGName}`;
+                    }
+
+                    return {
+                        ...f,
+                        folio_number: folioNum,
+                        market_code: f.market_code || booking.ratePlan || 'Standard Rate',
+                        guest_name: cleanGName,
+                        room_number: f.room_number || booking.roomNumber || 'Unassigned',
+                        room_type: f.room_type || booking.roomType || 'Standard Suite'
+                    };
+                });
                 setFolios(enriched);
                 // Maintain active folio or select first
                 setActiveFolioId(prev => {
@@ -268,40 +279,6 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
 
     return (
         <div className="w-full h-full flex flex-col bg-slate-50/50 text-gray-800 select-none overflow-hidden p-2.5 space-y-2 font-sans">
-            {/* Top Navigation Strip with Live Ledger Status & Refresh */}
-            <div className="flex items-center justify-between pb-1 border-b border-gray-200/80">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-xs font-bold text-gray-900 tracking-wide uppercase">
-                        Folio Operations Suite
-                    </h2>
-                    {activeFolio && (
-                        <span className="text-[10.5px] px-2 py-0.5 rounded font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                            {activeFolio.folio_number}
-                        </span>
-                    )}
-                    {isLoading && (
-                        <span className="text-[10px] text-blue-600 font-medium flex items-center gap-1 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                            <span>Syncing...</span>
-                        </span>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {onClose && (
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="h-6 px-2 rounded-md bg-white hover:bg-rose-50 border border-gray-300 text-gray-500 hover:text-rose-600 text-[11px] font-medium flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            title="Close Drawer"
-                        >
-                            <X size={12} />
-                            <span>Close</span>
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {errorMsg && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded-md text-xs flex items-center gap-2">
                     <AlertCircle size={14} className="text-rose-600" />
@@ -314,6 +291,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 folio={activeFolio}
                 booking={booking}
                 activeTab={activeTab}
+                isLoading={isLoading}
                 onSelectTab={setActiveTab}
                 onOpenAddPayment={onOpenAddPayment}
                 onOpenCheckOut={onOpenCheckOut}

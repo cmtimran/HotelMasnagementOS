@@ -314,67 +314,67 @@ export const TabBookingDetails: React.FC<TabBookingDetailsProps> = ({
                 </div>
             </div>
 
-            {/* Bottom Compliance Checkboxes & Save Button: Compact Sticky Footer */}
-            <div className="pt-2 border-t border-gray-200 flex items-center justify-between flex-wrap gap-2 bg-white flex-shrink-0">
+            {/* Bottom Compliance Checkboxes & Save Button: Compact Clean Footer */}
+            <div className="pt-2.5 border-t border-gray-200 flex items-center justify-between gap-4 bg-white flex-shrink-0">
                 <div className="flex items-center gap-3.5 text-[11px] text-gray-700 flex-wrap">
-                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 select-none">
                         <input
                             type="checkbox"
                             checked={sendMail}
                             onChange={(e) => setSendMail(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Send Mail</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 select-none">
                         <input
                             type="checkbox"
                             checked={checkoutMail}
                             onChange={(e) => setCheckoutMail(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Check Out Mail</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 select-none">
                         <input
                             type="checkbox"
                             checked={suppressRateQr}
                             onChange={(e) => setSuppressRateQr(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Suppress Rate or QR Card</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 select-none">
                         <input
                             type="checkbox"
                             checked={displayInclusionSeparate}
                             onChange={(e) => setDisplayInclusionSeparate(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Display Inclusion Separately On Folio</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900" title="Prevent auto-generating invoice sequence on secondary rooms">
+                    <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 select-none" title="Prevent auto-generating invoice sequence on secondary rooms">
                         <input
                             type="checkbox"
                             checked={generateInvoiceOnCheckout}
                             onChange={(e) => setGenerateInvoiceOnCheckout(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Generate invoice no. on checkout</span>
                     </label>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700 font-medium hover:text-gray-900">
+                <div className="flex items-center gap-3 shrink-0">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700 font-semibold hover:text-gray-900 select-none whitespace-nowrap">
                         <input
                             type="checkbox"
                             checked={applyToGroup}
                             onChange={(e) => setApplyToGroup(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                         />
                         <span>Apply To Group</span>
                     </label>
@@ -382,9 +382,9 @@ export const TabBookingDetails: React.FC<TabBookingDetailsProps> = ({
                     <button
                         type="submit"
                         disabled={isSaving}
-                        className="px-4 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0"
                     >
-                        <Save size={12} />
+                        <Save size={13} />
                         <span>{isSaving ? 'Saving...' : 'Save'}</span>
                     </button>
                 </div>

@@ -33,6 +33,7 @@ interface HorizonSummaryBannerProps {
     onPrintFolio?: () => void;
     onEmailFolio?: () => void;
     onExportExcel?: () => void;
+    isLoading?: boolean;
 }
 
 export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
@@ -48,7 +49,8 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     onOpenTaxExemption,
     onPrintFolio,
     onEmailFolio,
-    onExportExcel
+    onExportExcel,
+    isLoading
 }) => {
     const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
     const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
@@ -179,7 +181,13 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                 </div>
 
                 {/* Right Action Icons: Print & Edit */}
-                <div className="flex items-center gap-0.5 pl-2 flex-shrink-0 border-l border-slate-100 ml-2">
+                <div className="flex items-center gap-1 pl-2 flex-shrink-0 border-l border-slate-100 ml-2">
+                    {isLoading && (
+                        <span className="text-[9.5px] text-blue-600 font-medium flex items-center gap-1 animate-pulse mr-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                            <span className="hidden sm:inline">Syncing</span>
+                        </span>
+                    )}
                     <button
                         type="button"
                         onClick={onPrintFolio}

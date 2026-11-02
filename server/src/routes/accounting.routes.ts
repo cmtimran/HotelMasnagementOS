@@ -61,7 +61,7 @@ router.get('/folios', async (req: Request, res: Response) => {
         }
 
         if (reservationIdParam) {
-            whereClause += ` AND (f.reservation_id = ? OR r.reservation_number = ?)`;
+            whereClause += ` AND (f.reservation_id::text = ? OR r.reservation_number = ?)`;
             params.push(reservationIdParam, reservationIdParam);
         } else if (reservationNoParam) {
             whereClause += ` AND r.reservation_number = ?`;
@@ -927,10 +927,61 @@ router.post('/folios/:id/tax-exempt', async (req: Request, res: Response) => {
     }
 });
 
+// Helper to safely find or auto-create a folio by numeric ID, folio_number, or reservation reference
+async function findFolioByIdOrRef(rawId: any): Promise<any> {
+    if (!rawId || rawId === 'undefined' || rawId === 'null') return null;
+    const strId = String(rawId).trim();
+    if (!strId) return null;
+
+    const numId = Number(strId);
+    if (!isNaN(numId) && isFinite(numId)) {
+        const byId = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(numId) as any;
+        if (byId) return byId;
+    }
+
+    // Lookup by folio_number, reservation_id::text, or r.reservation_number
+    const byRef = await db.prepare(`
+        SELECT f.* FROM folios f
+        LEFT JOIN reservations r ON r.id = f.reservation_id
+        WHERE f.folio_number = ? OR f.reservation_id::text = ? OR r.reservation_number = ?
+        LIMIT 1
+    `).get(strId, strId, strId) as any;
+    if (byRef) return byRef;
+
+    // Auto-create if reservation exists without a folio yet
+    const targetRes = await db.prepare(`
+        SELECT r.*, g.first_name, g.last_name, g.phone, g.email 
+        FROM reservations r 
+        LEFT JOIN guests g ON g.id = r.booker_guest_id 
+        WHERE r.id::text = ? OR r.reservation_number = ? 
+        LIMIT 1
+    `).get(strId, strId) as any;
+
+    if (targetRes) {
+        const guestName = [targetRes.first_name, targetRes.last_name].filter(Boolean).join(' ') || 'Valued Guest';
+        const genFolioNo = `FN~${targetRes.reservation_number || targetRes.id} - ${guestName}`;
+        const created = await db.prepare(`
+            INSERT INTO folios (
+                reservation_id, guest_id, folio_number, folio_type, status, balance,
+                bill_to, business_source, generate_invoice_on_checkout
+            ) VALUES (?, ?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, TRUE)
+        `).run(targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct');
+
+        const newId = created.lastInsertRowid;
+        return await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(newId) as any;
+    }
+
+    return null;
+}
+
 // PUT /api/accounting/folios/:id/booking-details - Update Booking & Source Info and Compliance Flags
 router.put('/folios/:id/booking-details', async (req: Request, res: Response) => {
     try {
-        const folioId = Number(req.params.id);
+        const targetFolio = await findFolioByIdOrRef(req.params.id);
+        if (!targetFolio) {
+            return res.status(404).json({ success: false, error: 'Folio not found' });
+        }
+        const folioId = Number(targetFolio.id);
         const {
             billTo,
             marketCode,
@@ -949,11 +1000,6 @@ router.put('/folios/:id/booking-details', async (req: Request, res: Response) =>
             applyToGroup = false,
             userName = 'Front Desk'
         } = req.body;
-
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
-        if (!targetFolio) {
-            return res.status(404).json({ success: false, error: 'Folio not found' });
-        }
 
         const foliosToUpdate = [folioId];
         if (applyToGroup && targetFolio.reservation_id) {
@@ -1011,7 +1057,12 @@ router.put('/folios/:id/booking-details', async (req: Request, res: Response) =>
 // PUT /api/accounting/folios/:id/room-charges - Update Details (Rate, Pax, Scope, Complimentary, Inclusive Tax)
 router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
     try {
-        const folioId = Number(req.params.id);
+        const targetFolio = await findFolioByIdOrRef(req.params.id);
+        if (!targetFolio) {
+            return res.status(404).json({ success: false, error: 'Folio not found' });
+        }
+
+        const folioId = Number(targetFolio.id);
         const {
             stayDate,
             adults = 1,
@@ -1023,12 +1074,11 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
             userName = 'Front Desk'
         } = req.body;
 
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
-        if (!targetFolio) {
-            return res.status(404).json({ success: false, error: 'Folio not found' });
-        }
+        const safeAdults = isNaN(Number(adults)) ? 1 : Math.max(1, Number(adults));
+        const safeChildren = isNaN(Number(children)) ? 0 : Math.max(0, Number(children));
+        const safeRate = isNaN(Number(rate)) ? 0 : Math.max(0, Number(rate));
+        const effectiveRate = isComplimentary ? 0 : safeRate;
 
-        const effectiveRate = isComplimentary ? 0 : Math.max(0, Number(rate));
         let baseAmount = effectiveRate;
         let serviceCharge = 0;
         let vat = 0;
@@ -1058,7 +1108,10 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
         if (scope === 'SELECTED_DATES' && stayDate) {
             const existingCharge = await db.prepare(`
                 SELECT id FROM folio_charges 
-                WHERE folio_id = ? AND charge_date = ? AND charge_code = 'ROOM_CHG' AND (is_voided IS FALSE OR is_voided IS NULL)
+                WHERE folio_id = ? AND charge_date = ? 
+                AND (charge_code IN ('ROOM_CHG', 'ROOM_TARIFF') OR revenue_head IN ('Room Charges', 'Room Tariff'))
+                AND (is_voided IS FALSE OR is_voided IS NULL)
+                ORDER BY id ASC LIMIT 1
             `).get(folioId, stayDate) as any;
 
             if (existingCharge) {
@@ -1081,7 +1134,9 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
             const result = await db.prepare(`
                 UPDATE folio_charges 
                 SET amount = ?, service_charge = ?, vat = ?, city_tax = ?, total_tax = ?, total_amount = ?
-                WHERE folio_id = ? AND charge_code = 'ROOM_CHG' AND (is_voided IS FALSE OR is_voided IS NULL)
+                WHERE folio_id = ? 
+                AND (charge_code IN ('ROOM_CHG', 'ROOM_TARIFF') OR revenue_head IN ('Room Charges', 'Room Tariff'))
+                AND (is_voided IS FALSE OR is_voided IS NULL)
             `).run(baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, folioId);
             updatedChargesCount = result.rowCount || 0;
         }
@@ -1091,7 +1146,7 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
                 UPDATE reservation_rooms 
                 SET room_rate = ?, adults = ?, children = ?
                 WHERE reservation_id = ?
-            `).run(grandTotal, adults, children, targetFolio.reservation_id);
+            `).run(grandTotal, safeAdults, safeChildren, targetFolio.reservation_id);
         }
 
         await db.prepare(`
@@ -1100,7 +1155,7 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
         `).run(
             folioId,
             targetFolio.reservation_id,
-            `Room Charges Updated: Rate ${effectiveRate} (${scope === 'WHOLE_STAY' ? 'Whole Stay' : stayDate}), Adults: ${adults}, Children: ${children}${isComplimentary ? ' [Complimentary]' : ''}`,
+            `Room Charges Updated: Rate ${effectiveRate} (${scope === 'WHOLE_STAY' ? 'Whole Stay' : stayDate}), Adults: ${safeAdults}, Children: ${safeChildren}${isComplimentary ? ' [Complimentary]' : ''}`,
             userName
         );
 
@@ -1112,6 +1167,58 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to update room charges' });
+    }
+});
+
+// PUT /api/accounting/folios/:id/guest-details - Update guest list and primary guest contact details
+router.put('/folios/:id/guest-details', async (req: Request, res: Response) => {
+    try {
+        const targetFolio = await findFolioByIdOrRef(req.params.id);
+        if (!targetFolio) {
+            return res.status(404).json({ success: false, error: 'Folio not found' });
+        }
+        const { guests = [], userName = 'Front Desk' } = req.body;
+        if (Array.isArray(guests) && guests.length > 0) {
+            const primary = guests[0];
+            const rawName = (primary.guestName || '').trim();
+            const nameParts = rawName.split(/\s+/);
+            const firstName = nameParts[0] || 'Valued';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            const salutation = primary.salutation || 'Mr';
+
+            // Update primary guest profile if linked
+            if (targetFolio.guest_id) {
+                await db.prepare(`
+                    UPDATE guests 
+                    SET salutation = ?, first_name = ?, last_name = ?, phone = ?, email = ?, updated_at = NOW()
+                    WHERE id = ?
+                `).run(salutation, firstName, lastName, primary.mobile || '', primary.email || '', targetFolio.guest_id);
+            }
+
+            // Update folio bill_to
+            const fullGuestName = [salutation, firstName, lastName].filter(Boolean).join(' ');
+            await db.prepare(`
+                UPDATE folios 
+                SET bill_to = ?, updated_at = NOW()
+                WHERE id = ?
+            `).run(fullGuestName, targetFolio.id);
+
+            // Audit Trail
+            await db.prepare(`
+                INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+                VALUES (?, ?, 'GUEST_UPDATE', ?, ?)
+            `).run(
+                targetFolio.id,
+                targetFolio.reservation_id,
+                `Guest Details Updated: ${fullGuestName} (${primary.mobile || 'No Phone'}), Total Sharers: ${guests.length - 1}`,
+                userName
+            );
+        }
+
+        return res.json({ success: true, message: 'Guest roster and contact details saved successfully' });
+    } catch (err: any) {
+        console.error('Error updating guest details:', err);
+        return res.status(500).json({ success: false, error: err.message || 'Failed to update guest details' });
     }
 });
 

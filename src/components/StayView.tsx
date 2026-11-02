@@ -3789,7 +3789,6 @@ export const StayView: React.FC = () => {
                                                                             <span className="truncate">{booking.guestName}</span>
                                                                             <span
                                                                                 className="text-[8.5px] font-semibold bg-black/20 text-white/90 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"
-                                                                                title={`Occupancy: ${booking.adults || 2} Adult(s)${(booking.children || 0) > 0 ? `, ${booking.children} Child(ren)` : ''}`}
                                                                             >
                                                                                 <Users size={8} className="opacity-80" />
                                                                                 {booking.adults || 2}A{(booking.children || 0) > 0 ? ` ${booking.children}C` : ''}
