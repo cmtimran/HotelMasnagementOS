@@ -34,6 +34,7 @@ import { formatIdentityDisplay } from '../utils/identityUtils';
 import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../utils/geoData';
 import { useNavigation } from '../context/NavigationContext';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
+import { getCanonicalGuestProfiles } from '../utils/guestProfileEngine';
 import { ChildAgeSelector } from './common/ChildAgeSelector';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './modals/MultiRoomSelectorModal';
@@ -298,97 +299,10 @@ export const AddReservation: React.FC = () => {
     const [smokingPreference, setSmokingPreference] = useState<'Non-Smoking' | 'Smoking'>('Non-Smoking');
     const [dietaryPreference, setDietaryPreference] = useState('Halal');
 
-    // Stored & Canonical Guests for instant auto-complete
+    // Stored & Canonical Guests for instant auto-complete (Unified single-source-of-truth with Guest Profiles)
     const allKnownGuests = useMemo(() => {
-        const guestMap = new Map<string, any>();
-
-        try {
-            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
-            if (rawProfiles) {
-                const profiles = JSON.parse(rawProfiles);
-                if (Array.isArray(profiles)) {
-                    profiles.forEach(p => {
-                        const key = (p.name || '').trim().toLowerCase();
-                        if (key) {
-                            guestMap.set(key, {
-                                id: p.id,
-                                title: p.title || 'Mr.',
-                                name: p.name,
-                                phone: p.phone || '',
-                                altPhone: p.altPhone || '',
-                                email: p.email || '',
-                                vipTier: p.vipTier || 'Regular',
-                                nationality: p.nationality || 'Bangladeshi',
-                                idType: p.idType || 'National ID (NID)',
-                                idNumber: p.idNumber || '',
-                                dob: p.dob || '',
-                                gender: p.gender || 'Male',
-                                homeCity: p.homeCity || '',
-                                homeCountry: p.homeCountry || 'Bangladesh',
-                                address: p.address || '',
-                                postalCode: p.postalCode || '',
-                                company: p.company || '',
-                                designation: p.designation || '',
-                                totalStays: p.totalStays || 1,
-                                lifetimeSpendBDT: p.lifetimeSpendBDT || 0,
-                                preferences: p.preferences || {},
-                                emergencyContact: p.emergencyContact,
-                                isBlacklisted: Boolean(p.isBlacklisted),
-                                blacklistReason: p.blacklistReason,
-                                blacklistedBy: p.blacklistedBy,
-                                blacklistedAt: p.blacklistedAt,
-                                passportVisaNumber: p.passportVisaNumber,
-                                passportVisaType: p.passportVisaType,
-                                passportVisaExpiry: p.passportVisaExpiry,
-                                passportEntryPort: p.passportEntryPort,
-                                drivingVehicleClass: p.drivingVehicleClass,
-                                fatherOrSpouseName: p.fatherOrSpouseName,
-                                idIssueDate: p.idIssueDate,
-                                idExpiryDate: p.idExpiryDate || p.idExpiry,
-                                idIssueCountry: p.idIssueCountry,
-                                idIssuePlace: p.idIssuePlace
-                            });
-                        }
-                    });
-                }
-            }
-        } catch (e) { }
-
-        const reservations = getAllStoredReservations();
-        reservations.forEach(r => {
-            const cleanName = (r.guestName || '').replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, '').trim();
-            const key = cleanName.toLowerCase();
-            if (key && !guestMap.has(key)) {
-                guestMap.set(key, {
-                    id: r.id || key,
-                    title: r.guestName?.startsWith('Dr') ? 'Dr.' : r.guestName?.startsWith('Ms') ? 'Ms.' : 'Mr.',
-                    name: cleanName,
-                    phone: r.phone || r.guestPhone || '',
-                    altPhone: '',
-                    email: r.email || r.guestEmail || '',
-                    vipTier: r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
-                    nationality: r.nationality || 'Bangladeshi',
-                    idType: r.passportNo ? 'Passport' : 'National ID (NID)',
-                    idNumber: r.passportNo || r.nidNumber || '',
-                    dob: '',
-                    gender: 'Male',
-                    homeCity: 'Dhaka',
-                    homeCountry: 'Bangladesh',
-                    address: '',
-                    postalCode: '',
-                    company: r.company || (r.bookingSource === 'Corporate' ? r.source : ''),
-                    designation: '',
-                    totalStays: 1,
-                    lifetimeSpendBDT: Number(r.totalAmount) || 0,
-                    preferences: {},
-                    emergencyContact: undefined,
-                    isBlacklisted: false
-                });
-            }
-        });
-
-        return Array.from(guestMap.values());
-    }, []);
+        return getCanonicalGuestProfiles();
+    }, [isGuestSearchOpen]);
 
     const activeBlacklistAlert = useMemo(() => {
         if (selectedExistingGuest?.isBlacklisted) {
@@ -3227,7 +3141,7 @@ export const AddReservation: React.FC = () => {
                                                                                 <div className="min-w-0">
                                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                                         <span className="font-bold text-gray-900 text-[11.5px] truncate">
-                                                                                            {g.title} {g.name}
+                                                                                            {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
                                                                                         </span>
                                                                                         <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
                                                                                             {g.vipTier}

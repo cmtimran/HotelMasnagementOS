@@ -29,6 +29,7 @@ import { useProperty } from '../../context/PropertyContext';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
+import { getCanonicalGuestProfiles } from '../../utils/guestProfileEngine';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './MultiRoomSelectorModal';
 import type {
@@ -236,89 +237,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [idIssuePlace, setIdIssuePlace] = useState<string>('');
     const [managerOverrideApproved, setManagerOverrideApproved] = useState<boolean>(false);
 
-    // Stored & Canonical Guests for auto-complete & profile link-up
+    // Stored & Canonical Guests for auto-complete & profile link-up (Unified single-source-of-truth with Guest Profiles)
     const allKnownGuests = useMemo(() => {
-        const guestMap = new Map<string, any>();
-
-        try {
-            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
-            if (rawProfiles) {
-                const profiles = JSON.parse(rawProfiles);
-                if (Array.isArray(profiles)) {
-                    profiles.forEach(p => {
-                        const key = (p.name || '').trim().toLowerCase();
-                        if (key) {
-                            guestMap.set(key, {
-                                id: p.id,
-                                title: p.title || 'Mr.',
-                                name: p.name,
-                                phone: p.phone || '',
-                                altPhone: p.altPhone || '',
-                                email: p.email || '',
-                                vipTier: p.vipTier || 'Regular',
-                                nationality: p.nationality || 'Bangladeshi',
-                                idType: p.idType || 'National ID (NID)',
-                                idNumber: p.idNumber || '',
-                                dob: p.dob || '',
-                                gender: p.gender || 'Male',
-                                homeCity: p.homeCity || '',
-                                homeCountry: p.homeCountry || 'Bangladesh',
-                                address: p.address || '',
-                                postalCode: p.postalCode || '',
-                                company: p.company || '',
-                                designation: p.designation || '',
-                                totalStays: p.totalStays || 1,
-                                lifetimeSpendBDT: p.lifetimeSpendBDT || 0,
-                                preferences: p.preferences || {},
-                                isBlacklisted: Boolean(p.isBlacklisted),
-                                blacklistReason: p.blacklistReason,
-                                blacklistedBy: p.blacklistedBy,
-                                blacklistedAt: p.blacklistedAt,
-                                passportVisaNumber: p.passportVisaNumber,
-                                passportVisaType: p.passportVisaType,
-                                passportVisaExpiry: p.passportVisaExpiry,
-                                passportEntryPort: p.passportEntryPort,
-                                drivingVehicleClass: p.drivingVehicleClass,
-                                fatherOrSpouseName: p.fatherOrSpouseName,
-                                idIssueDate: p.idIssueDate,
-                                idExpiryDate: p.idExpiryDate || p.idExpiry,
-                                idIssueCountry: p.idIssueCountry,
-                                idIssuePlace: p.idIssuePlace
-                            });
-                        }
-                    });
-                }
-            }
-        } catch (e) { }
-
-        const reservations = getAllStoredReservations();
-        reservations.forEach(r => {
-            const cleanName = (r.guestName || '').replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, '').trim();
-            const key = cleanName.toLowerCase();
-            if (key && !guestMap.has(key)) {
-                guestMap.set(key, {
-                    id: r.id || key,
-                    title: r.guestName?.startsWith('Dr') ? 'Dr.' : r.guestName?.startsWith('Ms') ? 'Ms.' : 'Mr.',
-                    name: cleanName,
-                    phone: r.phone || (r as any).guestPhone || '',
-                    altPhone: '',
-                    email: r.email || (r as any).guestEmail || '',
-                    vipTier: r.vip || 'Regular',
-                    nationality: (r as any).nationality || 'Bangladeshi',
-                    idType: (r as any).idType || ((r as any).passportNo ? 'Passport' : 'National ID (NID)'),
-                    idNumber: (r as any).idNumber || (r as any).passportNo || '',
-                    dob: (r as any).dob || '',
-                    gender: (r as any).gender || 'Male',
-                    homeCity: (r as any).homeCity || 'Dhaka',
-                    homeCountry: (r as any).homeCountry || 'Bangladesh',
-                    totalStays: 1,
-                    lifetimeSpendBDT: Number(r.totalAmount) || 0,
-                    isBlacklisted: false
-                });
-            }
-        });
-
-        return Array.from(guestMap.values());
+        return getCanonicalGuestProfiles();
     }, [isOpen]);
 
     const knownProfiles = allKnownGuests;
@@ -2278,7 +2199,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="font-bold text-slate-900 text-[11.5px] truncate">
-                                                                        {g.title} {g.name}
+                                                                        {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
                                                                     </span>
                                                                     <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
                                                                         {g.vipTier || 'Regular'}
@@ -2366,7 +2287,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="font-bold text-slate-900 text-[11.5px] truncate">
-                                                                        {g.title} {g.name}
+                                                                        {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
                                                                     </span>
                                                                     <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
                                                                         {g.vipTier || 'Regular'}
