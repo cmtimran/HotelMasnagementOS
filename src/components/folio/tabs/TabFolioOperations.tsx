@@ -12,9 +12,11 @@ import {
 } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
 import type { FolioData } from '../folioTypes';
+import type { AmendBookingData } from '../../modals/AmendStayModal';
 
 interface TabFolioOperationsProps {
     folio: FolioData | null;
+    booking?: AmendBookingData | null;
     allFolios: FolioData[];
     activeFolioId: number | string;
     onSelectFolio: (id: number | string) => void;
@@ -28,6 +30,7 @@ interface TabFolioOperationsProps {
 
 export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     folio,
+    booking,
     allFolios,
     activeFolioId,
     onSelectFolio,
@@ -56,14 +59,16 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     };
 
     // Grouping rooms and folios for tree view
-    const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || '505';
-    const ratePlanCode = folio?.market_code || 'WRP';
+    const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || '101';
+    const ratePlanCode = folio?.market_code || booking?.ratePlan || 'Standard Rate';
 
     const nonVoidedCharges = folio?.charges?.filter(c => !c.is_voided) || [];
-    const totalCharges = folio?.summary?.totalCharges ?? nonVoidedCharges.reduce((sum, c) => sum + Number(c.total_amount || c.amount || 0), 0);
-    const totalPaid = folio?.summary?.totalPaid ?? (folio?.payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0);
-    const totalDiscount = folio?.summary?.totalDiscount ?? nonVoidedCharges.reduce((sum, c) => sum + Number(c.discount_amount || 0), 0);
-    const dueAmount = folio?.summary?.dueAmount ?? Math.max(0, totalCharges - totalPaid);
+    const totalCharges = nonVoidedCharges.length > 0 
+        ? nonVoidedCharges.reduce((sum, c) => sum + Number(c.total_amount || c.amount || 0), 0)
+        : Number(folio?.summary?.totalCharges ?? 0);
+    const totalPaid = Number(folio?.summary?.totalPaid ?? (folio?.payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0));
+    const totalDiscount = Number(folio?.summary?.totalDiscount ?? nonVoidedCharges.reduce((sum, c) => sum + Number(c.discount_amount || 0), 0));
+    const dueAmount = Math.max(0, totalCharges - totalPaid);
 
     // Merge charges and payments into chronological ledger items
     const ledgerItems = useMemo(() => {
@@ -135,29 +140,29 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     }, [folio?.charges, folio?.payments]);
 
     return (
-        <div className="w-full flex gap-3 h-full min-h-[460px] select-none text-gray-800">
+        <div className="w-full flex gap-3 flex-1 min-h-0 select-none text-gray-800 overflow-hidden">
             {/* LEFT SIDEBAR: Room / Folio Hierarchical Tree & Balance Summary */}
-            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-3">
+            <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-2.5 overflow-hidden">
                 {/* Tree View matching ff92009c.png */}
-                <div className="space-y-1 text-xs">
+                <div className="space-y-1 text-xs overflow-y-auto flex-1 min-h-0">
                     <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                         Room/ Folio
                     </div>
 
                     {/* Rate Group Accordion Header */}
                     <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-2 text-blue-900 font-semibold flex items-center justify-between shadow-2xs">
-                        <span className="font-bold">{ratePlanCode}</span>
-                        <ChevronDown size={14} className="text-blue-500" />
+                        <span className="font-bold truncate">{ratePlanCode}</span>
+                        <ChevronDown size={14} className="text-blue-500 shrink-0" />
                     </div>
 
                     {/* Room Level Sub-header */}
                     <div className="pl-2 pt-1 space-y-1">
                         <div className="text-gray-700 font-medium text-[11px] flex items-center justify-between py-1 px-1.5 rounded hover:bg-gray-50">
-                            <div className="flex items-center gap-1.5">
-                                <DoorClosed size={13} className="text-gray-500" />
-                                <span>{roomNumber} ({allFolios.length} folio{allFolios.length > 1 ? 's' : ''})</span>
+                            <div className="flex items-center gap-1.5 truncate">
+                                <DoorClosed size={13} className="text-gray-500 shrink-0" />
+                                <span className="truncate">{roomNumber} ({allFolios.length} folio{allFolios.length > 1 ? 's' : ''})</span>
                             </div>
-                            <ChevronDown size={12} className="text-gray-400" />
+                            <ChevronDown size={12} className="text-gray-400 shrink-0" />
                         </div>
 
                         {/* Folio Pills (Active & Inactive) */}
@@ -175,7 +180,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                 : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
                                         }`}
                                     >
-                                        <Crown size={12} className={isActive ? 'text-amber-300' : 'text-gray-400'} />
+                                        <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-gray-400'}`} />
                                         <span className="truncate">{f.folio_number}</span>
                                     </button>
                                 );
@@ -185,20 +190,20 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                 </div>
 
                 {/* Sidebar Bottom Summary Card matching ff92009c.png */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5 font-mono text-xs">
-                    <div className="flex items-center justify-between text-gray-500">
-                        <span className="font-sans text-[11px]">Total Charges:</span>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2 space-y-1 font-mono text-xs shrink-0 mt-1.5">
+                    <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                        <span className="font-sans">Total Charges:</span>
                         <span className="font-semibold text-gray-800">{currency} {totalCharges.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-emerald-700">
-                        <span className="font-sans text-[11px]">Total Paid:</span>
+                    <div className="flex items-center justify-between text-emerald-700 text-[11px]">
+                        <span className="font-sans">Total Paid:</span>
                         <span className="font-semibold">{currency} {totalPaid.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-blue-700">
-                        <span className="font-sans text-[11px]">Total Discount:</span>
+                    <div className="flex items-center justify-between text-blue-700 text-[11px]">
+                        <span className="font-sans">Total Discount:</span>
                         <span className="font-semibold">{currency} {totalDiscount.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-rose-600 font-bold border-t border-slate-200 pt-1.5 text-xs">
+                    <div className="flex items-center justify-between text-rose-600 font-bold border-t border-slate-200 pt-1 text-xs">
                         <span className="font-sans text-[11px]">Due Amount:</span>
                         <span>{currency} {dueAmount.toFixed(2)}</span>
                     </div>
@@ -206,10 +211,10 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
             </div>
 
             {/* RIGHT MAIN: Action Bar + Transaction Ledger Grid */}
-            <div className="flex-1 flex flex-col justify-between min-w-0">
-                <div className="space-y-2">
+            <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+                <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* Action Bar matching ff92009c.png */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         <button
                             type="button"
                             onClick={onOpenAddCharge}
@@ -286,7 +291,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     </div>
 
                     {/* Transaction Ledger Table matching ff92009c.png */}
-                    <div className="border border-gray-200/90 rounded-lg overflow-hidden bg-white shadow-xs">
+                    <div className="border border-gray-200/90 rounded-lg overflow-y-auto flex-1 min-h-0 bg-white shadow-xs">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-600 font-semibold text-[11px]">
                                 <tr>
@@ -426,7 +431,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                 </div>
 
                 {/* Bottom Right Net Due Amount Footer matching ff92009c.png */}
-                <div className="flex items-center justify-end pt-3 pb-1">
+                <div className="flex items-center justify-end pt-1.5 pb-0.5 shrink-0">
                     <div className="flex items-center gap-2">
                         <span className="text-xs uppercase font-bold text-gray-600 tracking-wide">Net Due Amount</span>
                         <span className="text-base font-black text-rose-600 font-mono tracking-tight">

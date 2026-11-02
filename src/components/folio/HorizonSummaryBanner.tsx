@@ -17,9 +17,11 @@ import {
     Percent
 } from 'lucide-react';
 import type { FolioData, FolioSubTab } from './folioTypes';
+import type { AmendBookingData } from '../modals/AmendStayModal';
 
 interface HorizonSummaryBannerProps {
     folio: FolioData | null;
+    booking?: AmendBookingData | null;
     activeTab: FolioSubTab;
     onSelectTab: (tab: FolioSubTab) => void;
     onOpenAddPayment?: () => void;
@@ -35,6 +37,7 @@ interface HorizonSummaryBannerProps {
 
 export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     folio,
+    booking,
     activeTab,
     onSelectTab,
     onOpenAddPayment,
@@ -51,8 +54,8 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
 
     const firstRoom = folio?.rooms?.[0];
-    const rawArrival = firstRoom?.check_in_date || folio?.check_in || '';
-    const rawDeparture = firstRoom?.check_out_date || folio?.check_out || '';
+    const rawArrival = firstRoom?.check_in_date || folio?.check_in || booking?.arrivalDate || '';
+    const rawDeparture = firstRoom?.check_out_date || folio?.check_out || booking?.departureDate || '';
 
     const formatDateDisplay = (dateStr?: string) => {
         if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'N/A';
@@ -80,17 +83,17 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     const arrivalDisplay = formatDateDisplay(rawArrival);
     const departureDisplay = formatDateDisplay(rawDeparture);
 
-    const totalNights = firstRoom?.nights || (
+    const totalNights = firstRoom?.nights || booking?.nights || (
         rawArrival && rawDeparture && rawArrival !== 'N/A' && rawDeparture !== 'N/A'
             ? Math.max(1, Math.round((new Date(rawDeparture).getTime() - new Date(rawArrival).getTime()) / 86400000))
             : 1
     );
 
-    const adultsCount = folio?.rooms?.reduce((acc, r) => acc + (r.adults || 1), 0) || 1;
-    const childrenCount = folio?.rooms?.reduce((acc, r) => acc + (r.children || 0), 0) || 0;
-    const roomNumbers = folio?.rooms?.map(r => r.room_number).filter(Boolean).join(', ') || folio?.room_number || 'Unassigned';
-    const roomTypeName = firstRoom?.room_type || folio?.room_type || 'Standard Suite';
-    const ratePlanName = folio?.market_code || 'Winter Rate Plan';
+    const adultsCount = (folio?.rooms?.[0]?.adults ?? booking?.adults) || 1;
+    const childrenCount = (folio?.rooms?.[0]?.children ?? booking?.children) || 0;
+    const roomNumbers = folio?.rooms?.map(r => r.room_number).filter(Boolean).join(', ') || folio?.room_number || booking?.roomNumber || 'Unassigned';
+    const roomTypeName = firstRoom?.room_type || folio?.room_type || booking?.roomType || 'Standard Suite';
+    const ratePlanName = folio?.market_code || booking?.ratePlan || 'Standard Rate Plan';
 
     return (
         <div className="w-full space-y-1.5 select-none">
@@ -139,9 +142,11 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                         <div className="min-w-0">
                             <div className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 leading-none">Guests</div>
                             <div className="text-[11px] font-bold text-slate-800 leading-tight flex items-center gap-1 mt-0.5">
-                                <span>{adultsCount}</span>
+                                <span>{adultsCount} Adult{adultsCount !== 1 ? 's' : ''}</span>
                                 {childrenCount > 0 && (
-                                    <span className="text-slate-400 font-medium text-[10px]">({childrenCount} Ch)</span>
+                                    <span className="text-purple-700 bg-purple-50 border border-purple-100 px-1 rounded text-[10px] font-semibold">
+                                        {childrenCount} Child{childrenCount !== 1 ? 'ren' : ''}
+                                    </span>
                                 )}
                             </div>
                         </div>

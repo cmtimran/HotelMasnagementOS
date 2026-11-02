@@ -196,7 +196,7 @@ router.get('/folios', async (req: Request, res: Response) => {
             const payments = await db.prepare(`
                 SELECT 
                     id, folio_id, property_id, payment_number, payment_method,
-                    amount, reference_code, transaction_date, created_at,
+                    amount, reference_code, transaction_date,
                     'Settled' as status
                 FROM payments 
                 WHERE folio_id = ? 

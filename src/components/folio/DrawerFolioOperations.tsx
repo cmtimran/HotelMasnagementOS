@@ -81,74 +81,104 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
             const data = await response.json();
 
             if (data?.success && Array.isArray(data.data) && data.data.length > 0) {
-                setFolios(data.data);
+                const enriched = data.data.map((f: any) => ({
+                    ...f,
+                    market_code: f.market_code || booking.ratePlan || 'Standard Rate',
+                    guest_name: f.guest_name || booking.guestName || 'Valued Guest',
+                    room_number: f.room_number || booking.roomNumber || 'Unassigned',
+                    room_type: f.room_type || booking.roomType || 'Standard Suite'
+                }));
+                setFolios(enriched);
                 // Maintain active folio or select first
                 setActiveFolioId(prev => {
-                    const match = data.data.find((f: any) => String(f.id) === String(prev));
-                    return match ? match.id : data.data[0].id;
+                    const match = enriched.find((f: any) => String(f.id) === String(prev));
+                    return match ? match.id : enriched[0].id;
                 });
             } else {
                 // If backend has no pre-existing folio, build initial dynamic folio directly from the real booking object
-                const guestName = booking.guestName || 'Valued Guest';
-                const resRoomNum = booking.roomNumber || '505';
-                const checkInDate = booking.arrivalDate || '2026-06-30';
-                const checkOutDate = booking.departureDate || '2026-07-02';
-                const nights = booking.nights || 2;
-                const dailyRate = booking.avgDailyRate || 3000;
-                const totalTariff = nights * dailyRate;
-                const paidAmt = booking.paidAmount || 0;
+                const rawGuestName = booking.guestName || 'Valued Guest';
+                const cleanGuestName = rawGuestName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim() || rawGuestName;
+                const resRoomNum = booking.roomNumber || '101';
+                const checkInDate = booking.arrivalDate || '2026-07-01';
+                const checkOutDate = booking.departureDate || '2026-07-03';
+                const nights = Math.max(1, booking.nights || (
+                    checkInDate && checkOutDate 
+                        ? Math.max(1, Math.round((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86400000))
+                        : 1
+                ));
+                const dailyRate = booking.avgDailyRate || (booking.totalAmount ? Math.round(booking.totalAmount / nights) : 3000);
+                const ratePlanName = booking.ratePlan || 'Standard Rate';
+                const adults = booking.adults ?? 1;
+                const children = booking.children ?? 0;
+                const paidAmt = Number(booking.paidAmount || 0);
+
+                // Generate real night-by-night room charges
+                const dynamicCharges: any[] = [];
+                let runningChargesTotal = 0;
+                for (let d = 0; d < nights; d++) {
+                    const nightDate = new Date(checkInDate);
+                    nightDate.setDate(nightDate.getDate() + d);
+                    const chargeDateStr = nightDate.toISOString().split('T')[0];
+                    const baseAmt = dailyRate;
+                    const svcCharge = Math.round(baseAmt * 0.10 * 100) / 100;
+                    const vatAmt = Math.round(baseAmt * 0.15 * 100) / 100;
+                    const cityTaxAmt = Math.round(baseAmt * 0.01 * 100) / 100;
+                    const totalTax = svcCharge + vatAmt + cityTaxAmt;
+                    const grandAmt = baseAmt + totalTax;
+                    runningChargesTotal += grandAmt;
+
+                    dynamicCharges.push({
+                        id: d + 1,
+                        charge_code: 'ROOM_CHG',
+                        revenue_head: 'Room Charges',
+                        ref_no: String(d + 1),
+                        description: `Room Charge - Room ${resRoomNum} (Night ${d + 1} of ${nights})`,
+                        amount: baseAmt,
+                        discount_amount: 0,
+                        service_charge: svcCharge,
+                        vat: vatAmt,
+                        city_tax: cityTaxAmt,
+                        total_tax: totalTax,
+                        total_amount: grandAmt,
+                        charge_date: chargeDateStr,
+                        is_tax_applicable: true,
+                        user_name: 'System Auditor',
+                        is_voided: false,
+                        status: 'Posted'
+                    });
+                }
 
                 const fallbackDynamicFolio: FolioData = {
                     id: booking.id || 'FOL-DEFAULT',
                     reservation_id: booking.id || '1',
-                    folio_number: `FN~${booking.reservationNumber || booking.id || '012607003'} - ${guestName.split(' ')[0]}`,
+                    folio_number: `FN~${booking.reservationNumber || booking.id || '012607003'} - ${cleanGuestName}`,
                     status: booking.status || 'OPEN',
-                    balance: Math.max(0, totalTariff - paidAmt),
+                    balance: Math.max(0, runningChargesTotal - paidAmt),
                     reservation_number: booking.reservationNumber || 'RES-1173-2026',
-                    guest_name: guestName,
-                    guest_phone: booking.phone || '01626758447',
-                    guest_email: booking.email || 'guest@example.com',
+                    guest_name: cleanGuestName,
+                    guest_phone: booking.phone || '',
+                    guest_email: booking.email || '',
                     room_number: resRoomNum,
-                    room_type: booking.roomType || 'Deluxe Room',
+                    room_type: booking.roomType || 'Standard Suite',
                     check_in: checkInDate,
                     check_out: checkOutDate,
-                    bill_to: guestName,
-                    market_code: 'WRP',
-                    business_source: 'Direct',
+                    bill_to: cleanGuestName,
+                    market_code: ratePlanName,
+                    business_source: booking.source || 'Direct',
                     rooms: [
                         {
                             id: 1,
                             room_number: resRoomNum,
-                            room_type: booking.roomType || 'Deluxe Room',
+                            room_type: booking.roomType || 'Standard Suite',
                             check_in_date: checkInDate,
                             check_out_date: checkOutDate,
                             room_rate: dailyRate,
-                            adults: booking.adults || 2,
-                            children: booking.children || 1,
+                            adults: adults,
+                            children: children,
                             nights: nights
                         }
                     ],
-                    charges: [
-                        {
-                            id: 1,
-                            charge_code: 'ROOM_CHG',
-                            revenue_head: 'Room Charges',
-                            ref_no: '4',
-                            description: `Room Charge - Room ${resRoomNum}`,
-                            amount: dailyRate,
-                            discount_amount: 0,
-                            service_charge: Math.round(dailyRate * 0.10 * 100) / 100,
-                            vat: Math.round(dailyRate * 0.15 * 100) / 100,
-                            city_tax: Math.round(dailyRate * 0.01 * 100) / 100,
-                            total_tax: Math.round(dailyRate * 0.26 * 100) / 100,
-                            total_amount: dailyRate + Math.round(dailyRate * 0.26 * 100) / 100,
-                            charge_date: checkInDate,
-                            is_tax_applicable: true,
-                            user_name: 'System Auditor',
-                            is_voided: false,
-                            status: 'Posted'
-                        }
-                    ],
+                    charges: dynamicCharges,
                     payments: paidAmt > 0 ? [
                         {
                             id: 1,
@@ -160,14 +190,14 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         }
                     ] : [],
                     summary: {
-                        totalCharges: totalTariff,
+                        totalCharges: runningChargesTotal,
                         totalPaid: paidAmt,
                         totalDiscount: 0,
-                        serviceCharge: totalTariff * 0.10,
-                        vat: totalTariff * 0.15,
-                        cityTax: totalTariff * 0.01,
-                        totalTax: totalTariff * 0.26,
-                        dueAmount: Math.max(0, totalTariff - paidAmt)
+                        serviceCharge: runningChargesTotal * 0.10,
+                        vat: runningChargesTotal * 0.15,
+                        cityTax: runningChargesTotal * 0.01,
+                        totalTax: runningChargesTotal * 0.26,
+                        dueAmount: Math.max(0, runningChargesTotal - paidAmt)
                     }
                 };
 
@@ -271,6 +301,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
             {/* 1. Horizon Summary Banner & Sub-Tabs Navigation */}
             <HorizonSummaryBanner
                 folio={activeFolio}
+                booking={booking}
                 activeTab={activeTab}
                 onSelectTab={setActiveTab}
                 onOpenAddPayment={onOpenAddPayment}
@@ -289,6 +320,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 {activeTab === 'operations' && (
                     <TabFolioOperations
                         folio={activeFolio}
+                        booking={booking}
                         allFolios={folios}
                         activeFolioId={activeFolioId}
                         onSelectFolio={setActiveFolioId}
