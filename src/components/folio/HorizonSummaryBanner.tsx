@@ -51,11 +51,38 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
 
     const firstRoom = folio?.rooms?.[0];
-    const arrivalDate = firstRoom?.check_in_date || folio?.check_in || 'N/A';
-    const departureDate = firstRoom?.check_out_date || folio?.check_out || 'N/A';
+    const rawArrival = firstRoom?.check_in_date || folio?.check_in || '';
+    const rawDeparture = firstRoom?.check_out_date || folio?.check_out || '';
+
+    const formatDateDisplay = (dateStr?: string) => {
+        if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'N/A';
+        try {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const year = parts[0];
+                const monthIdx = parseInt(parts[1], 10) - 1;
+                const day = parts[2];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                if (monthIdx >= 0 && monthIdx < 12) {
+                    return `${day} ${months[monthIdx]} ${year}`;
+                }
+            }
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+                return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+        } catch {
+            // fallback
+        }
+        return dateStr;
+    };
+
+    const arrivalDisplay = formatDateDisplay(rawArrival);
+    const departureDisplay = formatDateDisplay(rawDeparture);
+
     const totalNights = firstRoom?.nights || (
-        arrivalDate !== 'N/A' && departureDate !== 'N/A'
-            ? Math.max(1, Math.round((new Date(departureDate).getTime() - new Date(arrivalDate).getTime()) / 86400000))
+        rawArrival && rawDeparture && rawArrival !== 'N/A' && rawDeparture !== 'N/A'
+            ? Math.max(1, Math.round((new Date(rawDeparture).getTime() - new Date(rawArrival).getTime()) / 86400000))
             : 1
     );
 
@@ -63,163 +90,138 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     const childrenCount = folio?.rooms?.reduce((acc, r) => acc + (r.children || 0), 0) || 0;
     const roomNumbers = folio?.rooms?.map(r => r.room_number).filter(Boolean).join(', ') || folio?.room_number || 'Unassigned';
     const roomTypeName = firstRoom?.room_type || folio?.room_type || 'Standard Suite';
-    const ratePlanName = folio?.market_code || 'Standard Rate Plan';
+    const ratePlanName = folio?.market_code || 'Winter Rate Plan';
 
     return (
-        <div className="w-full space-y-2 select-none">
-            {/* Top Horizon Stat Cards */}
-            <div className="bg-white border border-blue-100 rounded-xl p-2 shadow-xs grid grid-cols-12 gap-2 items-center">
-                {/* Arrival */}
-                <div className="col-span-2.5 flex items-center gap-2 border-r border-gray-100 pr-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center flex-shrink-0">
-                        <Calendar size={14} />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">Arrival</div>
-                        <div className="text-xs font-bold text-gray-800 truncate font-mono">{arrivalDate}</div>
-                    </div>
-                </div>
-
-                {/* Nights */}
-                <div className="col-span-1.5 flex items-center gap-1.5 border-r border-gray-100 pr-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <Moon size={14} />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">Nights</div>
-                        <div className="text-xs font-bold text-gray-800 font-mono">{totalNights}</div>
-                    </div>
-                </div>
-
-                {/* Departure */}
-                <div className="col-span-2.5 flex items-center gap-2 border-r border-gray-100 pr-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center flex-shrink-0">
-                        <Calendar size={14} />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">Departure</div>
-                        <div className="text-xs font-bold text-gray-800 truncate font-mono">{departureDate}</div>
-                    </div>
-                </div>
-
-                {/* Guests */}
-                <div className="col-span-2 flex items-center gap-2 border-r border-gray-100 pr-2">
-                    <div className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-200/80 text-purple-600 flex items-center justify-center flex-shrink-0">
-                        <Users size={14} />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">Guests</div>
-                        <div className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                            <span>{adultsCount} Adults</span>
-                            {childrenCount > 0 && <span className="text-gray-500 font-normal">| {childrenCount} Ch</span>}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Room Details & Actions */}
-                <div className="col-span-3.5 flex items-center justify-between pl-1">
-                    <div className="min-w-0 flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                            <BedDouble size={14} />
+        <div className="w-full space-y-1.5 select-none">
+            {/* Top Horizon Stat Cards: Ultra-Compact PMS Horizon Row */}
+            <div className="bg-white border border-slate-200/90 rounded-lg px-2.5 py-1 shadow-2xs flex items-center justify-between text-xs min-h-[38px]">
+                {/* Left Metrics Strip */}
+                <div className="flex items-center divide-x divide-slate-100 flex-1 min-w-0">
+                    {/* Arrival */}
+                    <div className="flex items-center gap-1.5 pr-3 flex-shrink-0">
+                        <div className="w-5 h-5 rounded bg-blue-50 border border-blue-200/60 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <Calendar size={12} />
                         </div>
                         <div className="min-w-0">
-                            <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">Room Details</div>
-                            <div className="text-[11px] font-bold text-gray-800 truncate flex items-center gap-1.5">
-                                <span className="text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">Room {roomNumbers}</span>
-                                <span className="text-gray-600 truncate">{roomTypeName}</span>
-                                <span className="text-gray-400 font-normal truncate">| {ratePlanName}</span>
+                            <div className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 leading-none">Arrival</div>
+                            <div className="text-[11px] font-bold text-slate-800 leading-tight mt-0.5 font-mono">{arrivalDisplay}</div>
+                        </div>
+                    </div>
+
+                    {/* Nights */}
+                    <div className="flex items-center gap-1.5 px-3 flex-shrink-0">
+                        <div className="w-5 h-5 rounded bg-indigo-50 border border-indigo-200/60 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <Moon size={12} />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 leading-none">Nights</div>
+                            <div className="text-[11px] font-bold text-slate-800 leading-tight mt-0.5 text-center font-mono">{totalNights}</div>
+                        </div>
+                    </div>
+
+                    {/* Departure */}
+                    <div className="flex items-center gap-1.5 px-3 flex-shrink-0">
+                        <div className="w-5 h-5 rounded bg-blue-50 border border-blue-200/60 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <Calendar size={12} />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 leading-none">Departure</div>
+                            <div className="text-[11px] font-bold text-slate-800 leading-tight mt-0.5 font-mono">{departureDisplay}</div>
+                        </div>
+                    </div>
+
+                    {/* Guests */}
+                    <div className="flex items-center gap-1.5 px-3 flex-shrink-0">
+                        <div className="w-5 h-5 rounded bg-purple-50 border border-purple-200/60 text-purple-600 flex items-center justify-center flex-shrink-0">
+                            <Users size={12} />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 leading-none">Guests</div>
+                            <div className="text-[11px] font-bold text-slate-800 leading-tight flex items-center gap-1 mt-0.5">
+                                <span>{adultsCount}</span>
+                                {childrenCount > 0 && (
+                                    <span className="text-slate-400 font-medium text-[10px]">({childrenCount} Ch)</span>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                            type="button"
-                            onClick={onPrintFolio}
-                            title="Print Folio Document"
-                            className="w-7 h-7 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                            <Printer size={13} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onOpenAmendStay}
-                            title="Edit Reservation (Amend Stay)"
-                            className="w-7 h-7 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                            <Edit3 size={13} />
-                        </button>
+                    {/* Room Details & Rate Badges */}
+                    <div className="flex items-center gap-1.5 pl-3 min-w-0 flex-1 overflow-hidden">
+                        <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 mr-0.5 flex-shrink-0">Room Details</span>
+
+                        <div className="flex items-center gap-1.5 overflow-hidden flex-nowrap">
+                            {/* Rate Plan Badge */}
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200/80 shrink-0">
+                                <FileText size={10} className="text-slate-500" />
+                                <span className="truncate max-w-[120px]">{ratePlanName}</span>
+                            </span>
+
+                            {/* Room Type Badge */}
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
+                                <span className="font-bold text-[9px] text-emerald-600">$</span>
+                                <span className="truncate max-w-[120px]">{roomTypeName}</span>
+                            </span>
+
+                            {/* Room Number Badge */}
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0">
+                                <BedDouble size={10} className="text-amber-700" />
+                                <span>{roomNumbers}</span>
+                            </span>
+                        </div>
                     </div>
+                </div>
+
+                {/* Right Action Icons: Print & Edit */}
+                <div className="flex items-center gap-0.5 pl-2 flex-shrink-0 border-l border-slate-100 ml-2">
+                    <button
+                        type="button"
+                        onClick={onPrintFolio}
+                        title="Print Folio Document"
+                        className="w-6 h-6 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                        <Printer size={12.5} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onOpenAmendStay}
+                        title="Edit Reservation (Amend Stay)"
+                        className="w-6 h-6 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                        <Edit3 size={12.5} />
+                    </button>
                 </div>
             </div>
 
             {/* Sub-Tabs Navigation Bar + Print/Send & More Options Dropdowns */}
-            <div className="flex items-center justify-between border-b border-gray-200/80 pb-0 px-1">
+            <div className="flex items-center justify-between border-b border-slate-200/80 px-0.5 pt-0.5">
                 {/* 5 Main Sub-Tabs */}
-                <div className="flex items-center gap-6">
-                    <button
-                        type="button"
-                        onClick={() => onSelectTab('operations')}
-                        className={`text-xs pb-2 transition-all cursor-pointer font-medium relative ${
-                            activeTab === 'operations'
-                                ? 'text-blue-600 font-bold border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        Folio Operations
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => onSelectTab('booking')}
-                        className={`text-xs pb-2 transition-all cursor-pointer font-medium relative ${
-                            activeTab === 'booking'
-                                ? 'text-blue-600 font-bold border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        Booking Details
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => onSelectTab('guest')}
-                        className={`text-xs pb-2 transition-all cursor-pointer font-medium relative ${
-                            activeTab === 'guest'
-                                ? 'text-blue-600 font-bold border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        Guest Details
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => onSelectTab('charges')}
-                        className={`text-xs pb-2 transition-all cursor-pointer font-medium relative ${
-                            activeTab === 'charges'
-                                ? 'text-blue-600 font-bold border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        Room Charges
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => onSelectTab('audit')}
-                        className={`text-xs pb-2 transition-all cursor-pointer font-medium relative ${
-                            activeTab === 'audit'
-                                ? 'text-blue-600 font-bold border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                    >
-                        Audit Trail
-                    </button>
+                <div className="flex items-center gap-4 sm:gap-5">
+                    {[
+                        { id: 'operations', label: 'Folio Operations' },
+                        { id: 'booking', label: 'Booking Details' },
+                        { id: 'guest', label: 'Guest Details' },
+                        { id: 'charges', label: 'Room Charges' },
+                        { id: 'audit', label: 'Audit Trail' },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => onSelectTab(tab.id as FolioSubTab)}
+                            className={`text-[11px] pb-1.5 transition-all cursor-pointer font-medium relative ${
+                                activeTab === tab.id
+                                    ? 'text-blue-600 font-bold border-b-2 border-blue-600 -mb-[1px]'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Right Action Menus: Print/Send & More Options */}
-                <div className="flex items-center gap-2 pb-1.5">
+                <div className="flex items-center gap-1.5 pb-1">
                     {/* Print/Send Dropdown */}
                     <div className="relative">
                         <button
@@ -228,10 +230,10 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                                 setIsPrintMenuOpen(!isPrintMenuOpen);
                                 setIsMoreOptionsOpen(false);
                             }}
-                            className="bg-white hover:bg-gray-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                            className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <span>Print/ Send</span>
-                            <ChevronDown size={12} className={`transition-transform duration-200 ${isPrintMenuOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={11} className={`transition-transform duration-200 ${isPrintMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
 
                         {isPrintMenuOpen && (
@@ -283,10 +285,10 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                                 setIsMoreOptionsOpen(!isMoreOptionsOpen);
                                 setIsPrintMenuOpen(false);
                             }}
-                            className="bg-white hover:bg-gray-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                            className="bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <span>More Options</span>
-                            <ChevronDown size={12} className={`transition-transform duration-200 ${isMoreOptionsOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreOptionsOpen ? 'rotate-180' : ''}`} />
                         </button>
 
                         {isMoreOptionsOpen && (

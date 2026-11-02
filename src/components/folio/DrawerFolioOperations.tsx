@@ -224,7 +224,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     };
 
     return (
-        <div className="w-full h-full flex flex-col bg-slate-50/50 text-gray-800 select-none overflow-hidden p-3 space-y-3 font-sans">
+        <div className="w-full h-full flex flex-col bg-slate-50/50 text-gray-800 select-none overflow-hidden p-2.5 space-y-2 font-sans">
             {/* Top Navigation Strip with Back Button & Refresh */}
             <div className="flex items-center justify-between pb-1 border-b border-gray-200/80">
                 <div className="flex items-center gap-2">
