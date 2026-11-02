@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { RefreshCw, AlertCircle, X } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import type { FolioData, FolioSubTab } from './folioTypes';
@@ -22,7 +22,6 @@ import { VoidModal } from './modals/VoidModal';
 interface DrawerFolioOperationsProps {
     booking: AmendBookingData | null;
     onClose?: () => void;
-    onBackToDrawerOverview?: () => void;
     onOpenAddPayment?: () => void;
     onOpenCheckOut?: () => void;
     onOpenAmendStay?: () => void;
@@ -33,7 +32,6 @@ interface DrawerFolioOperationsProps {
 export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     booking,
     onClose,
-    onBackToDrawerOverview,
     onOpenAddPayment,
     onOpenCheckOut,
     onOpenAmendStay,
@@ -225,20 +223,9 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
 
     return (
         <div className="w-full h-full flex flex-col bg-slate-50/50 text-gray-800 select-none overflow-hidden p-2.5 space-y-2 font-sans">
-            {/* Top Navigation Strip with Back Button & Refresh */}
+            {/* Top Navigation Strip with Live Ledger Status & Refresh */}
             <div className="flex items-center justify-between pb-1 border-b border-gray-200/80">
                 <div className="flex items-center gap-2">
-                    {onBackToDrawerOverview && (
-                        <button
-                            type="button"
-                            onClick={onBackToDrawerOverview}
-                            className="h-6 px-2 rounded-md bg-white hover:bg-gray-100 border border-gray-300 text-blue-700 font-semibold text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            title="Back to Reservation Overview"
-                        >
-                            <ArrowLeft size={13} />
-                            <span>Drawer Overview</span>
-                        </button>
-                    )}
                     <h2 className="text-xs font-bold text-gray-900 tracking-wide uppercase">
                         Folio Operations Suite
                     </h2>

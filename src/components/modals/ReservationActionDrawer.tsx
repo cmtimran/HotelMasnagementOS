@@ -31,6 +31,7 @@ import {
     FileText,
     Key,
     ArrowRight,
+    ArrowLeft,
     Sparkles,
     CheckCircle2,
     RotateCcw,
@@ -1261,7 +1262,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             >
                 {/* 1. White Top Header Bar with Edit & Dynamic Action Dropdown */}
                 <div className="px-2.5 py-1.5 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-                    {/* Left: Close X, User Icon, Guest Name, Status */}
+                    {/* Left: Close X, Back to Overview (if in folio mode), User Icon, Guest Name, Status */}
                     <div className="flex items-center gap-1.5 min-w-0">
                         <button
                             type="button"
@@ -1271,6 +1272,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         >
                             <X size={12} />
                         </button>
+                        {mode === 'folio' && (
+                            <button
+                                type="button"
+                                onClick={() => setMode('overview')}
+                                className="h-6 px-2 rounded-md bg-white hover:bg-gray-100 border border-gray-300 text-blue-700 font-semibold text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer flex-shrink-0 mr-0.5"
+                                title="Back to Reservation Overview"
+                            >
+                                <ArrowLeft size={13} />
+                                <span>Drawer Overview</span>
+                            </button>
+                        )}
                         <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center flex-shrink-0">
                             <Users size={13} />
                         </div>
@@ -1464,7 +1476,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden flex flex-col">
                         <DrawerFolioOperations
                             booking={booking}
-                            onBackToDrawerOverview={() => setMode('overview')}
                             onOpenAddPayment={() => setMode('payment')}
                             onOpenAmendStay={() => {
                                 setMode('amend');
