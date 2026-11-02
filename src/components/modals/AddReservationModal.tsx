@@ -1340,7 +1340,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                 3
                             </div>
                             <span className={`text-sm ${step === 3 ? 'text-[#0f172a] font-bold' : 'text-gray-600 font-medium'}`}>
-                                Payments
+                                Billing &amp; Payments
                             </span>
                         </div>
                     </div>
@@ -2598,8 +2598,10 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                     >
                                                         <option value="Cash">Cash at Desk</option>
                                                         <option value="Card">Credit / Debit Card</option>
-                                                        <option value="bKash">bKash Merchant Pay</option>
+                                                        <option value="bKash">bKash (MFS)</option>
+                                                        <option value="Nagad">Nagad (MFS)</option>
                                                         <option value="Bank Transfer">Bank Transfer</option>
+                                                        <option value="Direct Billing">Company Direct Billing</option>
                                                     </select>
                                                 </div>
 

@@ -22,7 +22,8 @@ import {
     DoorOpen,
     DoorClosed,
     Cigarette,
-    CigaretteOff
+    CigaretteOff,
+    Clock
 } from 'lucide-react';
 import { getRoomSmokingPolicy } from '../../utils/roomInventoryEngine';
 import type { AmendBookingData } from './AmendStayModal';
@@ -295,8 +296,9 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                             <div className="min-w-0">
                                 <div className="text-[8.5px] uppercase text-blue-200">ARRIVAL</div>
                                 <div className="text-[11.5px] text-white truncate">{booking.arrivalDate}</div>
-                                <div className="text-[8.5px] text-blue-200 flex items-center gap-1">
-                                    <span>🕒 16:00:00</span>
+                                <div className="text-[8.5px] text-blue-200 flex items-center gap-1 font-mono">
+                                    <Clock size={10} className="opacity-75" />
+                                    <span>16:00:00</span>
                                 </div>
                             </div>
                         </div>
@@ -317,8 +319,9 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                             <div className="min-w-0">
                                 <div className="text-[8.5px] uppercase text-blue-200">DEPARTURE</div>
                                 <div className="text-[11.5px] text-white truncate">{booking.departureDate}</div>
-                                <div className="text-[8.5px] text-blue-200 flex items-center gap-1">
-                                    <span>🕒 12:00:00</span>
+                                <div className="text-[8.5px] text-blue-200 flex items-center gap-1 font-mono">
+                                    <Clock size={10} className="opacity-75" />
+                                    <span>12:00:00</span>
                                 </div>
                             </div>
                         </div>

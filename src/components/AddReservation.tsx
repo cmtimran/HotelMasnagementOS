@@ -2105,7 +2105,7 @@ export const AddReservation: React.FC = () => {
                                 }`}>
                                 3
                             </div>
-                            <span className="truncate tracking-tight font-medium">Billing &amp; Pay</span>
+                            <span className="truncate tracking-tight font-medium">Billing &amp; Payments</span>
                         </button>
                     </div>
                 </div>
@@ -4017,10 +4017,12 @@ export const AddReservation: React.FC = () => {
                                                         onChange={e => updatePaymentRow(pRow.id, 'method', e.target.value)}
                                                         className="h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                     >
-                                                        <option value="Cash">Cash</option>
-                                                        <option value="Card">Card (POS)</option>
+                                                        <option value="Cash">Cash at Desk</option>
+                                                        <option value="Card">Credit / Debit Card</option>
                                                         <option value="bKash">bKash (MFS)</option>
+                                                        <option value="Nagad">Nagad (MFS)</option>
                                                         <option value="Bank Transfer">Bank Transfer</option>
+                                                        <option value="Direct Billing">Company Direct Billing</option>
                                                     </select>
                                                 </div>
 

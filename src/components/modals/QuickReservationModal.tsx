@@ -20,7 +20,8 @@ import {
     ShieldCheck,
     FileText,
     Cigarette,
-    CigaretteOff
+    CigaretteOff,
+    Delete
 } from 'lucide-react';
 import { formatIdentityDisplay } from '../../utils/identityUtils';
 import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../../utils/geoData';
@@ -130,8 +131,9 @@ interface RoomItem {
 
 interface PaymentRow {
     id: number;
-    method: 'Cash' | 'Card' | 'bKash' | 'Bank Transfer';
+    method: 'Cash' | 'Card' | 'bKash' | 'Nagad' | 'Bank Transfer' | 'Direct Billing' | string;
     amount: number;
+    reference?: string;
 }
 
 export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
@@ -436,6 +438,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([
         { id: 1, method: 'Cash', amount: 3000 }
     ]);
+    const [keypadTargetIndex, setKeypadTargetIndex] = useState<number>(0);
 
     // Track if modal was previously open to prevent reset loops while modal is open
     const prevIsOpenRef = useRef(false);
@@ -1079,6 +1082,26 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         setPaymentRows(paymentRows.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
+    // Front Desk Keypad Press Handler for Active Payment Row
+    const handleKeypadPress = (val: string) => {
+        const currentTarget = paymentRows[keypadTargetIndex] || paymentRows[0];
+        if (!currentTarget) return;
+
+        let currentStr = String(currentTarget.amount || '');
+        if (val === 'CLEAR') {
+            handlePaymentRowChange(currentTarget.id, 'amount', 0);
+        } else if (val === 'BACK') {
+            const trimmed = currentStr.slice(0, -1);
+            handlePaymentRowChange(currentTarget.id, 'amount', Number(trimmed) || 0);
+        } else if (val === 'FULL') {
+            handlePaymentRowChange(currentTarget.id, 'amount', finalPayable);
+        } else {
+            if (currentStr === '0') currentStr = '';
+            const newStr = currentStr + val;
+            handlePaymentRowChange(currentTarget.id, 'amount', Number(newStr));
+        }
+    };
+
     // Submit reservation action
     const handleCompleteReservation = (requestedStatus: 'hold' | 'confirmed' | 'reserved' | 'stayover' | 'arrived') => {
         // Shared Pre-Commit Validation Guard
@@ -1526,7 +1549,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            2. Payment &amp; Billing
+                            2. Billing &amp; Payments
                         </button>
                     </div>
 
@@ -2724,47 +2747,148 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </div>
 
                                         <div className="space-y-2">
-                                            {paymentRows.map(row => (
+                                            {paymentRows.map((row, idx) => (
                                                 <div
                                                     key={row.id}
-                                                    className="flex items-center gap-2 bg-white p-2 border border-slate-200/80 rounded-md"
+                                                    onClick={() => setKeypadTargetIndex(idx)}
+                                                    className={`p-2.5 bg-white border rounded-lg transition-colors cursor-pointer space-y-2 ${
+                                                        keypadTargetIndex === idx ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-200/90'
+                                                    }`}
                                                 >
-                                                    <div className="w-1/2 flex flex-col gap-0.5">
-                                                        <label className="text-[9.5px] font-semibold text-slate-500">Method</label>
-                                                        <select
-                                                            value={row.method}
-                                                            onChange={e => handlePaymentRowChange(row.id, 'method', e.target.value as any)}
-                                                            className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-slate-500">Method</label>
+                                                            <select
+                                                                value={row.method}
+                                                                onChange={e => handlePaymentRowChange(row.id, 'method', e.target.value as any)}
+                                                                className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="Cash">Cash at Desk</option>
+                                                                <option value="Card">Credit / Debit Card</option>
+                                                                <option value="bKash">bKash (MFS)</option>
+                                                                <option value="Nagad">Nagad (MFS)</option>
+                                                                <option value="Bank Transfer">Bank Transfer</option>
+                                                                <option value="Direct Billing">Company Direct Billing</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <div className="flex-1 flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-slate-500">Amount ({currencySymbol})</label>
+                                                            <input
+                                                                type="number"
+                                                                value={row.amount || ''}
+                                                                onChange={e => handlePaymentRowChange(row.id, 'amount', parseFloat(e.target.value) || 0)}
+                                                                placeholder="0.00"
+                                                                className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none font-bold"
+                                                            />
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={e => {
+                                                                e.stopPropagation();
+                                                                handleRemovePaymentRow(row.id);
+                                                            }}
+                                                            disabled={paymentRows.length <= 1}
+                                                            className="text-red-400 hover:text-red-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer self-end mb-0.5 p-1"
+                                                            title="Delete Payment Row"
                                                         >
-                                                            <option value="Cash">Cash</option>
-                                                            <option value="Card">Card</option>
-                                                            <option value="bKash">bKash</option>
-                                                            <option value="Bank Transfer">Bank Transfer</option>
-                                                        </select>
+                                                            <Trash2 size={13} />
+                                                        </button>
                                                     </div>
 
-                                                    <div className="w-1/2 flex flex-col gap-0.5">
-                                                        <label className="text-[9.5px] font-semibold text-slate-500">Amount (BDT)</label>
-                                                        <input
-                                                            type="number"
-                                                            value={row.amount || ''}
-                                                            onChange={e => handlePaymentRowChange(row.id, 'amount', parseFloat(e.target.value) || 0)}
-                                                            placeholder="0.00"
-                                                            className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none font-bold"
-                                                        />
-                                                    </div>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemovePaymentRow(row.id)}
-                                                        disabled={paymentRows.length <= 1}
-                                                        className="text-red-400 hover:text-red-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer self-end mb-0.5 p-1"
-                                                        title="Delete Payment Row"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
+                                                    {row.method !== 'Cash' && (
+                                                        <div className="flex flex-col gap-0.5 pt-1 border-t border-slate-100">
+                                                            <label className="text-[9px] font-semibold text-slate-500">
+                                                                {row.method === 'Card' ? 'Card Last 4 / Auth Code' : row.method.includes('bKash') || row.method.includes('Nagad') ? 'MFS TrxID' : 'Bank Reference / Cheque No'}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={row.reference || ''}
+                                                                onChange={e => handlePaymentRowChange(row.id, 'reference', e.target.value)}
+                                                                placeholder={row.method === 'Card' ? 'e.g. 4242 / Auth: 89123' : 'e.g. TRX-98234123'}
+                                                                className="w-full h-6.5 px-2 border border-slate-200 rounded text-[10px] bg-white outline-none font-mono"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
+                                        </div>
+
+                                        {/* Numeric Keypad for Front Desk Touchscreen Velocity */}
+                                        <div className="bg-white border border-slate-200 rounded-lg p-2.5 mt-3 shadow-2xs">
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <p className="text-[9.5px] text-slate-500 font-semibold uppercase tracking-wider">
+                                                    Touchpad Keypad (Row #{keypadTargetIndex + 1})
+                                                </p>
+                                                <span className="font-mono font-bold text-xs text-blue-900">
+                                                    {currencySymbol} {(paymentRows[keypadTargetIndex]?.amount || 0).toLocaleString()}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-1.5">
+                                                {['1', '2', '3'].map(k => (
+                                                    <button
+                                                        key={k}
+                                                        type="button"
+                                                        onClick={() => handleKeypadPress(k)}
+                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
+                                                    >
+                                                        {k}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleKeypadPress('CLEAR')}
+                                                    className="h-8 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded font-bold text-xs cursor-pointer shadow-2xs"
+                                                >
+                                                    Clear
+                                                </button>
+
+                                                {['4', '5', '6'].map(k => (
+                                                    <button
+                                                        key={k}
+                                                        type="button"
+                                                        onClick={() => handleKeypadPress(k)}
+                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
+                                                    >
+                                                        {k}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleKeypadPress('BACK')}
+                                                    className="h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded font-bold text-xs flex items-center justify-center cursor-pointer shadow-2xs"
+                                                    title="Backspace"
+                                                >
+                                                    <Delete size={13} />
+                                                </button>
+
+                                                {['7', '8', '9'].map(k => (
+                                                    <button
+                                                        key={k}
+                                                        type="button"
+                                                        onClick={() => handleKeypadPress(k)}
+                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
+                                                    >
+                                                        {k}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleKeypadPress('0')}
+                                                    className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
+                                                >
+                                                    0
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleKeypadPress('FULL')}
+                                                className="w-full mt-2 h-7 bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                            >
+                                                Pay Full Payable ({currencySymbol} {finalPayable.toLocaleString()})
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
