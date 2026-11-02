@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { ensureRatesAndExtendedTablesPostgres } from './ratesModules.js';
+import { ensureFolioExtendedSchema } from './folioSchema.js';
 
 // Ensure environment variables are loaded immediately regardless of ESM import hoisting
 const __filename = fileURLToPath(import.meta.url);
@@ -128,6 +129,13 @@ export async function initPostgres(): Promise<boolean> {
                 console.log('✅ [Cloud PostgreSQL] Rate plans, meal plans, packages and connecting rooms active!');
             } catch (ratesErr: any) {
                 console.warn('Rates tables warning in PostgreSQL:', ratesErr?.message);
+            }
+
+            // 2.1 Ensure enterprise folio extended schema & revenue heads exist
+            try {
+                await ensureFolioExtendedSchema(pgPool);
+            } catch (folioErr: any) {
+                console.warn('Folio schema warning in PostgreSQL:', folioErr?.message);
             }
 
             // 3. Ensure baseline Organization 1 and single Super Admin exist (Zero properties/rooms hardcoded)

@@ -60,8 +60,11 @@ import {
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
+import { DrawerFolioOperations } from '../folio/DrawerFolioOperations';
+
 export type DrawerMode =
     | 'overview'
+    | 'folio'
     | 'amend'
     | 'move'
     | 'payment'
@@ -648,6 +651,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             groups.push({
                 title: 'Financial Reconciliation',
                 items: [
+                    { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                     { key: 'payment', label: 'Settle / Refund Folio', icon: CreditCard, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700' }
                 ]
             });
@@ -661,6 +665,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             groups.push({
                 title: 'Financial',
                 items: [
+                    { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                     { key: 'payment', label: 'Settle / Refund Cancellation Fee', icon: CreditCard }
                 ]
             });
@@ -680,6 +685,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             groups.push({
                 title: 'Financial Operations',
                 items: [
+                    { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                     { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard }
                 ]
             });
@@ -727,6 +733,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             groups.push({
                 title: 'Financial Operations',
                 items: [
+                    { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                     { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard }
                 ]
             });
@@ -777,6 +784,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         groups.push({
             title: 'Financial Operations',
             items: [
+                { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                 { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard }
             ]
         });
@@ -1160,6 +1168,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // Dynamic Labels & Titles for active mode
     const getModeMeta = () => {
         switch (mode) {
+            case 'folio':
+                return { title: 'Folio Operations', buttonText: 'Close Folio', buttonIcon: <FileText size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'amend':
                 return { title: 'Amend Stay', buttonText: 'Save Changes', buttonIcon: <Edit3 size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'move':
@@ -1243,7 +1253,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
             {/* Right-Side Docked Reusable Drawer */}
             <div
-                className="fixed top-0 bottom-0 right-0 w-full md:w-[65%] lg:w-[60%] min-w-[760px] max-w-[1050px] bg-[#0e3592] text-white shadow-2xl flex flex-col border-l border-blue-900 animate-in slide-in-from-right duration-200 z-[100000]"
+                className={`fixed top-0 bottom-0 right-0 ${
+                    mode === 'folio'
+                        ? 'w-full md:w-[85%] lg:w-[80%] min-w-[900px] max-w-[1300px]'
+                        : 'w-full md:w-[65%] lg:w-[60%] min-w-[760px] max-w-[1050px]'
+                } bg-[#0e3592] text-white shadow-2xl flex flex-col border-l border-blue-900 animate-in slide-in-from-right duration-200 z-[100000]`}
             >
                 {/* 1. White Top Header Bar with Edit & Dynamic Action Dropdown */}
                 <div className="px-2.5 py-1.5 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
@@ -1287,8 +1301,24 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         )}
                     </div>
 
-                    {/* Right: Top Action Buttons (Edit + Dynamic Action Dropdown) */}
+                    {/* Right: Top Action Buttons (Folio + Edit + Dynamic Action Dropdown) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMode(mode === 'folio' ? 'overview' : 'folio');
+                            }}
+                            className={`h-5 px-2 rounded text-[8px] flex items-center gap-1 shadow-2xs transition-colors cursor-pointer ${
+                                mode === 'folio'
+                                    ? 'bg-blue-600 text-white font-bold border border-blue-600'
+                                    : 'bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 font-semibold'
+                            }`}
+                            title="Folio Operations Suite"
+                        >
+                            <FileText size={10} className={mode === 'folio' ? 'text-white' : 'text-[#0e3592]'} />
+                            <span>Folio</span>
+                        </button>
+
                         <button
                             type="button"
                             disabled={Boolean(booking?.isPast)}
@@ -1429,8 +1459,24 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     </div>
                 )}
 
-                {/* 2. Drawer Body (Always 2-Column: Left = Room Details & Financials, Right = Reservation List or Action Form) */}
-                <div className="flex-1 min-h-0 grid grid-cols-12 bg-[#0e3592] overflow-hidden">
+                {/* 2. Drawer Body (Folio Operations Mode OR Standard 2-Column Overview & Action Form) */}
+                {mode === 'folio' ? (
+                    <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden flex flex-col">
+                        <DrawerFolioOperations
+                            booking={booking}
+                            onBackToDrawerOverview={() => setMode('overview')}
+                            onOpenAddPayment={() => setMode('payment')}
+                            onOpenAmendStay={() => {
+                                setMode('amend');
+                                if (onEdit) onEdit(booking);
+                            }}
+                            onOpenRoomMove={() => setMode('move')}
+                            onOpenRoomSplit={() => setMode('split')}
+                            onOpenCheckOut={() => onCheckOut && activeSubBookingNo && onCheckOut(activeSubBookingNo)}
+                        />
+                    </div>
+                ) : (
+                    <div className="flex-1 min-h-0 grid grid-cols-12 bg-[#0e3592] overflow-hidden">
                     {/* LEFT COLUMN: Overview & Financial Cards (Independent Scroll) */}
                     <div className="col-span-7 h-full overflow-y-auto p-3 space-y-2 border-r border-blue-800/40">
                         {/* Row 1: Reservation # & Status & Registration # */}
@@ -3316,6 +3362,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     )}
                 </div>
             </div>
+            )}
 
             {/* Status-Driven Printable Document Modal (GRC, Voucher, Folio Statement, Group Master Invoice, Group Pre-Reg) */}
             {activePrintDoc && (
