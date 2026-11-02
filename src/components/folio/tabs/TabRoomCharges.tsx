@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
-import { DoorClosed, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { DoorClosed, RefreshCw, X, CheckCircle2 } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { getApiBaseUrl } from '../../../utils/apiUrl';
+import { broadcastPMSEvent } from '../../../utils/roomInventoryEngine';
 import type { FolioData } from '../folioTypes';
 import type { AmendBookingData } from '../../modals/AmendStayModal';
 
@@ -21,6 +23,20 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     const roomTypeName = folio?.rooms?.[0]?.room_type || folio?.room_type || booking?.roomType || 'Standard Suite';
     const adults = (folio?.rooms?.[0]?.adults ?? booking?.adults) || 1;
     const children = (folio?.rooms?.[0]?.children ?? booking?.children) || 0;
+
+    // Slide-out Drawer Modal State for "Update Details" matching Screenshot ba116327.png
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [modalDate, setModalDate] = useState('');
+    const [modalAdults, setModalAdults] = useState(adults);
+    const [modalChildren, setModalChildren] = useState(children);
+    const [isComplimentary, setIsComplimentary] = useState(false);
+    const [modalCurrency, setModalCurrency] = useState('USD');
+    const [modalRate, setModalRate] = useState('0');
+    const [ratesInclusiveTax, setRatesInclusiveTax] = useState(false);
+    const [scope, setScope] = useState<'SELECTED_DATES' | 'WHOLE_STAY'>('SELECTED_DATES');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedbackMsg, setFeedbackMsg] = useState('');
+    const [errorMsg, setErrorMsg] = useState('');
 
     // Filter room tariff charges from ledger or calculate nights from stay dates
     const roomChargesList = useMemo(() => {
@@ -69,12 +85,87 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
         return list;
     }, [folio?.charges, folio?.rooms, folio?.check_in, folio?.check_out, booking, roomNumber, roomTypeName, adults, children]);
 
+    useEffect(() => {
+        if (roomChargesList.length > 0 && !modalDate) {
+            setModalDate(roomChargesList[0].stayDate);
+            setModalRate(String(roomChargesList[0].charge));
+        }
+    }, [roomChargesList, modalDate]);
+
+    const handleOpenUpdateDetails = (specificDate?: string, specificRate?: number) => {
+        if (specificDate) {
+            setModalDate(specificDate);
+        } else if (roomChargesList.length > 0) {
+            setModalDate(roomChargesList[0].stayDate);
+        } else {
+            setModalDate(new Date().toISOString().split('T')[0]);
+        }
+
+        if (specificRate !== undefined) {
+            setModalRate(String(specificRate));
+        } else if (roomChargesList.length > 0) {
+            setModalRate(String(roomChargesList[0].charge));
+        }
+
+        setModalAdults(adults);
+        setModalChildren(children);
+        setIsComplimentary(false);
+        setScope('SELECTED_DATES');
+        setErrorMsg('');
+        setIsUpdateModalOpen(true);
+    };
+
+    const handleApplyUpdateDetails = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!folio?.id) {
+            setErrorMsg('No active folio found to update');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setErrorMsg('');
+
+        try {
+            const numRate = parseFloat(modalRate) || 0;
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${folio.id}/room-charges`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    stayDate: modalDate,
+                    adults: modalAdults,
+                    children: modalChildren,
+                    isComplimentary,
+                    currency: modalCurrency,
+                    rate: isComplimentary ? 0 : numRate,
+                    ratesInclusiveTax,
+                    scope,
+                    userName: 'Front Desk'
+                })
+            });
+
+            const data = await res.json();
+            if (data?.success) {
+                setFeedbackMsg('Room charges updated successfully!');
+                setIsUpdateModalOpen(false);
+                onRefresh();
+                broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: folio.id });
+                setTimeout(() => setFeedbackMsg(''), 4000);
+            } else {
+                setErrorMsg(data?.error || 'Failed to update room charges');
+            }
+        } catch (err: any) {
+            setErrorMsg(err?.message || 'Network error while updating room charges');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const totalCharges = roomChargesList.reduce((sum, item) => sum + item.charge, 0);
     const totalTaxVat = roomChargesList.reduce((sum, item) => sum + item.taxVat, 0);
     const netBalance = totalCharges + totalTaxVat;
 
     return (
-        <div className="w-full flex gap-3 h-full select-none text-gray-800 text-xs py-1 min-h-0 overflow-y-auto">
+        <div className="relative w-full flex gap-3 h-full select-none text-gray-800 text-xs py-1 min-h-0 overflow-hidden">
             {/* LEFT SIDEBAR */}
             <div className="w-56 shrink-0 flex flex-col justify-between border-r border-gray-200/80 pr-3">
                 <div className="space-y-2">
@@ -112,17 +203,24 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
             </div>
 
             {/* MAIN RIGHT: Update Details button & Night-by-night table */}
-            <div className="flex-1 flex flex-col justify-between min-w-0 space-y-3">
+            <div className="flex-1 flex flex-col justify-between min-w-0 space-y-2.5 overflow-y-auto">
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
-                            onClick={onRefresh}
+                            onClick={() => handleOpenUpdateDetails()}
                             className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                         >
                             <RefreshCw size={12} className="text-gray-400" />
                             <span>Update Details</span>
                         </button>
+
+                        {feedbackMsg && (
+                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-0.5 rounded text-[11px] font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={12} className="text-emerald-600" />
+                                <span>{feedbackMsg}</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
@@ -140,7 +238,12 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                             </thead>
                             <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
                                 {roomChargesList.map((row) => (
-                                    <tr key={row.id} className="hover:bg-gray-50/70">
+                                    <tr
+                                        key={row.id}
+                                        onClick={() => handleOpenUpdateDetails(row.stayDate, row.charge)}
+                                        className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                                        title="Click to edit rate for this date"
+                                    >
                                         <td className="py-2 px-3 font-semibold text-gray-800">{row.stayDate}</td>
                                         <td className="py-2 px-2.5 font-bold text-blue-700">{row.roomNumber}</td>
                                         <td className="py-2 px-3 font-sans font-medium text-gray-700">{row.rateType}</td>
@@ -156,7 +259,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                 </div>
 
                 {/* Bottom Right Net Balance */}
-                <div className="flex items-center justify-end pt-2 pb-1 border-t border-gray-100">
+                <div className="flex items-center justify-end pt-2 pb-1 border-t border-gray-100 flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <span className="text-xs uppercase font-bold text-gray-600 tracking-wide font-sans">Net Balance</span>
                         <span className="text-base font-black text-rose-600 font-mono tracking-tight">
@@ -165,6 +268,168 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Slide-out Drawer Panel: Update Details matching Screenshot ba116327.png */}
+            {isUpdateModalOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[100004] bg-black/20 backdrop-blur-2xs transition-opacity"
+                        onClick={() => setIsUpdateModalOpen(false)}
+                    />
+                    <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
+                        {/* Header matching Screenshot ba116327.png */}
+                        <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-xs">
+                            <h3 className="text-xs font-bold tracking-wide">Update Details</h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsUpdateModalOpen(false)}
+                                className="text-white/80 hover:text-white transition-colors cursor-pointer"
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
+
+                        {errorMsg && (
+                            <div className="bg-rose-50 border-b border-rose-200 text-rose-700 px-4 py-2 text-[11px]">
+                                {errorMsg}
+                            </div>
+                        )}
+
+                        {/* Body Form matching Screenshot ba116327.png */}
+                        <form onSubmit={handleApplyUpdateDetails} className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                            {/* Date */}
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-700 mb-1">Date</label>
+                                <input
+                                    type="date"
+                                    value={modalDate}
+                                    onChange={(e) => setModalDate(e.target.value)}
+                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono"
+                                />
+                            </div>
+
+                            {/* Adults & Children */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-medium text-gray-700 mb-1">Adults</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={modalAdults}
+                                        onChange={(e) => setModalAdults(parseInt(e.target.value, 10) || 1)}
+                                        className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-medium text-gray-700 mb-1">Children</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={modalChildren}
+                                        onChange={(e) => setModalChildren(parseInt(e.target.value, 10) || 0)}
+                                        className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Complimentary Room */}
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700 font-normal">
+                                <input
+                                    type="checkbox"
+                                    checked={isComplimentary}
+                                    onChange={(e) => {
+                                        setIsComplimentary(e.target.checked);
+                                        if (e.target.checked) setModalRate('0');
+                                    }}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                />
+                                <span>Complimentary Room</span>
+                            </label>
+
+                            {/* Currency & Rate */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-medium text-gray-700 mb-1">Currency</label>
+                                    <select
+                                        value={modalCurrency}
+                                        onChange={(e) => setModalCurrency(e.target.value)}
+                                        className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+                                    >
+                                        <option value="USD">USD</option>
+                                        <option value="BDT">BDT</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="GBP">GBP</option>
+                                        <option value="INR">INR</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-medium text-gray-700 mb-1">Rate</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        disabled={isComplimentary}
+                                        value={modalRate}
+                                        onChange={(e) => setModalRate(e.target.value)}
+                                        className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 font-mono disabled:bg-gray-100 disabled:text-gray-400"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Rates Inclusive Tax */}
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700 font-normal">
+                                <input
+                                    type="checkbox"
+                                    checked={ratesInclusiveTax}
+                                    onChange={(e) => setRatesInclusiveTax(e.target.checked)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                />
+                                <span>Rates Inclusive Tax</span>
+                            </label>
+
+                            {/* Application Scope */}
+                            <div className="space-y-1.5 pt-1">
+                                <label className="block text-[11px] font-semibold text-gray-700">Application Scope</label>
+                                <div className="space-y-1.5 pl-0.5">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700">
+                                        <input
+                                            type="radio"
+                                            name="applicationScope"
+                                            value="SELECTED_DATES"
+                                            checked={scope === 'SELECTED_DATES'}
+                                            onChange={() => setScope('SELECTED_DATES')}
+                                            className="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                        />
+                                        <span>Apply on Selected Dates</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700">
+                                        <input
+                                            type="radio"
+                                            name="applicationScope"
+                                            value="WHOLE_STAY"
+                                            checked={scope === 'WHOLE_STAY'}
+                                            onChange={() => setScope('WHOLE_STAY')}
+                                            className="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                        />
+                                        <span>Apply on whole stay</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </form>
+
+                        {/* Footer Action matching Screenshot ba116327.png */}
+                        <div className="p-3 border-t border-gray-200 flex items-center justify-end bg-white flex-shrink-0">
+                            <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={handleApplyUpdateDetails}
+                                className="px-6 py-1.5 rounded-md bg-[#1e3a8a] hover:bg-blue-900 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                {isSubmitting ? 'Applying...' : 'Apply'}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

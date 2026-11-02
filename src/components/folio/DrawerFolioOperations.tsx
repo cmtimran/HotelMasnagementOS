@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, AlertCircle, X } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/apiUrl';
+import { subscribeToPMSEvents } from '../../utils/roomInventoryEngine';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import type { FolioData, FolioSubTab } from './folioTypes';
 import { HorizonSummaryBanner } from './HorizonSummaryBanner';
@@ -213,6 +214,20 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
 
     useEffect(() => {
         fetchFolioData();
+
+        // Automatically re-sync live ledger & folio when payments, charges, or reservations are updated
+        const unsubscribe = subscribeToPMSEvents((event) => {
+            if (
+                event.type === 'RESERVATION_COMMITTED' ||
+                event.type === 'RESERVATION_UPDATED' ||
+                event.type === 'FOLIO_UPDATED' ||
+                event.type === 'INVENTORY_REFRESH'
+            ) {
+                fetchFolioData();
+            }
+        });
+
+        return () => unsubscribe();
     }, [fetchFolioData]);
 
     const activeFolio = useMemo(() => {
@@ -264,19 +279,15 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                             {activeFolio.folio_number}
                         </span>
                     )}
+                    {isLoading && (
+                        <span className="text-[10px] text-blue-600 font-medium flex items-center gap-1 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                            <span>Syncing...</span>
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={fetchFolioData}
-                        disabled={isLoading}
-                        className="h-6 px-2 rounded-md bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 text-[11px] font-medium flex items-center gap-1 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-                        title="Reload live ledger records"
-                    >
-                        <RefreshCw size={11} className={isLoading ? 'animate-spin text-blue-600' : ''} />
-                        <span>Refresh</span>
-                    </button>
                     {onClose && (
                         <button
                             type="button"

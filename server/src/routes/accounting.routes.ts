@@ -1008,6 +1008,113 @@ router.put('/folios/:id/booking-details', async (req: Request, res: Response) =>
     }
 });
 
+// PUT /api/accounting/folios/:id/room-charges - Update Details (Rate, Pax, Scope, Complimentary, Inclusive Tax)
+router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
+    try {
+        const folioId = Number(req.params.id);
+        const {
+            stayDate,
+            adults = 1,
+            children = 0,
+            isComplimentary = false,
+            rate = 0,
+            ratesInclusiveTax = false,
+            scope = 'SELECTED_DATES',
+            userName = 'Front Desk'
+        } = req.body;
+
+        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
+        if (!targetFolio) {
+            return res.status(404).json({ success: false, error: 'Folio not found' });
+        }
+
+        const effectiveRate = isComplimentary ? 0 : Math.max(0, Number(rate));
+        let baseAmount = effectiveRate;
+        let serviceCharge = 0;
+        let vat = 0;
+        let cityTax = 0;
+        let totalTax = 0;
+        let grandTotal = effectiveRate;
+
+        if (effectiveRate > 0) {
+            if (ratesInclusiveTax) {
+                baseAmount = Math.round((effectiveRate / 1.26) * 100) / 100;
+                serviceCharge = Math.round(baseAmount * 0.10 * 100) / 100;
+                vat = Math.round(baseAmount * 0.15 * 100) / 100;
+                cityTax = Math.round(baseAmount * 0.01 * 100) / 100;
+                totalTax = serviceCharge + vat + cityTax;
+                grandTotal = baseAmount + totalTax;
+            } else {
+                baseAmount = effectiveRate;
+                serviceCharge = Math.round(baseAmount * 0.10 * 100) / 100;
+                vat = Math.round(baseAmount * 0.15 * 100) / 100;
+                cityTax = Math.round(baseAmount * 0.01 * 100) / 100;
+                totalTax = serviceCharge + vat + cityTax;
+                grandTotal = baseAmount + totalTax;
+            }
+        }
+
+        let updatedChargesCount = 0;
+        if (scope === 'SELECTED_DATES' && stayDate) {
+            const existingCharge = await db.prepare(`
+                SELECT id FROM folio_charges 
+                WHERE folio_id = ? AND charge_date = ? AND charge_code = 'ROOM_CHG' AND (is_voided IS FALSE OR is_voided IS NULL)
+            `).get(folioId, stayDate) as any;
+
+            if (existingCharge) {
+                await db.prepare(`
+                    UPDATE folio_charges 
+                    SET amount = ?, service_charge = ?, vat = ?, city_tax = ?, total_tax = ?, total_amount = ?
+                    WHERE id = ?
+                `).run(baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, existingCharge.id);
+                updatedChargesCount = 1;
+            } else {
+                await db.prepare(`
+                    INSERT INTO folio_charges (
+                        folio_id, charge_code, revenue_head, ref_no, description, amount, discount_amount,
+                        service_charge, vat, city_tax, total_tax, total_amount, charge_date, is_tax_applicable, user_name
+                    ) VALUES (?, 'ROOM_CHG', 'Room Charges', 'RC-UPD', 'Room Charge', ?, 0, ?, ?, ?, ?, ?, ?, TRUE, ?)
+                `).run(folioId, baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, stayDate, userName);
+                updatedChargesCount = 1;
+            }
+        } else {
+            const result = await db.prepare(`
+                UPDATE folio_charges 
+                SET amount = ?, service_charge = ?, vat = ?, city_tax = ?, total_tax = ?, total_amount = ?
+                WHERE folio_id = ? AND charge_code = 'ROOM_CHG' AND (is_voided IS FALSE OR is_voided IS NULL)
+            `).run(baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, folioId);
+            updatedChargesCount = result.rowCount || 0;
+        }
+
+        if (targetFolio.reservation_id) {
+            await db.prepare(`
+                UPDATE reservation_rooms 
+                SET room_rate = ?, adults = ?, children = ?
+                WHERE reservation_id = ?
+            `).run(grandTotal, adults, children, targetFolio.reservation_id);
+        }
+
+        await db.prepare(`
+            INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+            VALUES (?, ?, 'ROOM_CHARGES_UPDATED', ?, ?)
+        `).run(
+            folioId,
+            targetFolio.reservation_id,
+            `Room Charges Updated: Rate ${effectiveRate} (${scope === 'WHOLE_STAY' ? 'Whole Stay' : stayDate}), Adults: ${adults}, Children: ${children}${isComplimentary ? ' [Complimentary]' : ''}`,
+            userName
+        );
+
+        res.json({
+            success: true,
+            message: `Room charges updated successfully (${scope === 'WHOLE_STAY' ? 'Whole stay' : stayDate})`,
+            updatedChargesCount,
+            newRate: grandTotal
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update room charges' });
+    }
+});
+
 // GET /api/accounting/folios/:id/audit-trail - Chronological Audit Logs
 router.get('/folios/:id/audit-trail', async (req: Request, res: Response) => {
     try {
