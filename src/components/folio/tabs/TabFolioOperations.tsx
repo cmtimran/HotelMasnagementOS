@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
     ChevronDown,
     Plus,
@@ -71,6 +71,26 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     const [expandedRowIds, setExpandedRowIds] = useState<Array<number | string>>([]);
     const [selectedItemIds, setSelectedItemIds] = useState<Array<number | string>>([]);
     const [openRowActionId, setOpenRowActionId] = useState<number | string | null>(null);
+
+    // Refs for safe outside-click handling (prevents full-screen backdrop click interception)
+    const moreDropdownRef = useRef<HTMLDivElement>(null);
+    const rowActionRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (moreDropdownRef.current && !moreDropdownRef.current.contains(target)) {
+                setIsMoreDropdownOpen(false);
+            }
+            if (rowActionRef.current && !rowActionRef.current.contains(target)) {
+                setOpenRowActionId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     // Ledger View Controls (Matching media_1793667186222_9c97dd2d.png)
     const [statusFilter, setStatusFilter] = useState<'all' | 'posted' | 'unposted'>('all');
@@ -855,20 +875,19 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
 
                     {/* Row Action Menu ⋮ (Yanolja PMS Folio Operations) */}
                     <td className={`${cellPy} px-2 text-center relative`}>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenRowActionId(openRowActionId === item.id ? null : item.id);
-                            }}
-                            className="w-5 h-5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer transition-colors"
-                            title="Actions"
-                        >
-                            <MoreVertical size={13} />
-                        </button>
-                        {openRowActionId === item.id && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setOpenRowActionId(null)} />
+                        <div ref={openRowActionId === item.id ? rowActionRef : undefined} className="inline-block relative">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenRowActionId(openRowActionId === item.id ? null : item.id);
+                                }}
+                                className="w-5 h-5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                                title="Actions"
+                            >
+                                <MoreVertical size={13} />
+                            </button>
+                            {openRowActionId === item.id && (
                                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 text-left animate-in fade-in zoom-in-95 duration-100">
                                     {item.isVoided ? (
                                         <div className="px-3 py-1.5 text-[11px] text-gray-500 italic">
@@ -888,8 +907,8 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                         </button>
                                     )}
                                 </div>
-                            </>
-                        )}
+                            )}
+                        </div>
                     </td>
                 </tr>
 
@@ -1037,7 +1056,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     {/* Action Bar matching Screenshot d529d73d.png & media_1793667186222_9c97dd2d.png */}
                     <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 min-w-0 border-b border-gray-100/80">
                         {/* Left Action Buttons */}
-                        <div className="flex items-center gap-1.5 shrink min-w-0 overflow-x-auto no-scrollbar py-0.5">
+                        <div className="flex items-center gap-1.5 shrink min-w-0 py-0.5">
                             <button
                                 type="button"
                                 onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
@@ -1086,7 +1105,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             </button>
 
                             {/* More Actions Dropdown (Adjustments, Transfer, Split Folio) */}
-                            <div className="relative shrink-0">
+                            <div ref={moreDropdownRef} className="relative shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
@@ -1097,54 +1116,51 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 </button>
 
                                 {isMoreDropdownOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setIsMoreDropdownOpen(false)} />
-                                        <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenAdjustments(); }}
-                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <Sliders size={13} className="text-gray-400" />
-                                                <span>Adjustments</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenTransfer(); }}
-                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <ArrowRightLeft size={13} className="text-gray-400" />
-                                                <span>Transfer</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenSplitFolio(); }}
-                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <Scissors size={13} className="text-gray-400" />
-                                                <span>Split Folio</span>
-                                            </button>
-                                            <div className="my-1 border-t border-gray-100" />
-                                            <button
-                                                type="button"
-                                                disabled={!selectedChargeToVoid}
-                                                onClick={() => {
-                                                    setIsMoreDropdownOpen(false);
-                                                    if (selectedChargeToVoid) {
-                                                        onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
-                                                    }
-                                                }}
-                                                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 cursor-pointer ${
-                                                    selectedChargeToVoid
-                                                        ? 'text-rose-700 hover:bg-rose-50 font-medium'
-                                                        : 'text-gray-400 hover:bg-gray-50 cursor-not-allowed opacity-60'
-                                                }`}
-                                            >
-                                                <AlertTriangle size={13} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
-                                                <span>Void Selected Charge</span>
-                                            </button>
-                                        </div>
-                                    </>
+                                    <div className="absolute left-0 top-full mt-1.5 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenAdjustments(); }}
+                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <Sliders size={13} className="text-gray-400" />
+                                            <span>Adjustments</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenTransfer(); }}
+                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <ArrowRightLeft size={13} className="text-gray-400" />
+                                            <span>Transfer</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenSplitFolio(); }}
+                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <Scissors size={13} className="text-gray-400" />
+                                            <span>Split Folio</span>
+                                        </button>
+                                        <div className="my-1 border-t border-gray-100" />
+                                        <button
+                                            type="button"
+                                            disabled={!selectedChargeToVoid}
+                                            onClick={() => {
+                                                setIsMoreDropdownOpen(false);
+                                                if (selectedChargeToVoid) {
+                                                    onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
+                                                }
+                                            }}
+                                            className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
+                                                selectedChargeToVoid
+                                                    ? 'text-rose-700 hover:bg-rose-50 font-medium cursor-pointer'
+                                                    : 'text-gray-400 hover:bg-gray-50 cursor-not-allowed opacity-60'
+                                            }`}
+                                        >
+                                            <AlertTriangle size={13} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
+                                            <span>Void Selected Charge</span>
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
