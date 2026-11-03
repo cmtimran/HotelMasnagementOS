@@ -16,7 +16,9 @@ import {
     Percent,
     Settings2,
     RefreshCw,
-    FileText
+    FileText,
+    MoreVertical,
+    AlertTriangle
 } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
@@ -65,6 +67,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [expandedRowIds, setExpandedRowIds] = useState<Array<number | string>>([]);
     const [selectedItemIds, setSelectedItemIds] = useState<Array<number | string>>([]);
+    const [openRowActionId, setOpenRowActionId] = useState<number | string | null>(null);
 
     // Operations View States (matching Screenshots 9d2019f2.png & 605bdfde.png)
     const [selectedRoomFolioIds, setSelectedRoomFolioIds] = useState<Array<number | string>>([]);
@@ -389,6 +392,11 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
 
         return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [folio?.charges, folio?.payments]);
+
+    // Currently selected active charge for voiding
+    const selectedChargeToVoid = useMemo(() => {
+        return ledgerItems.find(i => selectedItemIds.includes(i.id) && !i.isVoided && i.type === 'charge');
+    }, [ledgerItems, selectedItemIds]);
 
     // =========================================================================
     // VIEW MODE 2: FOLIO OPERATIONS VIEW (Matching Screenshot 9d2019f2.png & 605bdfde.png)
@@ -904,16 +912,21 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
 
                         <button
                             type="button"
-                            disabled={selectedItemIds.length === 0}
+                            disabled={!selectedChargeToVoid}
                             onClick={() => {
-                                const firstSelected = ledgerItems.find(i => selectedItemIds.includes(i.id));
-                                if (firstSelected) {
-                                    onOpenVoid(firstSelected.type, firstSelected.id, firstSelected.description, firstSelected.amount);
+                                if (selectedChargeToVoid) {
+                                    onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
                                 }
                             }}
-                            className="bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 border border-gray-300 disabled:opacity-40 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed"
+                            title={
+                                selectedItemIds.length > 0 && !selectedChargeToVoid
+                                    ? 'Selected entry is already voided or is a payment'
+                                    : 'Void selected extra charge'
+                            }
+                            className="bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 border border-gray-300 disabled:opacity-40 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
-                            Void Charge
+                            <AlertTriangle size={12} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
+                            <span>Void Charge</span>
                         </button>
                     </div>
 
@@ -931,12 +944,13 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                     <th className="py-2 px-2">Status</th>
                                     <th className="py-2 px-2.5 text-right">Amount</th>
                                     <th className="py-2 px-2 text-center w-10">Receipt</th>
+                                    <th className="py-2 px-2 text-center w-8"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {ledgerItems.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="py-12 text-center text-gray-400">
+                                        <td colSpan={10} className="py-12 text-center text-gray-400">
                                             No charges or payments recorded yet for this folio.
                                         </td>
                                     </tr>
@@ -947,7 +961,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
 
                                         return (
                                             <React.Fragment key={`${item.type}-${item.id}`}>
-                                                <tr className={`hover:bg-gray-50/80 transition-colors ${isChecked ? 'bg-blue-50/40' : ''}`}>
+                                                <tr className={`hover:bg-gray-50/80 transition-colors ${isChecked ? 'bg-blue-50/40' : item.isVoided ? 'bg-rose-50/15' : ''}`}>
                                                     {/* Expand + / - and Checkbox */}
                                                     <td className="py-1.5 px-2 text-center">
                                                         <div className="flex items-center gap-1.5">
@@ -966,7 +980,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                                 type="checkbox"
                                                                 checked={isChecked}
                                                                 onChange={() => toggleSelectItem(item.id)}
-                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3"
+                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
                                                             />
                                                         </div>
                                                     </td>
@@ -974,7 +988,16 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                     <td className="py-1.5 px-2.5 font-mono text-[11px] text-gray-600">{item.date}</td>
                                                     <td className="py-1.5 px-2 font-mono text-[11px] text-gray-700">{item.refNo}</td>
                                                     <td className="py-1.5 px-2.5 font-medium text-gray-800">{item.revenueHead}</td>
-                                                    <td className="py-1.5 px-3 text-gray-700 truncate max-w-[200px]">{item.description}</td>
+                                                    <td className="py-1.5 px-3 truncate max-w-[200px]">
+                                                        <span className={item.isVoided ? 'line-through text-gray-400' : 'text-gray-700'}>
+                                                            {item.description}
+                                                        </span>
+                                                        {item.isVoided && item.rawItem?.void_reason && (
+                                                            <span className="ml-1.5 text-[10px] text-rose-600 italic">
+                                                                ({item.rawItem.void_reason})
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td className="py-1.5 px-2.5 text-gray-600 text-[11px]">{item.user}</td>
                                                     <td className="py-1.5 px-2">
                                                         {item.status === 'Posted' && (
@@ -991,10 +1014,12 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                             <span className="text-gray-400 font-mono">-</span>
                                                         )}
                                                     </td>
-                                                    <td className={`py-1.5 px-2.5 text-right font-mono font-bold text-xs ${
-                                                        item.type === 'payment' || item.amount < 0
-                                                            ? 'text-emerald-600'
-                                                            : 'text-rose-600'
+                                                    <td className={`py-1.5 px-2.5 text-right font-mono text-xs ${
+                                                        item.isVoided
+                                                            ? 'line-through text-gray-400'
+                                                            : item.type === 'payment' || item.amount < 0
+                                                                ? 'text-emerald-600 font-bold'
+                                                                : 'text-rose-600 font-bold'
                                                     }`}>
                                                         {Math.abs(item.amount).toFixed(2)}
                                                     </td>
@@ -1011,13 +1036,61 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                             <span className="text-gray-300">-</span>
                                                         )}
                                                     </td>
+
+                                                    {/* Row Action Menu ⋮ (Yanolja PMS Folio Operations) */}
+                                                    <td className="py-1.5 px-2 text-center relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOpenRowActionId(openRowActionId === item.id ? null : item.id);
+                                                            }}
+                                                            className="w-5 h-5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                                                            title="Actions"
+                                                        >
+                                                            <MoreVertical size={13} />
+                                                        </button>
+                                                        {openRowActionId === item.id && (
+                                                            <>
+                                                                <div className="fixed inset-0 z-40" onClick={() => setOpenRowActionId(null)} />
+                                                                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 text-left animate-in fade-in zoom-in-95 duration-100">
+                                                                    {item.isVoided ? (
+                                                                        <div className="px-3 py-1.5 text-[11px] text-gray-500 italic">
+                                                                            Voided: {item.rawItem?.void_reason || 'Reversed'}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setOpenRowActionId(null);
+                                                                                onOpenVoid(item.type, item.id, item.description, item.amount);
+                                                                            }}
+                                                                            className="w-full text-left px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
+                                                                        >
+                                                                            <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                                                                            <span>Void {item.type === 'charge' ? 'Extra Charge' : 'Payment'}</span>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </td>
                                                 </tr>
 
                                                 {/* Expanded Tax Breakdown Accordion Row */}
                                                 {isExpanded && item.type === 'charge' && (
                                                     <tr className="bg-blue-50/20 border-b border-blue-100/80">
-                                                        <td colSpan={9} className="px-8 py-2.5 text-xs font-mono">
+                                                        <td colSpan={10} className="px-8 py-2.5 text-xs font-mono">
                                                             <div className="bg-white border border-blue-200/80 rounded-lg p-2.5 space-y-1.5 shadow-2xs max-w-xl">
+                                                                {item.isVoided && (
+                                                                    <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded p-2 text-[11px] mb-2 flex items-center justify-between">
+                                                                        <span className="font-bold flex items-center gap-1">
+                                                                            <AlertTriangle size={12} className="text-rose-600" />
+                                                                            Void Reason:
+                                                                        </span>
+                                                                        <span className="italic">{item.rawItem?.void_reason || 'Reversed by Front Desk'}</span>
+                                                                    </div>
+                                                                )}
                                                                 {item.discountAmount > 0 && (
                                                                     <div className="flex items-center justify-between text-gray-600 text-[11px]">
                                                                         <span>Discount Amount:</span>
