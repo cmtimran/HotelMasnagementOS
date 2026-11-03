@@ -1035,14 +1035,14 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
             <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden h-full">
                 <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* Action Bar matching Screenshot d529d73d.png & media_1793667186222_9c97dd2d.png */}
-                    <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 flex-wrap">
+                    <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 min-w-0 border-b border-gray-100/80">
                         {/* Left Action Buttons */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 shrink min-w-0 overflow-x-auto no-scrollbar py-0.5">
                             <button
                                 type="button"
                                 onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
                                 title="New Folio"
-                                className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold"
+                                className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold shrink-0"
                             >
                                 <Plus size={13} />
                             </button>
@@ -1052,7 +1052,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 <button
                                     type="button"
                                     onClick={onOpenAddPayment}
-                                    className="bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                    className="h-7 bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
                                 >
                                     <CreditCard size={12} className="text-emerald-600" />
                                     <span>Add Payment</span>
@@ -1062,7 +1062,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             <button
                                 type="button"
                                 onClick={onOpenAddCharge}
-                                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             >
                                 Add Charges
                             </button>
@@ -1070,7 +1070,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             <button
                                 type="button"
                                 onClick={onOpenAddDiscount}
-                                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             >
                                 Apply Discount
                             </button>
@@ -1079,18 +1079,18 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setViewMode('operations')}
-                                className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-2.5 py-1 text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                className="h-7 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-2.5 text-xs shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
                             >
                                 <Settings2 size={12} className="text-amber-700" />
                                 <span>Folio Operations</span>
                             </button>
 
                             {/* More Actions Dropdown (Adjustments, Transfer, Split Folio) */}
-                            <div className="relative">
+                            <div className="relative shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
-                                    className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                    className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
                                 >
                                     <span>More</span>
                                     <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1124,39 +1124,54 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                 <Scissors size={13} className="text-gray-400" />
                                                 <span>Split Folio</span>
                                             </button>
+                                            <div className="my-1 border-t border-gray-100" />
+                                            <button
+                                                type="button"
+                                                disabled={!selectedChargeToVoid}
+                                                onClick={() => {
+                                                    setIsMoreDropdownOpen(false);
+                                                    if (selectedChargeToVoid) {
+                                                        onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
+                                                    }
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 cursor-pointer ${
+                                                    selectedChargeToVoid
+                                                        ? 'text-rose-700 hover:bg-rose-50 font-medium'
+                                                        : 'text-gray-400 hover:bg-gray-50 cursor-not-allowed opacity-60'
+                                                }`}
+                                            >
+                                                <AlertTriangle size={13} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
+                                                <span>Void Selected Charge</span>
+                                            </button>
                                         </div>
                                     </>
                                 )}
                             </div>
 
-                            <button
-                                type="button"
-                                disabled={!selectedChargeToVoid}
-                                onClick={() => {
-                                    if (selectedChargeToVoid) {
+                            {/* Contextual Void Charge Button when charge is checked */}
+                            {selectedChargeToVoid && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
                                         onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
-                                    }
-                                }}
-                                title={
-                                    selectedItemIds.length > 0 && !selectedChargeToVoid
-                                        ? 'Selected entry is already voided or is a payment'
-                                        : 'Void selected extra charge'
-                                }
-                                className="bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 border border-gray-300 disabled:opacity-40 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
-                            >
-                                <AlertTriangle size={12} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
-                                <span>Void Charge</span>
-                            </button>
+                                    }}
+                                    title="Void selected extra charge"
+                                    className="h-7 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap animate-in fade-in"
+                                >
+                                    <AlertTriangle size={12} className="text-rose-600" />
+                                    <span>Void Charge</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Right: Legend & View Toolbar Controls (Matching media_1793667186222_9c97dd2d.png) */}
-                        <div className="flex items-center gap-2.5 ml-auto shrink-0 select-none">
+                        <div className="flex items-center gap-2 ml-auto shrink-0 select-none">
                             {/* Unposted Indicator / Filter Toggle */}
                             <button
                                 type="button"
                                 onClick={() => setStatusFilter(prev => prev === 'unposted' ? 'all' : 'unposted')}
                                 title="Click to filter by Unposted transactions"
-                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer whitespace-nowrap ${
                                     statusFilter === 'unposted'
                                         ? 'bg-amber-100/90 text-amber-900 font-bold ring-1 ring-amber-400 shadow-2xs'
                                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -1171,7 +1186,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 type="button"
                                 onClick={() => setStatusFilter(prev => prev === 'posted' ? 'all' : 'posted')}
                                 title="Click to filter by Posted transactions"
-                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer whitespace-nowrap ${
                                     statusFilter === 'posted'
                                         ? 'bg-gray-200 text-gray-900 font-bold ring-1 ring-gray-400 shadow-2xs'
                                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -1182,10 +1197,10 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             </button>
 
                             {/* Divider */}
-                            <div className="h-3.5 w-px bg-gray-300 mx-0.5" />
+                            <div className="h-4 w-px bg-gray-300 mx-0.5 shrink-0" />
 
                             {/* 3 Icon Buttons */}
-                            <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200/90 rounded-md p-0.5 shadow-2xs">
+                            <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200/90 rounded-md p-0.5 shadow-2xs shrink-0">
                                 {/* List / Density Toggle */}
                                 <button
                                     type="button"
