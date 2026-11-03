@@ -1266,8 +1266,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             <div
                 className={`fixed top-0 bottom-0 right-0 ${
                     mode === 'folio'
-                        ? 'w-full md:w-[85%] lg:w-[80%] min-w-[900px] max-w-[1300px]'
-                        : 'w-full md:w-[65%] lg:w-[60%] min-w-[760px] max-w-[1050px]'
+                        ? 'w-full md:w-[90%] lg:w-[88%] min-w-[1000px] max-w-[1400px]'
+                        : 'w-full md:w-[70%] lg:w-[68%] min-w-[860px] max-w-[1150px]'
                 } bg-[#0e3592] text-white shadow-2xl flex flex-col border-l border-blue-900 animate-in slide-in-from-right duration-200 z-[100000]`}
             >
                 {/* 1. White Top Header Bar with Edit & Dynamic Action Dropdown */}
