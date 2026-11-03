@@ -102,6 +102,38 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         return allFolios[0];
     }, [allFolios, booking?.roomNumber]);
 
+    // Hierarchical Grouping by Room (Guarantees Room Number appears only ONCE with nested sub-folios)
+    const foliosByRoom = useMemo(() => {
+        const groups: Array<{
+            roomNumber: string;
+            isOwnerRoom: boolean;
+            folios: FolioData[];
+        }> = [];
+
+        const roomMap = new Map<string, FolioData[]>();
+        allFolios.forEach(f => {
+            const rNo = String(f.room_number || f.rooms?.[0]?.room_number || booking?.roomNumber || 'Unassigned');
+            if (!roomMap.has(rNo)) {
+                roomMap.set(rNo, []);
+            }
+            roomMap.get(rNo)!.push(f);
+        });
+
+        roomMap.forEach((roomFolios, rNo) => {
+            const isOwnerRoom = roomFolios.some(f => Boolean(ownerFolio && String(f.id) === String(ownerFolio.id))) ||
+                String(rNo) === String(booking?.roomNumber);
+            groups.push({
+                roomNumber: rNo,
+                isOwnerRoom,
+                folios: roomFolios
+            });
+        });
+
+        // Sort so the owner room is placed at the top
+        groups.sort((a, b) => (b.isOwnerRoom ? 1 : 0) - (a.isOwnerRoom ? 1 : 0));
+        return groups;
+    }, [allFolios, booking?.roomNumber, ownerFolio]);
+
     const isAllSelected = allFolios.length > 0 && selectedRoomFolioIds.length === allFolios.length;
 
     const handleToggleSelectAll = () => {
@@ -116,6 +148,16 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         setSelectedRoomFolioIds(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
+    };
+
+    const handleToggleRoom = (roomFolios: FolioData[]) => {
+        const roomIds = roomFolios.map(f => f.id);
+        const allSelected = roomIds.every(id => selectedRoomFolioIds.includes(id));
+        if (allSelected) {
+            setSelectedRoomFolioIds(prev => prev.filter(id => !roomIds.includes(id)));
+        } else {
+            setSelectedRoomFolioIds(prev => Array.from(new Set([...prev, ...roomIds])));
+        }
     };
 
     // Group Total Charges & Balance for Operations Checklist Footer
@@ -268,8 +310,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         );
     };
 
-    // Grouping rooms and folios for tree view
-    const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || '101';
+    // Rate code for grouping tree view
     const ratePlanCode = folio?.market_code || booking?.ratePlan || 'Standard Rate';
 
     const nonVoidedCharges = folio?.charges?.filter(c => !c.is_voided) || [];
@@ -423,50 +464,77 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                     <ChevronDown size={14} className="text-blue-500 shrink-0" />
                                 </div>
 
-                                {/* Room Checkboxes with Sub-Folio Pills */}
-                                <div className="space-y-1.5 pl-1 pt-1">
-                                    {allFolios.map((f, idx) => {
-                                        const isChecked = selectedRoomFolioIds.includes(f.id);
-                                        const isOwner = String(f.id) === String(ownerFolio?.id);
-                                        const isActive = String(f.id) === String(activeFolioId);
+                                {/* Room Checkboxes with Sub-Folio Pills (Grouped by Room) */}
+                                <div className="space-y-2.5 pl-1 pt-1">
+                                    {foliosByRoom.map((group) => {
+                                        const roomIds = group.folios.map(f => f.id);
+                                        const isRoomFullySelected = roomIds.length > 0 && roomIds.every(id => selectedRoomFolioIds.includes(id));
+                                        const isRoomPartiallySelected = roomIds.some(id => selectedRoomFolioIds.includes(id)) && !isRoomFullySelected;
 
                                         return (
-                                            <div key={f.id} className="space-y-1">
+                                            <div key={group.roomNumber} className="space-y-1">
+                                                {/* Single Room Header (Rendered once per Room) */}
                                                 <label className="flex items-center gap-2 py-1 px-1.5 rounded hover:bg-gray-50 cursor-pointer select-none text-xs font-semibold text-gray-800">
                                                     <input
                                                         type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={() => handleToggleSelectRoomFolio(f.id)}
+                                                        checked={isRoomFullySelected}
+                                                        ref={el => {
+                                                            if (el) el.indeterminate = isRoomPartiallySelected;
+                                                        }}
+                                                        onChange={() => handleToggleRoom(group.folios)}
                                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                                                     />
                                                     <DoorClosed size={13} className="text-gray-500 shrink-0" />
-                                                    <span>{f.room_number || `Room ${idx + 1}`}</span>
-                                                    {isOwner && (
+                                                    <span>{group.roomNumber}</span>
+                                                    {group.folios.length > 1 && (
+                                                        <span className="text-[10px] text-gray-400 font-normal">
+                                                            ({group.folios.length} folios)
+                                                        </span>
+                                                    )}
+                                                    {group.isOwnerRoom && (
                                                         <span className="ml-auto text-[9.5px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">
                                                             Owner
                                                         </span>
                                                     )}
                                                 </label>
 
-                                                {/* Sub-Folio Pill */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onSelectFolio(f.id)}
-                                                    className={`w-full text-left py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer shadow-2xs ${
-                                                        isActive
-                                                            ? 'bg-[#1e3a8a] text-white font-bold'
-                                                            : isOwner
-                                                                ? 'bg-slate-200/90 text-slate-800 font-bold border border-slate-300'
-                                                                : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
-                                                    }`}
-                                                >
-                                                    {isOwner ? (
-                                                        <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-600'}`} />
-                                                    ) : (
-                                                        <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-200' : 'text-gray-400'}`} />
-                                                    )}
-                                                    <span className="truncate">{f.folio_number}</span>
-                                                </button>
+                                                {/* Sub-Folio Pills nested under this Room */}
+                                                <div className="space-y-1 pl-4">
+                                                    {group.folios.map((f) => {
+                                                        const isChecked = selectedRoomFolioIds.includes(f.id);
+                                                        const isOwner = Boolean(ownerFolio && String(f.id) === String(ownerFolio.id));
+                                                        const isActive = String(f.id) === String(activeFolioId);
+
+                                                        return (
+                                                            <div key={f.id} className="flex items-center gap-1.5">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={() => handleToggleSelectRoomFolio(f.id)}
+                                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer shrink-0"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onSelectFolio(f.id)}
+                                                                    className={`flex-1 min-w-0 text-left py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer shadow-2xs ${
+                                                                        isActive
+                                                                            ? 'bg-[#1e3a8a] text-white font-bold'
+                                                                            : isOwner
+                                                                                ? 'bg-slate-200/90 text-slate-800 font-bold border border-slate-300'
+                                                                                : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
+                                                                    }`}
+                                                                >
+                                                                    {isOwner ? (
+                                                                        <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-600'}`} />
+                                                                    ) : (
+                                                                        <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-200' : 'text-gray-400'}`} />
+                                                                    )}
+                                                                    <span className="truncate">{f.folio_number}</span>
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -662,49 +730,58 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         <ChevronDown size={14} className="text-blue-500 shrink-0" />
                     </div>
 
-                    {/* Room Level Sub-header */}
-                    <div className="pl-2 pt-1 space-y-1">
-                        <div className="text-gray-700 font-medium text-[11px] flex items-center justify-between py-1 px-1.5 rounded hover:bg-gray-50">
-                            <div className="flex items-center gap-1.5 truncate">
-                                <DoorClosed size={13} className="text-gray-500 shrink-0" />
-                                <span className="truncate">{roomNumber} ({allFolios.length} folio{allFolios.length > 1 ? 's' : ''})</span>
-                            </div>
-                            <ChevronDown size={12} className="text-gray-400 shrink-0" />
-                        </div>
+                    {/* Room Level Sub-headers & Folio Pills (Grouped by Room) */}
+                    <div className="space-y-2 pt-1">
+                        {foliosByRoom.map((group) => (
+                            <div key={group.roomNumber} className="pl-1 space-y-1">
+                                <div className="text-gray-700 font-medium text-[11px] flex items-center justify-between py-1 px-1.5 rounded hover:bg-gray-50">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                        <DoorClosed size={13} className="text-gray-500 shrink-0" />
+                                        <span className="truncate">{group.roomNumber} ({group.folios.length} folio{group.folios.length > 1 ? 's' : ''})</span>
+                                    </div>
+                                    {group.isOwnerRoom && (
+                                        <span className="ml-auto mr-1 text-[9px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-bold">
+                                            Owner
+                                        </span>
+                                    )}
+                                    <ChevronDown size={12} className="text-gray-400 shrink-0" />
+                                </div>
 
-                        {/* Folio Pills (Active & Inactive) */}
-                        <div className="space-y-1 pl-2">
-                            {allFolios.map((f) => {
-                                const isOwner = Boolean(ownerFolio && String(f.id) === String(ownerFolio.id));
-                                const isActive = String(f.id) === String(activeFolioId);
-                                return (
-                                    <button
-                                        key={f.id}
-                                        type="button"
-                                        onClick={() => onSelectFolio(f.id)}
-                                        className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-                                            isActive
-                                                ? 'bg-blue-600 text-white font-bold'
-                                                : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
-                                        }`}
-                                    >
-                                        {isOwner ? (
-                                            <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-500'}`} />
-                                        ) : (
-                                            <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-100' : 'text-gray-400'}`} />
-                                        )}
-                                        <span className="truncate">{f.folio_number}</span>
-                                        {isOwner && (
-                                            <span className={`ml-auto text-[9px] px-1 py-0.2 rounded font-bold ${
-                                                isActive ? 'bg-blue-500/80 text-amber-200 border border-amber-300/40' : 'bg-amber-100 text-amber-800'
-                                            }`}>
-                                                Owner
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                {/* Folio Pills (Active & Inactive) */}
+                                <div className="space-y-1 pl-2">
+                                    {group.folios.map((f) => {
+                                        const isOwner = Boolean(ownerFolio && String(f.id) === String(ownerFolio.id));
+                                        const isActive = String(f.id) === String(activeFolioId);
+                                        return (
+                                            <button
+                                                key={f.id}
+                                                type="button"
+                                                onClick={() => onSelectFolio(f.id)}
+                                                className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                                                    isActive
+                                                        ? 'bg-blue-600 text-white font-bold'
+                                                        : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
+                                                }`}
+                                            >
+                                                {isOwner ? (
+                                                    <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-500'}`} />
+                                                ) : (
+                                                    <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-100' : 'text-gray-400'}`} />
+                                                )}
+                                                <span className="truncate">{f.folio_number}</span>
+                                                {isOwner && (
+                                                    <span className={`ml-auto text-[9px] px-1 py-0.2 rounded font-bold ${
+                                                        isActive ? 'bg-blue-500/80 text-amber-200 border border-amber-300/40' : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                        Owner
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
