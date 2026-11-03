@@ -15,6 +15,8 @@ import { TabAuditTrail } from './tabs/TabAuditTrail';
 import { AddChargeModal } from './modals/AddChargeModal';
 import { ApplyDiscountModal } from './modals/ApplyDiscountModal';
 import { AddPaymentModal } from './modals/AddPaymentModal';
+import { NewFolioModal } from './modals/NewFolioModal';
+import { RouteFolioModal } from './modals/RouteFolioModal';
 import { AdjustmentPostingModal } from './modals/AdjustmentPostingModal';
 import { TransferChargesModal } from './modals/TransferChargesModal';
 import { SplitFolioModal } from './modals/SplitFolioModal';
@@ -52,6 +54,9 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     const [errorMsg, setErrorMsg] = useState<string>('');
 
     // Modal Control States
+    const [isNewFolioOpen, setIsNewFolioOpen] = useState(false);
+    const [isRouteFolioOpen, setIsRouteFolioOpen] = useState(false);
+    const [successBannerMsg, setSuccessBannerMsg] = useState('');
     const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
     const [isAddChargeOpen, setIsAddChargeOpen] = useState(false);
     const [isApplyDiscountOpen, setIsApplyDiscountOpen] = useState(false);
@@ -414,6 +419,23 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 </div>
             )}
 
+            {/* Black Pill Toast Banner matching Screenshot 009f9d7b.png */}
+            {successBannerMsg && (
+                <div className="bg-slate-800 text-white px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center justify-center gap-2 shadow-md mx-auto animate-in fade-in zoom-in-95 duration-150">
+                    <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold">
+                        ✓
+                    </span>
+                    <span>{successBannerMsg}</span>
+                    <button
+                        type="button"
+                        onClick={() => setSuccessBannerMsg('')}
+                        className="text-gray-400 hover:text-white text-xs ml-1 cursor-pointer"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
             {/* 1. Horizon Summary Banner & Sub-Tabs Navigation */}
             <HorizonSummaryBanner
                 folio={activeFolio}
@@ -435,6 +457,8 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         allFolios={folios}
                         activeFolioId={activeFolioId}
                         onSelectFolio={setActiveFolioId}
+                        onOpenNewFolio={() => setIsNewFolioOpen(true)}
+                        onOpenRouteFolio={() => setIsRouteFolioOpen(true)}
                         onOpenAddPayment={() => {
                             setIsAddPaymentOpen(true);
                             if (onOpenAddPayment) onOpenAddPayment();
@@ -488,6 +512,35 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
             </div>
 
             {/* 3. Sub-Modal Suite */}
+            <NewFolioModal
+                isOpen={isNewFolioOpen}
+                onClose={() => setIsNewFolioOpen(false)}
+                currentFolio={activeFolio}
+                booking={booking}
+                allFolios={folios}
+                onSuccess={(createdFolio) => {
+                    setSuccessBannerMsg('New folio has been created for selected guest.');
+                    fetchFolioData();
+                    if (createdFolio?.id) {
+                        setFolios(prev => [...prev.filter(f => f.id !== createdFolio.id), createdFolio]);
+                        setActiveFolioId(createdFolio.id);
+                    }
+                    setTimeout(() => setSuccessBannerMsg(''), 4500);
+                }}
+            />
+
+            <RouteFolioModal
+                isOpen={isRouteFolioOpen}
+                onClose={() => setIsRouteFolioOpen(false)}
+                currentFolio={activeFolio}
+                allFolios={folios}
+                onSuccess={(msg) => {
+                    setSuccessBannerMsg(msg || 'Folio routing rule saved successfully.');
+                    fetchFolioData();
+                    setTimeout(() => setSuccessBannerMsg(''), 4500);
+                }}
+            />
+
             <AddPaymentModal
                 isOpen={isAddPaymentOpen}
                 onClose={() => setIsAddPaymentOpen(false)}

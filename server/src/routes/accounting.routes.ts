@@ -347,6 +347,209 @@ router.get('/folios/:id', async (req: Request, res: Response) => {
     }
 });
 
+// POST /api/accounting/folios - Create a New Sub-Folio for Guest / Reservation (matching Screenshot 1908f04f.png)
+router.post('/folios', async (req: Request, res: Response) => {
+    try {
+        const {
+            reservationId,
+            reservationNumber,
+            sharer,
+            gstin,
+            showTaxOnPrintedFolio = true,
+            generateInvoiceOnCheckout = false,
+            roomNumber,
+            userName = 'Front Desk'
+        } = req.body;
+
+        let resId: any = reservationId;
+        let resRecord: any = null;
+
+        if (reservationId || reservationNumber) {
+            resRecord = await db.prepare(`
+                SELECT * FROM reservations
+                WHERE id::text = ? OR UPPER(reservation_number) = UPPER(?) OR reservation_number ILIKE ?
+                LIMIT 1
+            `).get(
+                reservationId || '',
+                reservationNumber || '',
+                `%${(reservationNumber || reservationId || '').replace(/^(res|fol)[-_~]/i, '')}%`
+            ) as any;
+
+            if (resRecord) {
+                resId = resRecord.id;
+            }
+        }
+
+        const guestName = (sharer || resRecord?.guest_name || 'Valued Guest').trim();
+        const cleanName = guestName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim() || guestName;
+
+        // Generate next sequential folio number (e.g. "79 - Ms. Jobel Yubos")
+        const maxIdResult = await db.prepare(`SELECT MAX(id) as max_id FROM folios`).get() as any;
+        const nextNum = (maxIdResult?.max_id || 70) + 1;
+        const folioNumber = `${nextNum} - ${guestName}`;
+
+        const insertRes = await db.prepare(`
+            INSERT INTO folios (
+                reservation_id, folio_number, folio_type, status, balance,
+                bill_to, gstin_number, generate_invoice_on_checkout
+            )
+            VALUES (?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, ?)
+            RETURNING *
+        `).run(
+            resId,
+            folioNumber,
+            guestName,
+            gstin || '',
+            generateInvoiceOnCheckout ? 1 : 0
+        ) as any;
+
+        const newFolioId = insertRes?.lastInsertRowid || insertRes?.id || nextNum;
+
+        // Audit Trail Log
+        try {
+            await db.prepare(`
+                INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+                VALUES (?, ?, 'FOLIO_CREATED', ?, ?)
+            `).run(
+                newFolioId,
+                resId,
+                `New sub-folio [${folioNumber}] created for selected guest`,
+                userName
+            );
+        } catch {
+            // Audit log optional
+        }
+
+        res.json({
+            success: true,
+            message: 'New folio has been created for selected guest.',
+            data: {
+                id: newFolioId,
+                folio_number: folioNumber,
+                reservation_id: resId,
+                status: 'OPEN',
+                balance: 0,
+                guest_name: cleanName,
+                room_number: roomNumber || resRecord?.room_number || '',
+                bill_to: guestName,
+                gstin: gstin || '',
+                show_tax_on_printed_folio: showTaxOnPrintedFolio,
+                generate_invoice_on_checkout: generateInvoiceOnCheckout,
+                charges: [],
+                payments: [],
+                summary: {
+                    totalCharges: 0,
+                    totalPaid: 0,
+                    totalDiscount: 0,
+                    dueAmount: 0
+                }
+            }
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to create new folio' });
+    }
+});
+
+// POST /api/accounting/folios/route - Configure Folio Routing (Extra Charges & Taxes to separate folio, matching Screenshot be874197.png)
+router.post('/folios/route', async (req: Request, res: Response) => {
+    try {
+        const {
+            sourceFolioId,
+            destFolioId,
+            scope = 'ALL_FOLIOS',
+            routeRoomCharges = false,
+            routeInclusions = false,
+            routeAllExtraCharges = false,
+            routedExtraCharges = [],
+            userName = 'Front Desk'
+        } = req.body;
+
+        const sourceFolio = await findFolioByIdOrRef(sourceFolioId);
+        const destFolio = await findFolioByIdOrRef(destFolioId);
+
+        if (!sourceFolio || !destFolio) {
+            return res.status(404).json({ success: false, error: 'Source or destination folio not found' });
+        }
+
+        const sId = Number(sourceFolio.id);
+        const dId = Number(destFolio.id);
+
+        if (sId === dId) {
+            return res.status(400).json({ success: false, error: 'Source and destination folios cannot be the same' });
+        }
+
+        // Move existing matching charges from source to destination folio
+        const existingCharges = await db.prepare(`
+            SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)
+        `).all(sId) as any[];
+
+        let movedCount = 0;
+        let movedSum = 0;
+
+        for (const c of existingCharges) {
+            const head = (c.revenue_head || '').trim().toLowerCase();
+            const desc = (c.description || '').trim().toLowerCase();
+            const code = (c.charge_code || '').trim().toLowerCase();
+            const isRoom = code === 'room_chg' || head.includes('room charge') || head.includes('room tariff');
+            const isInclusion = head.includes('inclusion') || code.includes('inclusion');
+
+            let shouldMove = false;
+
+            if (routeRoomCharges && isRoom) {
+                shouldMove = true;
+            } else if (routeInclusions && isInclusion) {
+                shouldMove = true;
+            } else if (routeAllExtraCharges && !isRoom) {
+                shouldMove = true;
+            } else if (Array.isArray(routedExtraCharges) && routedExtraCharges.length > 0) {
+                const matchFound = routedExtraCharges.some(extra => {
+                    const extraLower = extra.trim().toLowerCase();
+                    return head === extraLower || desc.includes(extraLower) || head.includes(extraLower);
+                });
+                if (matchFound) {
+                    shouldMove = true;
+                }
+            }
+
+            if (shouldMove) {
+                const amt = Number(c.total_amount || c.amount || 0);
+                await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(dId, c.id);
+                movedCount++;
+                movedSum += amt;
+            }
+        }
+
+        if (movedSum > 0) {
+            await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedSum, sId);
+            await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedSum, dId);
+        }
+
+        // Log audit trail
+        try {
+            await db.prepare(`
+                INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+                VALUES (?, ?, 'FOLIO_ROUTING_CONFIGURED', ?, ?)
+            `).run(
+                sId,
+                sourceFolio.reservation_id,
+                `Folio routing configured: ${movedCount} extra charge(s) routed to [${destFolio.folio_number}].`,
+                userName
+            );
+        } catch {}
+
+        res.json({
+            success: true,
+            message: `Folio routing rule saved successfully. ${movedCount > 0 ? `${movedCount} charge(s) routed to ${destFolio.folio_number}.` : ''}`,
+            sourceFolioId: sId,
+            destFolioId: dId,
+            movedCount,
+            movedAmount: movedSum
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to configure folio routing' });
+    }
+});
+
 // POST /api/accounting/folios/:id/charges - Post a charge to Folio with Tax & Discount calculation
 router.post('/folios/:id/charges', async (req: Request, res: Response) => {
     try {

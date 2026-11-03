@@ -34,6 +34,8 @@ interface TabFolioOperationsProps {
     onOpenAdjustments: () => void;
     onOpenTransfer: () => void;
     onOpenSplitFolio: () => void;
+    onOpenNewFolio?: () => void;
+    onOpenRouteFolio?: () => void;
     onOpenTaxExemption?: () => void;
     onRefresh?: () => void;
     onOpenVoid: (type: 'charge' | 'payment', id: number | string, desc: string, amt: number) => void;
@@ -51,6 +53,8 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     onOpenAdjustments,
     onOpenTransfer,
     onOpenSplitFolio,
+    onOpenNewFolio,
+    onOpenRouteFolio,
     onOpenTaxExemption,
     onRefresh,
     onOpenVoid
@@ -353,8 +357,8 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => onOpenSplitFolio()}
-                            title="Add Folio"
+                            onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
+                            title="New Folio"
                             className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold"
                         >
                             <Plus size={13} />
@@ -583,10 +587,14 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setToastMessage({
-                                        type: 'success',
-                                        text: 'Folio routing rules configured for this group.'
-                                    });
+                                    if (onOpenRouteFolio) {
+                                        onOpenRouteFolio();
+                                    } else {
+                                        setToastMessage({
+                                            type: 'success',
+                                            text: 'Folio routing rules configured for this group.'
+                                        });
+                                    }
                                 }}
                                 className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-semibold rounded py-2 px-3 text-xs shadow-xs transition-colors cursor-pointer"
                             >
@@ -709,8 +717,8 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     <div className="flex items-center gap-2 shrink-0 pb-1">
                         <button
                             type="button"
-                            onClick={() => onOpenSplitFolio()}
-                            title="Add Folio"
+                            onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
+                            title="New Folio"
                             className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold"
                         >
                             <Plus size={13} />
