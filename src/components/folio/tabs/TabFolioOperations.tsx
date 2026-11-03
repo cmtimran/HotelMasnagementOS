@@ -18,7 +18,10 @@ import {
     RefreshCw,
     FileText,
     MoreVertical,
-    AlertTriangle
+    AlertTriangle,
+    EyeOff,
+    List,
+    Layers
 } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
@@ -68,6 +71,12 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     const [expandedRowIds, setExpandedRowIds] = useState<Array<number | string>>([]);
     const [selectedItemIds, setSelectedItemIds] = useState<Array<number | string>>([]);
     const [openRowActionId, setOpenRowActionId] = useState<number | string | null>(null);
+
+    // Ledger View Controls (Matching media_1793667186222_9c97dd2d.png)
+    const [statusFilter, setStatusFilter] = useState<'all' | 'posted' | 'unposted'>('all');
+    const [hideVoided, setHideVoided] = useState<boolean>(false);
+    const [isGroupedView, setIsGroupedView] = useState<boolean>(false);
+    const [isCompactView, setIsCompactView] = useState<boolean>(false);
 
     // Operations View States (matching Screenshots 9d2019f2.png & 605bdfde.png)
     const [selectedRoomFolioIds, setSelectedRoomFolioIds] = useState<Array<number | string>>([]);
@@ -347,6 +356,9 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         }> = [];
 
         folio?.charges?.forEach((c) => {
+            const isFutureCharge = Boolean(c.charge_date && new Date(c.charge_date).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0));
+            const chargeStatus = c.is_voided ? 'Voided' : (c.status || (isFutureCharge ? 'Unposted' : 'Posted'));
+
             list.push({
                 id: c.id,
                 type: 'charge',
@@ -355,7 +367,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                 revenueHead: c.revenue_head || 'Room Charges',
                 description: c.description || 'Charge',
                 user: c.user_name || 'Front Desk',
-                status: c.status || (c.is_voided ? 'Voided' : 'Posted'),
+                status: chargeStatus,
                 amount: Number(c.total_amount || c.amount || 0),
                 isVoided: Boolean(c.is_voided),
                 discountAmount: Number(c.discount_amount || 0),
@@ -397,6 +409,36 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     const selectedChargeToVoid = useMemo(() => {
         return ledgerItems.find(i => selectedItemIds.includes(i.id) && !i.isVoided && i.type === 'charge');
     }, [ledgerItems, selectedItemIds]);
+
+    // Filtered ledger items based on Unposted/Posted status filter and Hide Voided toggle
+    const filteredLedgerItems = useMemo(() => {
+        let items = ledgerItems;
+        if (hideVoided) {
+            items = items.filter(i => !i.isVoided);
+        }
+        if (statusFilter === 'posted') {
+            items = items.filter(i => i.status === 'Posted' || i.status === 'Settled');
+        } else if (statusFilter === 'unposted') {
+            items = items.filter(i => i.status === 'Unposted');
+        }
+        return items;
+    }, [ledgerItems, hideVoided, statusFilter]);
+
+    // Grouped ledger items by Revenue Head for Consolidated / Layers view
+    const groupedLedgerItems = useMemo(() => {
+        if (!isGroupedView) return null;
+        const map = new Map<string, typeof filteredLedgerItems>();
+        filteredLedgerItems.forEach(item => {
+            const head = item.revenueHead || 'General Charges';
+            if (!map.has(head)) map.set(head, []);
+            map.get(head)!.push(item);
+        });
+        return Array.from(map.entries()).map(([head, items]) => ({
+            revenueHead: head,
+            items,
+            subTotal: items.reduce((sum, i) => sum + (i.isVoided ? 0 : (i.type === 'payment' ? -i.amount : i.amount)), 0)
+        }));
+    }, [filteredLedgerItems, isGroupedView]);
 
     // =========================================================================
     // VIEW MODE 2: FOLIO OPERATIONS VIEW (Matching Screenshot 9d2019f2.png & 605bdfde.png)
@@ -723,6 +765,181 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     // =========================================================================
     // VIEW MODE 1: STANDARD LEDGER VIEW (Matching Screenshot d529d73d.png)
     // =========================================================================
+    const renderLedgerRow = (item: typeof ledgerItems[0]) => {
+        const isExpanded = expandedRowIds.includes(item.id);
+        const isChecked = selectedItemIds.includes(item.id);
+        const cellPy = isCompactView ? 'py-1' : 'py-1.5';
+
+        return (
+            <React.Fragment key={`${item.type}-${item.id}`}>
+                <tr className={`hover:bg-gray-50/80 transition-colors ${isChecked ? 'bg-blue-50/40' : item.isVoided ? 'bg-rose-50/15' : ''}`}>
+                    {/* Expand + / - and Checkbox */}
+                    <td className={`${cellPy} px-2 text-center`}>
+                        <div className="flex items-center gap-1.5">
+                            {item.type === 'charge' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => toggleRowExpand(item.id)}
+                                    className="w-4 h-4 rounded text-gray-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center font-bold text-xs cursor-pointer"
+                                >
+                                    {isExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                                </button>
+                            ) : (
+                                <span className="w-4" />
+                            )}
+                            <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectItem(item.id)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
+                            />
+                        </div>
+                    </td>
+
+                    <td className={`${cellPy} px-2.5 font-mono text-[11px] text-gray-600`}>{item.date}</td>
+                    <td className={`${cellPy} px-2 font-mono text-[11px] text-gray-700`}>{item.refNo}</td>
+                    <td className={`${cellPy} px-2.5 font-medium text-gray-800`}>{item.revenueHead}</td>
+                    <td className={`${cellPy} px-3 truncate max-w-[200px]`}>
+                        <span className={item.isVoided ? 'line-through text-gray-400' : 'text-gray-700'}>
+                            {item.description}
+                        </span>
+                        {item.isVoided && item.rawItem?.void_reason && (
+                            <span className="ml-1.5 text-[10px] text-rose-600 italic">
+                                ({item.rawItem.void_reason})
+                            </span>
+                        )}
+                    </td>
+                    <td className={`${cellPy} px-2.5 text-gray-600 text-[11px]`}>{item.user}</td>
+                    <td className={`${cellPy} px-2`}>
+                        {item.status === 'Posted' && (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-1.5 py-0.2 rounded">
+                                Posted
+                            </span>
+                        )}
+                        {item.status === 'Unposted' && (
+                            <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold px-1.5 py-0.2 rounded">
+                                Unposted
+                            </span>
+                        )}
+                        {item.status === 'Voided' && (
+                            <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold px-1.5 py-0.2 rounded">
+                                Voided
+                            </span>
+                        )}
+                        {item.status !== 'Posted' && item.status !== 'Unposted' && item.status !== 'Voided' && (
+                            <span className="text-gray-400 font-mono">-</span>
+                        )}
+                    </td>
+                    <td className={`${cellPy} px-2.5 text-right font-mono text-xs ${
+                        item.isVoided
+                            ? 'line-through text-gray-400'
+                            : item.type === 'payment' || item.amount < 0
+                                ? 'text-emerald-600 font-bold'
+                                : 'text-rose-600 font-bold'
+                    }`}>
+                        {Math.abs(item.amount).toFixed(2)}
+                    </td>
+                    <td className={`${cellPy} px-2 text-center`}>
+                        {item.type === 'payment' ? (
+                            <button
+                                type="button"
+                                title="View Payment Receipt"
+                                className="text-blue-600 hover:text-blue-800 cursor-pointer inline-flex items-center justify-center"
+                            >
+                                <Eye size={13} />
+                            </button>
+                        ) : (
+                            <span className="text-gray-300">-</span>
+                        )}
+                    </td>
+
+                    {/* Row Action Menu ⋮ (Yanolja PMS Folio Operations) */}
+                    <td className={`${cellPy} px-2 text-center relative`}>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenRowActionId(openRowActionId === item.id ? null : item.id);
+                            }}
+                            className="w-5 h-5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                            title="Actions"
+                        >
+                            <MoreVertical size={13} />
+                        </button>
+                        {openRowActionId === item.id && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setOpenRowActionId(null)} />
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 text-left animate-in fade-in zoom-in-95 duration-100">
+                                    {item.isVoided ? (
+                                        <div className="px-3 py-1.5 text-[11px] text-gray-500 italic">
+                                            Voided: {item.rawItem?.void_reason || 'Reversed'}
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setOpenRowActionId(null);
+                                                onOpenVoid(item.type, item.id, item.description, item.amount);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
+                                        >
+                                            <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                                            <span>Void {item.type === 'charge' ? 'Extra Charge' : 'Payment'}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </td>
+                </tr>
+
+                {/* Expanded Tax Breakdown Accordion Row */}
+                {isExpanded && item.type === 'charge' && (
+                    <tr className="bg-blue-50/20 border-b border-blue-100/80">
+                        <td colSpan={10} className="px-8 py-2.5 text-xs font-mono">
+                            <div className="bg-white border border-blue-200/80 rounded-lg p-2.5 space-y-1.5 shadow-2xs max-w-xl">
+                                {item.isVoided && (
+                                    <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded p-2 text-[11px] mb-2 flex items-center justify-between">
+                                        <span className="font-bold flex items-center gap-1">
+                                            <AlertTriangle size={12} className="text-rose-600" />
+                                            Void Reason:
+                                        </span>
+                                        <span className="italic">{item.rawItem?.void_reason || 'Reversed by Front Desk'}</span>
+                                    </div>
+                                )}
+                                {item.discountAmount > 0 && (
+                                    <div className="flex items-center justify-between text-gray-600 text-[11px]">
+                                        <span>Discount Amount:</span>
+                                        <span>{item.discountAmount.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                                    <span>(+) Service Charge (10%):</span>
+                                    <span>{item.serviceCharge.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                                    <span>(+) VAT (15%):</span>
+                                    <span>{item.vat.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                                    <span>(+) CITY TAX (1%):</span>
+                                    <span>{item.cityTax.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-gray-700 font-semibold text-[11px] border-t border-gray-100 pt-1">
+                                    <span>Total Tax:</span>
+                                    <span>{item.totalTax.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-blue-700 font-bold border-t border-blue-100 pt-1 text-xs">
+                                    <span>GRAND TOTAL (NET AMOUNT):</span>
+                                    <span>{currency} {item.totalAmount.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                )}
+            </React.Fragment>
+        );
+    };
     return (
         <div className="w-full flex gap-3 h-full flex-1 min-h-0 select-none text-gray-800 overflow-hidden">
             {/* LEFT SIDEBAR: Room / Folio Hierarchical Tree & Balance Summary */}
@@ -817,117 +1034,201 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
             {/* RIGHT MAIN: Action Bar + Middle Scrolling Transaction Table + Pinned Bottom Due Amount */}
             <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden h-full">
                 <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
-                    {/* Action Bar matching Screenshot d529d73d.png */}
-                    <div className="flex items-center gap-2 shrink-0 pb-1">
-                        <button
-                            type="button"
-                            onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
-                            title="New Folio"
-                            className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold"
-                        >
-                            <Plus size={13} />
-                        </button>
-
-                        {/* Add Payment Button (matching Screenshot d529d73d.png) */}
-                        {onOpenAddPayment && (
+                    {/* Action Bar matching Screenshot d529d73d.png & media_1793667186222_9c97dd2d.png */}
+                    <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 flex-wrap">
+                        {/* Left Action Buttons */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
                             <button
                                 type="button"
-                                onClick={onOpenAddPayment}
-                                className="bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                                onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
+                                title="New Folio"
+                                className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold"
                             >
-                                <CreditCard size={12} className="text-emerald-600" />
-                                <span>Add Payment</span>
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={onOpenAddCharge}
-                            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                        >
-                            Add Charges
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={onOpenAddDiscount}
-                            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                        >
-                            Apply Discount
-                        </button>
-
-                        {/* Folio Operations Button (Box 4 in d529d73d.png) */}
-                        <button
-                            type="button"
-                            onClick={() => setViewMode('operations')}
-                            className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-3 py-1 text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                            <Settings2 size={12} className="text-amber-700" />
-                            <span>Folio Operations</span>
-                        </button>
-
-                        {/* More Actions Dropdown (Adjustments, Transfer, Split Folio) */}
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
-                                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                                <span>More</span>
-                                <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
+                                <Plus size={13} />
                             </button>
 
-                            {isMoreDropdownOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setIsMoreDropdownOpen(false)} />
-                                    <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
-                                        <button
-                                            type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenAdjustments(); }}
-                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <Sliders size={13} className="text-gray-400" />
-                                            <span>Adjustments</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenTransfer(); }}
-                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <ArrowRightLeft size={13} className="text-gray-400" />
-                                            <span>Transfer</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenSplitFolio(); }}
-                                            className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <Scissors size={13} className="text-gray-400" />
-                                            <span>Split Folio</span>
-                                        </button>
-                                    </div>
-                                </>
+                            {/* Add Payment Button (matching Screenshot d529d73d.png) */}
+                            {onOpenAddPayment && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenAddPayment}
+                                    className="bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                    <CreditCard size={12} className="text-emerald-600" />
+                                    <span>Add Payment</span>
+                                </button>
                             )}
+
+                            <button
+                                type="button"
+                                onClick={onOpenAddCharge}
+                                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                            >
+                                Add Charges
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onOpenAddDiscount}
+                                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                            >
+                                Apply Discount
+                            </button>
+
+                            {/* Folio Operations Button (Box 4 in d529d73d.png) */}
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('operations')}
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-2.5 py-1 text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                                <Settings2 size={12} className="text-amber-700" />
+                                <span>Folio Operations</span>
+                            </button>
+
+                            {/* More Actions Dropdown (Adjustments, Transfer, Split Folio) */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
+                                    className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                    <span>More</span>
+                                    <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isMoreDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsMoreDropdownOpen(false)} />
+                                        <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenAdjustments(); }}
+                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <Sliders size={13} className="text-gray-400" />
+                                                <span>Adjustments</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenTransfer(); }}
+                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <ArrowRightLeft size={13} className="text-gray-400" />
+                                                <span>Transfer</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsMoreDropdownOpen(false); onOpenSplitFolio(); }}
+                                                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <Scissors size={13} className="text-gray-400" />
+                                                <span>Split Folio</span>
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                disabled={!selectedChargeToVoid}
+                                onClick={() => {
+                                    if (selectedChargeToVoid) {
+                                        onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
+                                    }
+                                }}
+                                title={
+                                    selectedItemIds.length > 0 && !selectedChargeToVoid
+                                        ? 'Selected entry is already voided or is a payment'
+                                        : 'Void selected extra charge'
+                                }
+                                className="bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 border border-gray-300 disabled:opacity-40 rounded px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
+                            >
+                                <AlertTriangle size={12} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
+                                <span>Void Charge</span>
+                            </button>
                         </div>
 
-                        <button
-                            type="button"
-                            disabled={!selectedChargeToVoid}
-                            onClick={() => {
-                                if (selectedChargeToVoid) {
-                                    onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
-                                }
-                            }}
-                            title={
-                                selectedItemIds.length > 0 && !selectedChargeToVoid
-                                    ? 'Selected entry is already voided or is a payment'
-                                    : 'Void selected extra charge'
-                            }
-                            className="bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 border border-gray-300 disabled:opacity-40 rounded px-3 py-1 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
-                        >
-                            <AlertTriangle size={12} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
-                            <span>Void Charge</span>
-                        </button>
+                        {/* Right: Legend & View Toolbar Controls (Matching media_1793667186222_9c97dd2d.png) */}
+                        <div className="flex items-center gap-2.5 ml-auto shrink-0 select-none">
+                            {/* Unposted Indicator / Filter Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter(prev => prev === 'unposted' ? 'all' : 'unposted')}
+                                title="Click to filter by Unposted transactions"
+                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer ${
+                                    statusFilter === 'unposted'
+                                        ? 'bg-amber-100/90 text-amber-900 font-bold ring-1 ring-amber-400 shadow-2xs'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                }`}
+                            >
+                                <span className="w-2.5 h-2.5 rounded-xs bg-[#f59e0b] shadow-2xs shrink-0" />
+                                <span className="text-[11.5px] font-medium">Unposted</span>
+                            </button>
+
+                            {/* Posted Indicator / Filter Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter(prev => prev === 'posted' ? 'all' : 'posted')}
+                                title="Click to filter by Posted transactions"
+                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer ${
+                                    statusFilter === 'posted'
+                                        ? 'bg-gray-200 text-gray-900 font-bold ring-1 ring-gray-400 shadow-2xs'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                }`}
+                            >
+                                <span className="w-2.5 h-2.5 rounded-xs bg-[#6b7280] shadow-2xs shrink-0" />
+                                <span className="text-[11.5px] font-medium">Posted</span>
+                            </button>
+
+                            {/* Divider */}
+                            <div className="h-3.5 w-px bg-gray-300 mx-0.5" />
+
+                            {/* 3 Icon Buttons */}
+                            <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200/90 rounded-md p-0.5 shadow-2xs">
+                                {/* List / Density Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCompactView(!isCompactView)}
+                                    title={isCompactView ? 'Switch to Standard List View' : 'Switch to Compact List View'}
+                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                        isCompactView
+                                            ? 'bg-white text-blue-600 shadow-xs font-bold ring-1 ring-blue-300'
+                                            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
+                                    }`}
+                                >
+                                    <List size={13} />
+                                </button>
+
+                                {/* Show / Hide Voided Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => setHideVoided(!hideVoided)}
+                                    title={hideVoided ? 'Show Voided Transactions' : 'Hide Voided Transactions'}
+                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                        hideVoided
+                                            ? 'bg-rose-100 text-rose-700 shadow-xs font-bold ring-1 ring-rose-300'
+                                            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
+                                    }`}
+                                >
+                                    {hideVoided ? <EyeOff size={13} /> : <Eye size={13} />}
+                                </button>
+
+                                {/* Group / Consolidated View by Revenue Head */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsGroupedView(!isGroupedView)}
+                                    title={isGroupedView ? 'Switch to Chronological Ledger View' : 'Group by Revenue Head (Consolidated View)'}
+                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                        isGroupedView
+                                            ? 'bg-white text-indigo-600 shadow-xs font-bold ring-1 ring-indigo-300'
+                                            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
+                                    }`}
+                                >
+                                    <Layers size={13} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Transaction Ledger Table - ONLY MIDDLE SCROLLS */}
@@ -948,182 +1249,31 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {ledgerItems.length === 0 ? (
+                                {filteredLedgerItems.length === 0 ? (
                                     <tr>
                                         <td colSpan={10} className="py-12 text-center text-gray-400">
-                                            No charges or payments recorded yet for this folio.
+                                            {statusFilter !== 'all' || hideVoided
+                                                ? 'No transactions matching active filter criteria.'
+                                                : 'No charges or payments recorded yet for this folio.'}
                                         </td>
                                     </tr>
+                                ) : isGroupedView && groupedLedgerItems ? (
+                                    groupedLedgerItems.map(group => (
+                                        <React.Fragment key={group.revenueHead}>
+                                            <tr className="bg-slate-100/90 border-y border-slate-200 text-slate-800 font-bold text-[11px]">
+                                                <td colSpan={7} className="py-1.5 px-3 uppercase tracking-wide">
+                                                    {group.revenueHead} ({group.items.length})
+                                                </td>
+                                                <td className="py-1.5 px-2.5 text-right font-mono font-bold text-xs">
+                                                    {currency} {group.subTotal.toFixed(2)}
+                                                </td>
+                                                <td colSpan={2} />
+                                            </tr>
+                                            {group.items.map(item => renderLedgerRow(item))}
+                                        </React.Fragment>
+                                    ))
                                 ) : (
-                                    ledgerItems.map((item) => {
-                                        const isExpanded = expandedRowIds.includes(item.id);
-                                        const isChecked = selectedItemIds.includes(item.id);
-
-                                        return (
-                                            <React.Fragment key={`${item.type}-${item.id}`}>
-                                                <tr className={`hover:bg-gray-50/80 transition-colors ${isChecked ? 'bg-blue-50/40' : item.isVoided ? 'bg-rose-50/15' : ''}`}>
-                                                    {/* Expand + / - and Checkbox */}
-                                                    <td className="py-1.5 px-2 text-center">
-                                                        <div className="flex items-center gap-1.5">
-                                                            {item.type === 'charge' ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => toggleRowExpand(item.id)}
-                                                                    className="w-4 h-4 rounded text-gray-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center font-bold text-xs cursor-pointer"
-                                                                >
-                                                                    {isExpanded ? <Minus size={11} /> : <Plus size={11} />}
-                                                                </button>
-                                                            ) : (
-                                                                <span className="w-4" />
-                                                            )}
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isChecked}
-                                                                onChange={() => toggleSelectItem(item.id)}
-                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
-                                                            />
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="py-1.5 px-2.5 font-mono text-[11px] text-gray-600">{item.date}</td>
-                                                    <td className="py-1.5 px-2 font-mono text-[11px] text-gray-700">{item.refNo}</td>
-                                                    <td className="py-1.5 px-2.5 font-medium text-gray-800">{item.revenueHead}</td>
-                                                    <td className="py-1.5 px-3 truncate max-w-[200px]">
-                                                        <span className={item.isVoided ? 'line-through text-gray-400' : 'text-gray-700'}>
-                                                            {item.description}
-                                                        </span>
-                                                        {item.isVoided && item.rawItem?.void_reason && (
-                                                            <span className="ml-1.5 text-[10px] text-rose-600 italic">
-                                                                ({item.rawItem.void_reason})
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-1.5 px-2.5 text-gray-600 text-[11px]">{item.user}</td>
-                                                    <td className="py-1.5 px-2">
-                                                        {item.status === 'Posted' && (
-                                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-1.5 py-0.2 rounded">
-                                                                Posted
-                                                            </span>
-                                                        )}
-                                                        {item.status === 'Voided' && (
-                                                            <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold px-1.5 py-0.2 rounded">
-                                                                Voided
-                                                            </span>
-                                                        )}
-                                                        {item.status !== 'Posted' && item.status !== 'Voided' && (
-                                                            <span className="text-gray-400 font-mono">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className={`py-1.5 px-2.5 text-right font-mono text-xs ${
-                                                        item.isVoided
-                                                            ? 'line-through text-gray-400'
-                                                            : item.type === 'payment' || item.amount < 0
-                                                                ? 'text-emerald-600 font-bold'
-                                                                : 'text-rose-600 font-bold'
-                                                    }`}>
-                                                        {Math.abs(item.amount).toFixed(2)}
-                                                    </td>
-                                                    <td className="py-1.5 px-2 text-center">
-                                                        {item.type === 'payment' ? (
-                                                            <button
-                                                                type="button"
-                                                                title="View Payment Receipt"
-                                                                className="text-blue-600 hover:text-blue-800 cursor-pointer inline-flex items-center justify-center"
-                                                            >
-                                                                <Eye size={13} />
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-gray-300">-</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Row Action Menu ⋮ (Yanolja PMS Folio Operations) */}
-                                                    <td className="py-1.5 px-2 text-center relative">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setOpenRowActionId(openRowActionId === item.id ? null : item.id);
-                                                            }}
-                                                            className="w-5 h-5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer transition-colors"
-                                                            title="Actions"
-                                                        >
-                                                            <MoreVertical size={13} />
-                                                        </button>
-                                                        {openRowActionId === item.id && (
-                                                            <>
-                                                                <div className="fixed inset-0 z-40" onClick={() => setOpenRowActionId(null)} />
-                                                                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 text-left animate-in fade-in zoom-in-95 duration-100">
-                                                                    {item.isVoided ? (
-                                                                        <div className="px-3 py-1.5 text-[11px] text-gray-500 italic">
-                                                                            Voided: {item.rawItem?.void_reason || 'Reversed'}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setOpenRowActionId(null);
-                                                                                onOpenVoid(item.type, item.id, item.description, item.amount);
-                                                                            }}
-                                                                            className="w-full text-left px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
-                                                                        >
-                                                                            <AlertTriangle size={13} className="text-rose-600 shrink-0" />
-                                                                            <span>Void {item.type === 'charge' ? 'Extra Charge' : 'Payment'}</span>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </>
-                                                        )}
-                                                    </td>
-                                                </tr>
-
-                                                {/* Expanded Tax Breakdown Accordion Row */}
-                                                {isExpanded && item.type === 'charge' && (
-                                                    <tr className="bg-blue-50/20 border-b border-blue-100/80">
-                                                        <td colSpan={10} className="px-8 py-2.5 text-xs font-mono">
-                                                            <div className="bg-white border border-blue-200/80 rounded-lg p-2.5 space-y-1.5 shadow-2xs max-w-xl">
-                                                                {item.isVoided && (
-                                                                    <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded p-2 text-[11px] mb-2 flex items-center justify-between">
-                                                                        <span className="font-bold flex items-center gap-1">
-                                                                            <AlertTriangle size={12} className="text-rose-600" />
-                                                                            Void Reason:
-                                                                        </span>
-                                                                        <span className="italic">{item.rawItem?.void_reason || 'Reversed by Front Desk'}</span>
-                                                                    </div>
-                                                                )}
-                                                                {item.discountAmount > 0 && (
-                                                                    <div className="flex items-center justify-between text-gray-600 text-[11px]">
-                                                                        <span>Discount Amount:</span>
-                                                                        <span>{item.discountAmount.toFixed(2)}</span>
-                                                                    </div>
-                                                                )}
-                                                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
-                                                                    <span>(+) Service Charge (10%):</span>
-                                                                    <span>{item.serviceCharge.toFixed(2)}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
-                                                                    <span>(+) VAT (15%):</span>
-                                                                    <span>{item.vat.toFixed(2)}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between text-gray-500 text-[11px]">
-                                                                    <span>(+) CITY TAX (1%):</span>
-                                                                    <span>{item.cityTax.toFixed(2)}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between text-gray-700 font-semibold text-[11px] border-t border-gray-100 pt-1">
-                                                                    <span>Total Tax:</span>
-                                                                    <span>{item.totalTax.toFixed(2)}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between text-blue-700 font-bold border-t border-blue-100 pt-1 text-xs">
-                                                                    <span>GRAND TOTAL (NET AMOUNT):</span>
-                                                                    <span>{currency} {item.totalAmount.toFixed(2)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
-                                        );
-                                    })
+                                    filteredLedgerItems.map(item => renderLedgerRow(item))
                                 )}
                             </tbody>
                         </table>
