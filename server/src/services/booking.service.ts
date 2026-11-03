@@ -48,6 +48,10 @@ export interface BookingRecord {
   depositRequired?: number;
   autoRelease?: boolean;
   isGuaranteed?: boolean;
+  stopRoomMove?: boolean;
+  stopRoomMoveReason?: string;
+  registrationCardSigned?: boolean;
+  registrationCardSignedAt?: string;
   roomsList?: any[];
   groupRoomsList?: any[];
   createdAt: string;
@@ -239,6 +243,10 @@ export const bookingService = {
         r.deposit_required,
         r.auto_release,
         r.is_guaranteed,
+        r.stop_room_move,
+        r.stop_room_move_reason,
+        r.registration_card_signed,
+        r.registration_card_signed_at,
         r.created_at,
         g.id as guest_id,
         g.salutation,
@@ -408,6 +416,10 @@ export const bookingService = {
         depositRequired: Number(r.deposit_required) || 0,
         autoRelease: r.auto_release !== false,
         isGuaranteed: Boolean(r.is_guaranteed || Number(r.paid_amount) > 0),
+        stopRoomMove: Boolean(r.stop_room_move),
+        stopRoomMoveReason: r.stop_room_move_reason || undefined,
+        registrationCardSigned: Boolean(r.registration_card_signed),
+        registrationCardSignedAt: r.registration_card_signed_at ? (typeof r.registration_card_signed_at === 'string' ? r.registration_card_signed_at : r.registration_card_signed_at.toISOString()) : undefined,
         roomsList: rooms.map((rm, idx) => {
           const rIn = formatDate(rm.check_in_date);
           const rOut = formatDate(rm.check_out_date);
@@ -1074,6 +1086,11 @@ export const bookingService = {
     const resId = existing.id;
     const { oldRoomNumber, newRoomNumber, newFromDate, newToDate } = payload;
 
+    // Yanolja PMS Stop Room Move Enforcement
+    if (existing.stopRoomMove && !(payload as any).overrideStopMove) {
+      throw new Error(`Room Move blocked: Stop Room Move is active for reservation ${existing.reservationNumber} (${existing.stopRoomMoveReason || 'Locked'}). Uncheck Stop Room Move or provide supervisor override.`);
+    }
+
     const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(newRoomNumber)]);
     if (targetRoomRes.rows.length === 0) {
       throw new Error(`Target room ${newRoomNumber} not found for property ${propId}`);
@@ -1143,6 +1160,107 @@ export const bookingService = {
   /**
    * Record Payment on Reservation Folio
    */
+  
+  /**
+   * Stop Room Move (Toggle Lock on Reservation to prevent moving, matching Yanolja PMS)
+   */
+  stopRoomMove: async (id: string | number, propertyId: string | number, payload: {
+    stopRoomMove: boolean;
+    reason?: string;
+  }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    await getPool().query(`
+      UPDATE reservations
+      SET stop_room_move = $1,
+          stop_room_move_reason = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3 AND property_id = $4
+    `, [Boolean(payload.stopRoomMove), payload.reason || null, existing.id, propId]);
+
+    try {
+      await getPool().query(`
+        INSERT INTO audit_logs (property_id, entity_type, entity_id, action, details)
+        VALUES ($1, 'RESERVATION', $2, 'STOP_ROOM_MOVE', $3)
+      `, [propId, String(existing.id), `Stop Room Move set to ${payload.stopRoomMove ? 'LOCKED' : 'UNLOCKED'}. Reason: ${payload.reason || 'None'}`]);
+    } catch {}
+
+    return bookingService.getBookingById(id, propId);
+  },
+
+  /**
+   * Atomic Room Swap (Two-way room switch between two active reservations)
+   */
+  swapRooms: async (propertyId: string | number, payload: {
+    bookingId1: string | number;
+    bookingId2: string | number;
+    reason?: string;
+  }): Promise<{ success: boolean; booking1: BookingRecord | null; booking2: BookingRecord | null }> => {
+    const propId = resolvePropertyId(propertyId);
+    if (!propId) throw new Error('Invalid property ID');
+
+    const b1 = await bookingService.getBookingById(payload.bookingId1, propId);
+    const b2 = await bookingService.getBookingById(payload.bookingId2, propId);
+    if (!b1 || !b2) throw new Error('One or both reservations not found for room swap');
+
+    if (b1.stopRoomMove) throw new Error(`Cannot swap: Stop Room Move is active on Room ${b1.roomNumber} (${b1.guestName})`);
+    if (b2.stopRoomMove) throw new Error(`Cannot swap: Stop Room Move is active on Room ${b2.roomNumber} (${b2.guestName})`);
+
+    const room1Num = b1.roomNumber;
+    const room2Num = b2.roomNumber;
+    if (String(room1Num) === String(room2Num)) throw new Error('Both reservations are already in the same room');
+
+    const pool = getPool();
+    const r1Res = await pool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(room1Num)]);
+    const r2Res = await pool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(room2Num)]);
+    if (r1Res.rows.length === 0 || r2Res.rows.length === 0) throw new Error('One or both room records not found in database');
+    const r1Id = r1Res.rows[0].id;
+    const r2Id = r2Res.rows[0].id;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(`
+        UPDATE reservation_rooms
+        SET room_id = $1
+        WHERE reservation_id = $2 AND room_id = $3
+      `, [r2Id, b1.id, r1Id]);
+
+      await client.query(`
+        UPDATE reservation_rooms
+        SET room_id = $1
+        WHERE reservation_id = $2 AND room_id = $3
+      `, [r1Id, b2.id, r2Id]);
+
+      await client.query(`
+        INSERT INTO audit_logs (property_id, entity_type, entity_id, action, details)
+        VALUES ($1, 'RESERVATION', $2, 'ROOM_SWAP', $3)
+      `, [propId, String(b1.id), `Atomic Room Swap: Room ${room1Num} -> Room ${room2Num}. Reason: ${payload.reason || 'Guest preference'}`]);
+
+      await client.query(`
+        INSERT INTO audit_logs (property_id, entity_type, entity_id, action, details)
+        VALUES ($1, 'RESERVATION', $2, 'ROOM_SWAP', $3)
+      `, [propId, String(b2.id), `Atomic Room Swap: Room ${room2Num} -> Room ${room1Num}. Reason: ${payload.reason || 'Guest preference'}`]);
+
+      await client.query('COMMIT');
+    } catch (swapErr) {
+      await client.query('ROLLBACK');
+      throw swapErr;
+    } finally {
+      client.release();
+    }
+
+    notifyChannelManager(propId);
+    const updated1 = await bookingService.getBookingById(payload.bookingId1, propId);
+    const updated2 = await bookingService.getBookingById(payload.bookingId2, propId);
+
+    return { success: true, booking1: updated1, booking2: updated2 };
+  },
+
   recordPayment: async (id: string | number, propertyId: string | number, payload: {
     amount: number;
     paymentMethod?: string;

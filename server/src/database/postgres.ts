@@ -105,11 +105,34 @@ export async function initPostgres(): Promise<boolean> {
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS is_guaranteed BOOLEAN DEFAULT FALSE;');
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_released_at TIMESTAMPTZ;');
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_released_by BIGINT;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stop_room_move BOOLEAN DEFAULT FALSE;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stop_room_move_reason TEXT;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_card_signed BOOLEAN DEFAULT FALSE;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_card_signed_at TIMESTAMPTZ;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS signature_data TEXT;');
 
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS sub_booking_number VARCHAR(64);');
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS registration_number VARCHAR(64);');
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP;');
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS folio_number VARCHAR(64);');
+
+                await client.query(`
+                    CREATE TABLE IF NOT EXISTS folio_routing_rules (
+                        id SERIAL PRIMARY KEY,
+                        property_id BIGINT DEFAULT 1,
+                        reservation_id VARCHAR(100) NOT NULL,
+                        source_folio_id INTEGER NOT NULL,
+                        dest_folio_id INTEGER NOT NULL,
+                        scope VARCHAR(100) DEFAULT 'All folio of this guest',
+                        route_room_charges BOOLEAN DEFAULT FALSE,
+                        route_inclusions BOOLEAN DEFAULT FALSE,
+                        route_all_extra_charges BOOLEAN DEFAULT FALSE,
+                        routed_extra_charges TEXT[] DEFAULT '{}',
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                        created_by VARCHAR(100) NOT NULL DEFAULT 'Front Desk'
+                    );
+                `);
 
                 await client.query(`
                     CREATE TABLE IF NOT EXISTS daily_sequences (

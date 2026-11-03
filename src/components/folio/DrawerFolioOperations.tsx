@@ -9,6 +9,7 @@ import { TabFolioOperations } from './tabs/TabFolioOperations';
 import { TabBookingDetails } from './tabs/TabBookingDetails';
 import { TabGuestDetails } from './tabs/TabGuestDetails';
 import { TabRoomCharges } from './tabs/TabRoomCharges';
+import { TabCreditCard } from './tabs/TabCreditCard';
 import { TabAuditTrail } from './tabs/TabAuditTrail';
 
 // Sub-Modals
@@ -502,6 +503,15 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                     <TabRoomCharges
                         folio={activeFolio}
                         booking={booking}
+                        onRefresh={fetchFolioData}
+                    />
+                )}
+
+                {activeTab === 'credit_card' && (
+                    <TabCreditCard
+                        folio={activeFolio}
+                        booking={booking}
+                        onOpenAddPayment={() => setIsAddPaymentOpen(true)}
                         onRefresh={fetchFolioData}
                     />
                 )}

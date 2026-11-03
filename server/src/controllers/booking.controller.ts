@@ -207,6 +207,70 @@ export const bookingController = {
     }
   },
 
+  stopRoomMove: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.stopRoomMove(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast stop room move', err);
+      }
+
+      res.json({ success: true, data: updated, message: `Stop Room Move updated to ${req.body.stopRoomMove ? 'Locked' : 'Unlocked'}` });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  swapRooms: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const result = await bookingService.swapRooms(propertyId, req.body);
+
+      try {
+        if (result.booking1) {
+          broadcastServerEvent({
+            type: 'RESERVATION_COMMITTED',
+            reservation: result.booking1,
+            propertyId
+          });
+        }
+        if (result.booking2) {
+          broadcastServerEvent({
+            type: 'RESERVATION_COMMITTED',
+            reservation: result.booking2,
+            propertyId
+          });
+        }
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast room swap', err);
+      }
+
+      res.json({ success: true, data: result, message: 'Atomic room swap executed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
   addPayment: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const propertyId = getReqPropertyId(req);

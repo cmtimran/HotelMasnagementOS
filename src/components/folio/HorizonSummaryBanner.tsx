@@ -181,6 +181,7 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                         { id: 'booking', label: 'Booking Details' },
                         { id: 'guest', label: 'Guest Details' },
                         { id: 'charges', label: 'Room Charges' },
+                        { id: 'credit_card', label: 'Credit Card' },
                         { id: 'audit', label: 'Audit Trail' },
                     ].map(tab => (
                         <button

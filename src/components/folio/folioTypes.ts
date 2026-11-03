@@ -1,4 +1,4 @@
-export type FolioSubTab = 'operations' | 'booking' | 'guest' | 'charges' | 'audit';
+export type FolioSubTab = 'operations' | 'booking' | 'guest' | 'charges' | 'credit_card' | 'audit';
 
 export interface FolioChargeItem {
     id: number | string;

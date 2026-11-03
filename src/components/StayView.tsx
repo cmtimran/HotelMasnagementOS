@@ -70,6 +70,8 @@ import {
     ungroupReservationInDB,
     changeGroupOwnerInDB,
     deleteReservationInDB,
+    updateStopRoomMoveInDB,
+    autoApplyAdvanceDepositOnCheckIn,
     getOperatingSystemDate,
     formatToISODate,
     updateReservationStatusInDB,
@@ -1730,6 +1732,11 @@ export const StayView: React.FC = () => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
+        if ((targetB as any).stopRoomMove) {
+            toast.error(`🔒 Cannot move room: Stop Room Move is active for ${targetB.guestName} (${(targetB as any).stopRoomMoveReason || 'Locked'})!`);
+            return;
+        }
+
         const isGuestInHouse = isInHouseBooking(targetB);
         // For in-house bookings, move cannot be backdated before System Date!
         const validatedFromDate = isGuestInHouse && newFromDate < operatingDateStr
@@ -2009,9 +2016,14 @@ export const StayView: React.FC = () => {
         showToast(`Reservation ${target.reservationNumber} split between Room ${target.roomNumber} (until ${effectiveSplitDate}) & Room ${targetRoomNumber}!`);
     };
 
-    const handleStopRoomMove = (bookingId: string, allow: boolean) => {
+    const handleStopRoomMove = async (bookingId: string, allow: boolean) => {
+        const isLocked = !allow;
         const target = bookings.find(b => b.id === bookingId);
-        showToast(`Room move status updated for ${target?.guestName || 'reservation'} (Allow: ${allow})`);
+        const reason = isLocked ? 'Guest requested fixed room assignment' : 'Room move unlocked by Front Desk';
+        
+        await updateStopRoomMoveInDB(bookingId, isLocked, reason);
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, stopRoomMove: isLocked, stopRoomMoveReason: reason } : b));
+        showToast(`Room move status updated for ${target?.guestName || 'reservation'} (${isLocked ? '🔒 LOCKED' : '🔓 ALLOWED'})`);
     };
 
     const handleProceedNewBooking = (bookingId?: string, ownerFolio?: string, groupOwner?: string, drawerBooking?: any) => {
@@ -2451,6 +2463,12 @@ export const StayView: React.FC = () => {
                 registrationNumber: regNo,
                 folioNumber: folioNo
             } : b));
+
+            // Yanolja PMS Automatic Advance Deposit Application on Check-In
+            const advanceDeposit = Number((targetB as any)?.depositAmount || (targetB as any)?.paidAmount || storedTarget?.paidAmount || storedTarget?.depositRequired || 0);
+            if (advanceDeposit > 0) {
+                await autoApplyAdvanceDepositOnCheckIn(reservationNumber, advanceDeposit);
+            }
             toast.success(`Guest Checked In! Reg: ${regNo} | Folio: ${folioNo}`);
             setIsActionDrawerOpen(false);
             syncStoredReservations();
@@ -3680,6 +3698,11 @@ export const StayView: React.FC = () => {
                                                                                 handleOpenDetailsDrawer(booking);
                                                                                 return;
                                                                             }
+                                                                            if ((booking as any).stopRoomMove) {
+                                                                                handleOpenDetailsDrawer(booking);
+                                                                                toast.error(`🔒 Stop Room Move is active for ${booking.guestName} (${(booking as any).stopRoomMoveReason || 'Locked'}). Dragging disabled.`);
+                                                                                return;
+                                                                            }
                                                                             const barRect = e.currentTarget.getBoundingClientRect();
                                                                             const grabOffset = Math.max(
                                                                                 0,
@@ -3707,6 +3730,14 @@ export const StayView: React.FC = () => {
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] [EX Exempt] */}
                                                                         <div className={`flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 ${isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'}`}>
+                                                                            {Boolean((booking as any).stopRoomMove) && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-slate-900 border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
+                                                                                    title={`Stop Room Move Active: ${(booking as any).stopRoomMoveReason || 'Locked assignment'}`}
+                                                                                >
+                                                                                    <Lock size={8} className="stroke-[2.5]" />
+                                                                                </span>
+                                                                            )}
                                                                             {booking.isPast && (
                                                                                 <span
                                                                                     className="w-4 h-4 rounded-full bg-slate-900/90 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"

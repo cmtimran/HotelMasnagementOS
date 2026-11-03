@@ -17,6 +17,8 @@ router.post('/group/link', requirePermission('reservation.manage'), bookingContr
 router.post('/group/unlink', requirePermission('reservation.manage'), bookingController.unlinkGroup);
 router.patch('/:id/amend', requirePermission('reservation.manage'), bookingController.amendBooking);
 router.post('/:id/move', requirePermission('reservation.manage'), bookingController.moveRoom);
+router.post('/:id/stop-room-move', requirePermission('reservation.manage'), bookingController.stopRoomMove);
+router.post('/swap-rooms', requirePermission('reservation.manage'), bookingController.swapRooms);
 router.post('/:id/payment', requirePermission('reservation.manage'), bookingController.addPayment);
 router.post('/:id/split', requirePermission('reservation.manage'), bookingController.splitBooking);
 router.post('/:id/hold', requirePermission('reservation.manage'), bookingController.holdBooking);

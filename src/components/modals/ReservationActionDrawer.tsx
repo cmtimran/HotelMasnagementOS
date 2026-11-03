@@ -32,6 +32,7 @@ import {
     Key,
     ArrowRight,
     ArrowLeft,
+    ArrowRightLeft,
     Sparkles,
     CheckCircle2,
     RotateCcw,
@@ -51,6 +52,8 @@ import {
     calculateTariffForRatePlan,
     getOperatingSystemDate,
     getAllStoredReservations,
+    updateStopRoomMoveInDB,
+    executeRoomSwapInDB,
     linkBookingsInDB,
     unlinkBookingInDB,
     generateRegistrationNumber,
@@ -64,12 +67,15 @@ import {
 import { toast } from '../../context/ToastContext';
 
 import { DrawerFolioOperations } from '../folio/DrawerFolioOperations';
+import { DigitalRegCardModal } from './DigitalRegCardModal';
 
 export type DrawerMode =
     | 'overview'
     | 'folio'
     | 'amend'
     | 'move'
+    | 'swap'
+    | 'reg_card'
     | 'payment'
     | 'split'
     | 'stop_move'
@@ -230,8 +236,20 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [splitFromDate, setSplitFromDate] = useState<string>('');
     const [splitToDate, setSplitToDate] = useState<string>('');
 
-    // 5. Stop Room Move Form States
-    const [allowRoomMove, setAllowRoomMove] = useState(true);
+    // 5. Stop Room Move Form States (Yanolja PMS Lock & Move Guard)
+    const [stopMoveLocked, setStopMoveLocked] = useState(false);
+    const [stopMoveReason, setStopMoveReason] = useState('Guest requested fixed room assignment');
+    const [stopMovePreset, setStopMovePreset] = useState('Guest Special Request');
+    const [isSavingStopMove, setIsSavingStopMove] = useState(false);
+    const [supervisorOverrideMove, setSupervisorOverrideMove] = useState(false);
+
+    // 5b. Atomic Room Swap States
+    const [swapTargetBookingId, setSwapTargetBookingId] = useState('');
+    const [swapReason, setSwapReason] = useState('Mutual room change requested by guests');
+    const [isSwapping, setIsSwapping] = useState(false);
+
+    // 5c. Digital Reg Card Modal State
+    const [isRegCardModalOpen, setIsRegCardModalOpen] = useState(false);
 
     // 6. Add New Booking Form States
     const [newBookingFolio, setNewBookingFolio] = useState<string>('');
@@ -332,7 +350,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setSplitFromDate(arr);
             setSplitToDate(dep);
 
-            setAllowRoomMove(true);
+            const isLocked = Boolean((booking as any).stopRoomMove);
+            setStopMoveLocked(isLocked);
+            setStopMoveReason((booking as any).stopRoomMoveReason || 'Guest requested fixed room assignment');
+            setSupervisorOverrideMove(false);
+            setSwapTargetBookingId('');
 
             setNewBookingFolio(`FN~012607004 - ${booking.guestName}`);
             setNewBookingGroupOwner(`${booking.guestName} (${booking.roomNumber})`);
@@ -477,6 +499,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             folioNumber: booking.folioNumber,
             isPrimary: true
         }];
+    }, [booking]);
+
+    // All active other reservations eligible for Atomic Room Swap
+    const allOtherBookings = useMemo(() => {
+        if (!booking) return [];
+        const stored = getAllStoredReservations();
+        return stored.filter(r => {
+            const isDifferent = String(r.id) !== String(booking.id) && r.reservationNumber !== booking.reservationNumber;
+            const notCancelled = String(r.status || '').toLowerCase() !== 'cancelled' && String(r.status || '').toLowerCase() !== 'voided';
+            const hasRoom = r.roomNumber && r.roomNumber !== 'Unassigned' && r.roomNumber !== booking.roomNumber;
+            return isDifferent && notCancelled && hasRoom;
+        });
     }, [booking]);
 
     // Active room data currently selected in the "Reservation List" panel
@@ -704,8 +738,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 items: [
                     { key: 'amend', label: 'Amend Stay (Extend/Shorten)', icon: Calendar },
                     { key: 'move', label: 'Room Move & Upgrade', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
+                    { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
                     { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
-                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand },
+                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                    { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                     { key: 'add_booking', label: 'Add Companion Room', icon: CalendarPlus }
                 ]
             });
@@ -1060,7 +1096,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         }
     };
 
-    const handlePrimaryAction = () => {
+    const handlePrimaryAction = async () => {
         switch (mode) {
             case 'link_group':
                 handleLinkGroup();
@@ -1082,6 +1118,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 break;
             }
             case 'move': {
+                if (Boolean((booking as any)?.stopRoomMove) && !supervisorOverrideMove) {
+                    toast.error(`🔒 Cannot move room: Stop Room Move is active for ${booking.guestName}! Check supervisor override to proceed.`);
+                    return;
+                }
+
                 const avail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
                     excludeReservationId: booking.reservationNumber || booking.id
                 });
@@ -1137,9 +1178,51 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 if (onSaveRoomSplit) onSaveRoomSplit(booking.id, splitRoom, splitFromDate, splitToDate);
                 break;
             }
-            case 'stop_move':
-                if (onStopRoomMove) onStopRoomMove(booking.id, allowRoomMove);
+            case 'stop_move': {
+                setIsSavingStopMove(true);
+                try {
+                    const ok = await updateStopRoomMoveInDB(booking.id, stopMoveLocked, stopMoveReason);
+                    if (ok) {
+                        toast.success(`Stop Room Move set to ${stopMoveLocked ? 'LOCKED' : 'UNLOCKED'}`);
+                        (booking as any).stopRoomMove = stopMoveLocked;
+                        (booking as any).stopRoomMoveReason = stopMoveReason;
+                        if (onStopRoomMove) onStopRoomMove(booking.id, !stopMoveLocked);
+                    } else {
+                        toast.error('Failed to update Stop Room Move');
+                    }
+                } catch (e: any) {
+                    toast.error(e?.message || 'Error updating Stop Room Move');
+                } finally {
+                    setIsSavingStopMove(false);
+                }
                 break;
+            }
+            case 'swap': {
+                if (!swapTargetBookingId) {
+                    toast.error('Please select an eligible target room to swap with.');
+                    return;
+                }
+                setIsSwapping(true);
+                try {
+                    const res = await executeRoomSwapInDB(booking.id, swapTargetBookingId, swapReason);
+                    if (res && res.success) {
+                        toast.success(res.message || 'Rooms swapped successfully!');
+                        onClose();
+                        window.location.reload();
+                    } else {
+                        toast.error(res?.error || 'Failed to swap rooms');
+                    }
+                } catch (e: any) {
+                    toast.error(e?.message || 'Error executing room swap');
+                } finally {
+                    setIsSwapping(false);
+                }
+                break;
+            }
+            case 'reg_card': {
+                setIsRegCardModalOpen(true);
+                return;
+            }
             case 'add_booking':
                 if (onProceedNewBooking) onProceedNewBooking(booking.id, newBookingFolio, newBookingGroupOwner, booking);
                 break;
@@ -1194,8 +1277,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 return { title: 'Add Payment', buttonText: 'Save Payment', buttonIcon: <CreditCard size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'split':
                 return { title: 'Room Split', buttonText: 'Save Room Split', buttonIcon: <GitFork size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+            case 'swap':
+                return { title: 'Swap Rooms (Atomic Transfer)', buttonText: isSwapping ? 'Swapping Rooms...' : 'Execute Atomic Swap', buttonIcon: <ArrowRightLeft size={13} />, buttonClass: 'bg-emerald-600 hover:bg-emerald-700 font-bold' };
             case 'stop_move':
-                return { title: 'Stop Room Move', buttonText: 'Submit', buttonIcon: <Hand size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+                return { title: 'Stop Room Move & Lock Status', buttonText: isSavingStopMove ? 'Saving...' : 'Save Lock Status', buttonIcon: <Hand size={13} />, buttonClass: 'bg-amber-600 hover:bg-amber-700 font-bold' };
+            case 'reg_card':
+                return { title: 'Digital Registration Card', buttonText: 'Open e-Reg Card', buttonIcon: <FileText size={13} />, buttonClass: 'bg-indigo-600 hover:bg-indigo-700 font-bold' };
             case 'add_booking':
                 return { title: 'Add New Booking', buttonText: 'Proceed to Full Form', buttonIcon: <CalendarPlus size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'cancel':
@@ -2237,6 +2324,30 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 {/* MODE 2: ROOM MOVE (Enhanced with Dynamic Inventory & Upgrade Detection Engine) */}
                                 {mode === 'move' && (
                                     <div className="space-y-3">
+                                        {/* Stop Room Move Warning Guard */}
+                                        {Boolean((booking as any)?.stopRoomMove) && (
+                                            <div className="bg-amber-500/20 border-2 border-amber-400 rounded-xl p-3 text-amber-200 text-xs space-y-2 shadow-md">
+                                                <div className="flex items-start gap-2 font-bold text-amber-100">
+                                                    <Lock size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <div>STOP ROOM MOVE IS ACTIVE FOR THIS RESERVATION</div>
+                                                        <div className="text-[10px] font-normal text-amber-200/90 mt-0.5">
+                                                            Reason: {(booking as any)?.stopRoomMoveReason || 'Locked by Front Desk Supervisor'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label className="flex items-center gap-2 pt-1 border-t border-amber-400/30 cursor-pointer select-none text-[11px] font-semibold text-white">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={supervisorOverrideMove}
+                                                        onChange={e => setSupervisorOverrideMove(e.target.checked)}
+                                                        className="w-4 h-4 rounded text-amber-600 bg-white cursor-pointer accent-amber-500"
+                                                    />
+                                                    <span>Supervisor Override: I confirm authorization to bypass the Room Move Lock.</span>
+                                                </label>
+                                            </div>
+                                        )}
+
                                         {isBookingInHouse && (
                                             <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-lg p-2 text-emerald-200 text-[10px] flex items-center gap-1.5 font-medium shadow-xs">
                                                 <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
@@ -2690,25 +2801,160 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* MODE 5: STOP ROOM MOVE (03-stop-room-move-modal.png) */}
+                                {/* MODE 5: STOP ROOM MOVE (03-stop-room-move-modal.png & Yanolja PMS) */}
                                 {mode === 'stop_move' && (
                                     <div className="space-y-4">
-                                        <p className="text-[8px] text-blue-100 leading-relaxed">
-                                            This action will stop all pending room moves for the selected reservations.
-                                        </p>
-                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 flex items-start gap-1">
-                                            <input
-                                                type="checkbox"
-                                                id="allow_move"
-                                                checked={allowRoomMove}
-                                                onChange={e => setAllowRoomMove(e.target.checked)}
-                                                className="w-4 h-4 rounded text-blue-600 bg-white cursor-pointer mt-0.5 accent-blue-500"
-                                            />
-                                            <label htmlFor="allow_move" className="cursor-pointer">
-                                                <div className="text-[8px]  text-white">Allow room move</div>
-                                                <div className="text-[8px] text-blue-200">Sends allow_room_move as true.</div>
-                                            </label>
+                                        {/* Status indicator banner */}
+                                        <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                                            stopMoveLocked
+                                                ? 'bg-amber-500/15 border-amber-400/40 text-amber-200'
+                                                : 'bg-emerald-500/15 border-emerald-400/40 text-emerald-200'
+                                        }`}>
+                                            <div className="flex items-center gap-2">
+                                                {stopMoveLocked ? <Lock size={18} className="text-amber-400" /> : <ShieldCheck size={18} className="text-emerald-400" />}
+                                                <div>
+                                                    <div className="text-xs font-bold text-white">
+                                                        {stopMoveLocked ? 'Room Move is Currently LOCKED' : 'Room Move is Allowed'}
+                                                    </div>
+                                                    <div className="text-[10px] text-blue-200">
+                                                        {stopMoveLocked ? 'All automatic & manual room moves are blocked for this stay.' : 'Room can be moved or upgraded freely.'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const nextLocked = !stopMoveLocked;
+                                                    setStopMoveLocked(nextLocked);
+                                                }}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                                                    stopMoveLocked
+                                                        ? 'bg-amber-500 text-slate-900 hover:bg-amber-400'
+                                                        : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                                }`}
+                                            >
+                                                {stopMoveLocked ? 'Unlock Move' : 'Lock Room Move'}
+                                            </button>
                                         </div>
+
+                                        {/* Lock Reasons Configuration */}
+                                        {stopMoveLocked && (
+                                            <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-blue-100 mb-1">
+                                                        Reason Category
+                                                    </label>
+                                                    <select
+                                                        value={stopMovePreset}
+                                                        onChange={e => {
+                                                            setStopMovePreset(e.target.value);
+                                                            if (e.target.value !== 'Other') {
+                                                                setStopMoveReason(e.target.value);
+                                                            }
+                                                        }}
+                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none"
+                                                    >
+                                                        <option value="Guest Special Request">Guest Special Request (Specific Room Allocated)</option>
+                                                        <option value="Connecting / Adjoining Room Requirement">Connecting / Adjoining Room Requirement</option>
+                                                        <option value="VIP / High Profile Guest Preference">VIP / High Profile Guest Preference</option>
+                                                        <option value="Accessibility / Medical Assistance">Accessibility / Medical Assistance</option>
+                                                        <option value="Maintenance / Deep Clean Scheduled">Maintenance / Deep Clean Scheduled</option>
+                                                        <option value="Group Master / Tour Coordinator Room">Group Master / Tour Coordinator Room</option>
+                                                        <option value="Other">Other Custom Reason</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-blue-100 mb-1">
+                                                        Lock Explanation &amp; Audit Notes
+                                                    </label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={stopMoveReason}
+                                                        onChange={e => setStopMoveReason(e.target.value)}
+                                                        placeholder="Provide details on why this room assignment cannot be moved..."
+                                                        className="w-full p-2 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* MODE: ATOMIC ROOM SWAP (Yanolja PMS) */}
+                                {mode === 'swap' && (
+                                    <div className="space-y-3">
+                                        {/* Source Room Box */}
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-2">
+                                            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Source Room (Current Reservation)</span>
+                                            <div className="flex items-center justify-between text-xs text-white">
+                                                <div>
+                                                    <div className="font-bold text-sm">Room {booking.roomNumber} - {booking.roomType}</div>
+                                                    <div className="text-blue-200 text-[11px]">{booking.guestName} ({booking.reservationNumber})</div>
+                                                </div>
+                                                <div className="text-right font-mono text-xs text-blue-200">
+                                                    <div>{booking.arrivalDate} ➔ {booking.departureDate}</div>
+                                                    <div className="text-emerald-300 font-bold">{currencySymbol} {Number(booking.avgDailyRate || 0).toFixed(2)}/nt</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Swap Arrow Icon */}
+                                        <div className="flex items-center justify-center">
+                                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shadow-xs">
+                                                <ArrowRightLeft size={16} />
+                                            </div>
+                                        </div>
+
+                                        {/* Target Room Selector */}
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-3">
+                                            <label className="block text-xs font-bold text-white uppercase tracking-wider">
+                                                Select Target Room to Swap With
+                                            </label>
+                                            <select
+                                                value={swapTargetBookingId}
+                                                onChange={e => setSwapTargetBookingId(e.target.value)}
+                                                className="w-full h-9 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none"
+                                            >
+                                                <option value="">-- Choose Occupied / Reserved Room --</option>
+                                                {allOtherBookings.map(ob => (
+                                                    <option key={ob.id} value={ob.id}>
+                                                        Room {ob.roomNumber} - {ob.guestName} ({ob.roomType || 'Standard'}) [{ob.arrivalDate} to {ob.departureDate}]
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            <div>
+                                                <label className="block text-xs font-semibold text-blue-100 mb-1">
+                                                    Swap Reason &amp; Audit Trail
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={swapReason}
+                                                    onChange={e => setSwapReason(e.target.value)}
+                                                    placeholder="e.g. Mutual room change requested by guests, AC issue, etc."
+                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MODE: DIGITAL REG CARD (Yanolja PMS e-Reg Card) */}
+                                {mode === 'reg_card' && (
+                                    <div className="p-4 bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl text-center space-y-3">
+                                        <FileText size={36} className="text-indigo-300 mx-auto" />
+                                        <h4 className="text-sm font-bold text-white">e-Registration Card (Digital Sign-In)</h4>
+                                        <p className="text-xs text-blue-200">
+                                            Generate, sign, and print digital hotel check-in registration card with guest tariff breakdown and digital signature capture.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRegCardModalOpen(true)}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-md transition-all cursor-pointer"
+                                        >
+                                            Launch Digital Signature Pad
+                                        </button>
                                     </div>
                                 )}
 
@@ -4219,6 +4465,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     </div>
                 </div>
             )}
+            {/* Digital e-Registration Card Modal (Yanolja PMS) */}
+            <DigitalRegCardModal
+                isOpen={isRegCardModalOpen}
+                onClose={() => setIsRegCardModalOpen(false)}
+                booking={booking}
+                onSuccess={() => {
+                    if (booking) {
+                        (booking as any).registrationCardSigned = true;
+                    }
+                }}
+            />
         </div>
     </div>,
     document.body

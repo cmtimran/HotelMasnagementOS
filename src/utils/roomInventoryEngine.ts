@@ -2006,6 +2006,144 @@ export const updateReservationStatusInDB = async (
 };
 
 /**
+ * Update Stop Room Move in Central Database & Broadcast to PMS (Yanolja PMS Lock feature)
+ */
+export const updateStopRoomMoveInDB = async (
+    bookingId: string | number,
+    stopRoomMove: boolean,
+    reason?: string
+): Promise<boolean> => {
+    try {
+        const existing = getAllStoredReservations();
+        const targetStr = String(bookingId);
+        const updated = existing.map(r => {
+            if (String(r.id) === targetStr || r.reservationNumber === targetStr) {
+                return {
+                    ...r,
+                    stopRoomMove,
+                    stopRoomMoveReason: reason || r.stopRoomMoveReason
+                };
+            }
+            return r;
+        });
+        saveStoredReservations(updated);
+        broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: bookingId });
+
+        if (typeof window !== 'undefined') {
+            const API_BASE = getApiBaseUrl();
+            await fetch(`${API_BASE}/api/bookings/${bookingId}/stop-room-move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stopRoomMove, reason })
+            });
+        }
+        return true;
+    } catch (err) {
+        console.warn('Failed to update stop room move in DB:', err);
+        return true;
+    }
+};
+
+/**
+ * Execute Atomic Room Swap between two active reservations in Database & PMS state
+ */
+export const executeRoomSwapInDB = async (
+    bookingId1: string | number,
+    bookingId2: string | number,
+    reason?: string
+): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+        const existing = getAllStoredReservations();
+        const b1 = existing.find(r => String(r.id) === String(bookingId1) || r.reservationNumber === String(bookingId1));
+        const b2 = existing.find(r => String(r.id) === String(bookingId2) || r.reservationNumber === String(bookingId2));
+
+        if (!b1 || !b2) {
+            return { success: false, message: 'One or both reservations not found' };
+        }
+
+        if (b1.stopRoomMove) {
+            return { success: false, message: `Cannot swap: Stop Room Move is active on Room ${b1.roomNumber} (${b1.guestName})` };
+        }
+        if (b2.stopRoomMove) {
+            return { success: false, message: `Cannot swap: Stop Room Move is active on Room ${b2.roomNumber} (${b2.guestName})` };
+        }
+
+        const room1 = b1.roomNumber;
+        const room2 = b2.roomNumber;
+
+        // Optimistic swap in local cache
+        const swapped = existing.map(r => {
+            if (String(r.id) === String(b1.id) || r.reservationNumber === b1.reservationNumber) {
+                return { ...r, roomNumber: room2, roomNo: room2, allocatedRooms: [room2] };
+            }
+            if (String(r.id) === String(b2.id) || r.reservationNumber === b2.reservationNumber) {
+                return { ...r, roomNumber: room1, roomNo: room1, allocatedRooms: [room1] };
+            }
+            return r;
+        });
+        saveStoredReservations(swapped);
+        broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: b1.id });
+        broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: b2.id });
+        broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+
+        if (typeof window !== 'undefined') {
+            const API_BASE = getApiBaseUrl();
+            const res = await fetch(`${API_BASE}/api/bookings/swap-rooms`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId1: b1.id, bookingId2: b2.id, reason })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                return { success: false, message: data.error || 'Server rejected room swap' };
+            }
+        }
+
+        return { success: true, message: `Swapped Room ${room1} (${b1.guestName}) ↔ Room ${room2} (${b2.guestName}) successfully!` };
+    } catch (err: any) {
+        console.warn('Failed to swap rooms:', err);
+        return { success: false, message: err?.message || 'Failed to execute room swap' };
+    }
+};
+
+/**
+ * Auto-Apply Advance Deposit to Folio 1 upon Check-In (Yanolja PMS Accounting Rule)
+ */
+export const autoApplyAdvanceDepositOnCheckIn = async (
+    reservationNumber: string,
+    depositAmount: number,
+    paymentMethod: string = 'Advance Deposit / Pre-paid'
+): Promise<boolean> => {
+    if (!depositAmount || depositAmount <= 0) return true;
+    try {
+        const API_BASE = getApiBaseUrl();
+        const foliosRes = await fetch(`${API_BASE}/api/accounting/folios?reservationNumber=${encodeURIComponent(reservationNumber)}`);
+        const foliosData = await foliosRes.json();
+        const primaryFolio = foliosData?.data?.[0];
+
+        if (primaryFolio?.id) {
+            await fetch(`${API_BASE}/api/accounting/folios/${primaryFolio.id}/payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: depositAmount,
+                    paymentMethod,
+                    reference: `ADV-DEP-${reservationNumber.replace(/^RES-/, '')}`,
+                    notes: 'Advance deposit auto-applied upon Check-In (Escrow Settlement)',
+                    transactionDate: new Date().toISOString().slice(0, 10),
+                    status: 'Settled'
+                })
+            });
+            broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: primaryFolio.id });
+        }
+        return true;
+    } catch (err) {
+        console.warn('Failed to auto-apply advance deposit:', err);
+        return false;
+    }
+};
+
+/**
  * Update Room Housekeeping Status directly in Central Database & Broadcast to PMS
  */
 export const updateRoomHousekeepingInDB = async (
