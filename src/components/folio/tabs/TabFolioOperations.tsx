@@ -15,7 +15,8 @@ import {
     CreditCard,
     Percent,
     Settings2,
-    RefreshCw
+    RefreshCw,
+    FileText
 } from 'lucide-react';
 import { getCurrencySymbol } from '../../../utils/currencyUtils';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
@@ -91,9 +92,11 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         }
     }, [folio, booking]);
 
-    // Group Owner Folio Resolver
+    // Group Owner Folio Resolver (Guarantees exactly ONE primary/owner folio)
     const ownerFolio = useMemo(() => {
         if (!allFolios || allFolios.length === 0) return null;
+        const explicitOwner = allFolios.find((f: any) => f.is_group_owner || f.is_master || f.folio_type === 'MASTER');
+        if (explicitOwner) return explicitOwner;
         const byBookingRoom = allFolios.find(f => String(f.room_number) === String(booking?.roomNumber));
         if (byBookingRoom) return byBookingRoom;
         return allFolios[0];
@@ -457,7 +460,11 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                                 : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
                                                     }`}
                                                 >
-                                                    <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : isOwner ? 'text-amber-600' : 'text-gray-400'}`} />
+                                                    {isOwner ? (
+                                                        <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-600'}`} />
+                                                    ) : (
+                                                        <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-200' : 'text-gray-400'}`} />
+                                                    )}
                                                     <span className="truncate">{f.folio_number}</span>
                                                 </button>
                                             </div>
@@ -668,6 +675,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         {/* Folio Pills (Active & Inactive) */}
                         <div className="space-y-1 pl-2">
                             {allFolios.map((f) => {
+                                const isOwner = Boolean(ownerFolio && String(f.id) === String(ownerFolio.id));
                                 const isActive = String(f.id) === String(activeFolioId);
                                 return (
                                     <button
@@ -680,8 +688,19 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                 : 'bg-white hover:bg-blue-50/70 border border-gray-200 text-gray-700'
                                         }`}
                                     >
-                                        <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-gray-400'}`} />
+                                        {isOwner ? (
+                                            <Crown size={12} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-500'}`} />
+                                        ) : (
+                                            <FileText size={12} className={`shrink-0 ${isActive ? 'text-blue-100' : 'text-gray-400'}`} />
+                                        )}
                                         <span className="truncate">{f.folio_number}</span>
+                                        {isOwner && (
+                                            <span className={`ml-auto text-[9px] px-1 py-0.2 rounded font-bold ${
+                                                isActive ? 'bg-blue-500/80 text-amber-200 border border-amber-300/40' : 'bg-amber-100 text-amber-800'
+                                            }`}>
+                                                Owner
+                                            </span>
+                                        )}
                                     </button>
                                 );
                             })}

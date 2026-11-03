@@ -1854,6 +1854,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             const isRoomConfirmed = rmStatus === 'CONFIRMED' || rmStatus === 'ARRIVING';
                                             const rmResNo = rm.reservationNumber || rm.subBookingNumber || (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber);
                                             const rmRegNo = rm.registrationNumber || (isRoomInHouse ? generateRegistrationNumber(rmResNo) : undefined);
+                                            const hasExplicitPrimary = resolvedGroupRooms.some((r: any) => Boolean(r.isPrimary));
+                                            const isPrimaryOwner = hasExplicitPrimary ? Boolean(rm.isPrimary) : idx === 0;
 
                                             return (
                                                 <div
@@ -1870,7 +1872,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <span className="text-[11px] font-bold text-white truncate">
                                                                 {rm.guestName || booking.guestName}
                                                             </span>
-                                                            {(rm.isPrimary || idx === 0) && (
+                                                            {isPrimaryOwner && (
                                                                 <span title="Primary Booker / Group Owner">
                                                                     <Crown size={12} className="text-amber-300 fill-amber-300 shrink-0" />
                                                                 </span>
