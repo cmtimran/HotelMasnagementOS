@@ -36,7 +36,9 @@ import {
     CheckCircle2,
     RotateCcw,
     Undo2,
-    Clock
+    Clock,
+    LogOut,
+    Percent
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
@@ -82,7 +84,10 @@ export type DrawerMode =
     | 'unassign'
     | 'ungroup'
     | 'link_group'
-    | 'change_owner';
+    | 'change_owner'
+    | 'checkout'
+    | 'checkin'
+    | 'tax_exemption';
 
 export interface ReservationActionDrawerProps {
     isOpen: boolean;
@@ -169,6 +174,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // Current Active Mode State
     const [mode, setMode] = useState<DrawerMode>(initialMode);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+    const [isTaxExemptionModalOpen, setIsTaxExemptionModalOpen] = useState(false);
 
     // Status-Driven Document Printing States
     const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
@@ -687,7 +693,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 title: 'Financial Operations',
                 items: [
                     { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
-                    { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard }
+                    { key: 'payment', label: 'Add Payment / Post Charge', icon: CreditCard },
+                    { key: 'checkout', label: 'Check Out Guest', icon: LogOut, badge: 'Depart', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold', isSpecial: true },
+                    { key: 'tax_exemption', label: 'Tax Operation / Exemption', icon: Percent }
                 ]
             });
 
@@ -735,7 +743,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 title: 'Financial Operations',
                 items: [
                     { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
-                    { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard }
+                    { key: 'payment', label: 'Collect Deposit / Guarantee', icon: CreditCard },
+                    { key: 'tax_exemption', label: 'Tax Operation / Exemption', icon: Percent }
                 ]
             });
 
@@ -786,7 +795,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             title: 'Financial Operations',
             items: [
                 { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
-                { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard }
+                { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard },
+                { key: 'tax_exemption', label: 'Tax Operation / Exemption', icon: Percent }
             ]
         });
 
@@ -1405,6 +1415,23 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                 type="button"
                                                                 onClick={() => {
                                                                     setIsOptionsOpen(false);
+                                                                    if (opt.key === 'checkout') {
+                                                                        if (onCheckOut && activeSubBookingNo) {
+                                                                            onCheckOut(activeSubBookingNo);
+                                                                        }
+                                                                        return;
+                                                                    }
+                                                                    if (opt.key === 'checkin') {
+                                                                        if (onCheckIn && activeSubBookingNo) {
+                                                                            onCheckIn(activeSubBookingNo);
+                                                                        }
+                                                                        return;
+                                                                    }
+                                                                    if (opt.key === 'tax_exemption') {
+                                                                        setMode('folio');
+                                                                        setIsTaxExemptionModalOpen(true);
+                                                                        return;
+                                                                    }
                                                                     setMode(opt.key);
                                                                 }}
                                                                 className={`w-full px-3 py-1.5 text-left text-[9px] font-medium flex items-center justify-between cursor-pointer transition-colors ${
@@ -1476,7 +1503,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden flex flex-col">
                         <DrawerFolioOperations
                             booking={booking}
+                            resolvedGroupRooms={resolvedGroupRooms}
+                            onOpenAddPayment={() => setMode('payment')}
+                            onOpenAmendStay={() => {
+                                setMode('amend');
+                                if (onEdit) onEdit(booking);
+                            }}
+                            onOpenRoomMove={() => setMode('move')}
                             onOpenRoomSplit={() => setMode('split')}
+                            onOpenCheckOut={() => onCheckOut && activeSubBookingNo && onCheckOut(activeSubBookingNo)}
+                            isTaxExemptionOpen={isTaxExemptionModalOpen}
+                            onToggleTaxExemption={setIsTaxExemptionModalOpen}
                         />
                     </div>
                 ) : (

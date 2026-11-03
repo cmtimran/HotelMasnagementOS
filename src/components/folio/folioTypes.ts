@@ -89,6 +89,7 @@ export interface FolioData {
     suppress_rate_qr?: boolean;
     display_inclusion_separate?: boolean;
     generate_invoice_on_checkout?: boolean;
+    gstin?: string | null;
     gstin_number?: string | null;
     rooms: FolioRoomItem[];
     charges: FolioChargeItem[];

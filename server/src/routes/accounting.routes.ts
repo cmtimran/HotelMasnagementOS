@@ -168,6 +168,20 @@ router.get('/folios', async (req: Request, res: Response) => {
                         VALUES (?, ?, 'FOLIO_CREATED', ?, 'Front Desk')
                     `).run(newFolioId, targetRes.id, `Master Folio ${genFolioNo} created for reservation ${targetRes.reservation_number}`);
                 }
+
+                // If this reservation is part of a group, expand query to fetch all folios of the entire group!
+                if (targetRes.group_code) {
+                    whereClause = `(r.status NOT IN ('CANCELLED', 'VOID') OR r.status IS NULL) AND f.status = 'OPEN' AND (
+                        f.reservation_id IN (SELECT id FROM reservations WHERE group_code = ?)
+                        OR f.reservation_id = ?
+                    )`;
+                    params.length = 0;
+                    params.push(targetRes.group_code, targetRes.id);
+                    if (propertyId) {
+                        whereClause += ` AND r.property_id = ?`;
+                        params.push(propertyId);
+                    }
+                }
             }
         }
 
@@ -706,6 +720,122 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to transfer charges' });
+    }
+});
+
+// POST /api/accounting/folios/transfer-to-owner - Transfer group charges to the group owner's folio
+router.post('/folios/transfer-to-owner', async (req: Request, res: Response) => {
+    try {
+        const { sourceFolioIds = [], ownerFolioId, reservationId, reservationNumber, userName = 'Front Desk' } = req.body;
+
+        let ownerFolio: any = null;
+        if (ownerFolioId) {
+            ownerFolio = await findFolioByIdOrRef(ownerFolioId);
+        }
+        if (!ownerFolio && (reservationId || reservationNumber)) {
+            ownerFolio = await findFolioByIdOrRef(reservationNumber || reservationId);
+        }
+
+        if (!ownerFolio) {
+            return res.status(404).json({ success: false, error: 'Group owner folio not found' });
+        }
+
+        const targetOwnerId = Number(ownerFolio.id);
+
+        // Find which folios are being transferred from
+        let targetSourceIds: number[] = [];
+        if (Array.isArray(sourceFolioIds) && sourceFolioIds.length > 0) {
+            targetSourceIds = sourceFolioIds.map(id => Number(id)).filter(id => !isNaN(id) && id !== targetOwnerId);
+        } else if (ownerFolio.reservation_id) {
+            // Check if group reservation
+            const ownerRes = await db.prepare(`SELECT id, group_code FROM reservations WHERE id = ?`).get(ownerFolio.reservation_id) as any;
+            if (ownerRes?.group_code) {
+                const groupFolios = await db.prepare(`
+                    SELECT f.id FROM folios f
+                    JOIN reservations r ON r.id = f.reservation_id
+                    WHERE r.group_code = ? AND f.id != ?
+                `).all(ownerRes.group_code, targetOwnerId) as any[];
+                targetSourceIds = groupFolios.map(g => Number(g.id));
+            } else {
+                const siblingFolios = await db.prepare(`
+                    SELECT id FROM folios WHERE reservation_id = ? AND id != ?
+                `).all(ownerFolio.reservation_id, targetOwnerId) as any[];
+                targetSourceIds = siblingFolios.map(s => Number(s.id));
+            }
+        }
+
+        if (targetSourceIds.length === 0) {
+            return res.status(400).json({ success: false, error: 'No sub-folios selected or found to transfer charges from' });
+        }
+
+        let totalTransferredCount = 0;
+        let totalTransferredSum = 0;
+
+        for (const sId of targetSourceIds) {
+            const src = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(sId) as any;
+            if (!src) continue;
+
+            const charges = await db.prepare(`
+                SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)
+            `).all(sId) as any[];
+
+            if (charges.length === 0) continue;
+
+            let folioChargesSum = 0;
+            for (const c of charges) {
+                const amt = Number(c.total_amount || c.amount || 0);
+                folioChargesSum += amt;
+                await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(targetOwnerId, c.id);
+            }
+
+            totalTransferredCount += charges.length;
+            totalTransferredSum += folioChargesSum;
+
+            // Update source folio balance
+            await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(folioChargesSum, sId);
+
+            // Audit log on source
+            await db.prepare(`
+                INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+                VALUES (?, ?, 'GROUP_CHARGES_TRANSFERRED_TO_OWNER', ?, ?)
+            `).run(
+                sId,
+                src.reservation_id,
+                `Transferred ${charges.length} group charge(s) totaling ৳${folioChargesSum.toFixed(2)} to Group Owner Folio [${ownerFolio.folio_number}]`,
+                userName
+            );
+        }
+
+        // Add transferred sum to owner folio balance
+        await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(totalTransferredSum, targetOwnerId);
+
+        // Audit log on owner
+        await db.prepare(`
+            INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+            VALUES (?, ?, 'GROUP_CHARGES_RECEIVED_FROM_SUB_FOLIOS', ?, ?)
+        `).run(
+            targetOwnerId,
+            ownerFolio.reservation_id,
+            `Received ${totalTransferredCount} group charge(s) totaling ৳${totalTransferredSum.toFixed(2)} transferred from ${targetSourceIds.length} sub-folio(s)`,
+            userName
+        );
+
+        // Clean owner folio display name for the notification
+        let displayOwner = ownerFolio.folio_number || String(targetOwnerId);
+        if (displayOwner.startsWith('FN~')) {
+            displayOwner = displayOwner.replace(/^FN~/, '');
+        }
+
+        res.json({
+            success: true,
+            message: `Charges posted to Folio. ${displayOwner} successfully..`,
+            ownerFolioId: targetOwnerId,
+            ownerFolioNumber: ownerFolio.folio_number,
+            transferredCount: totalTransferredCount,
+            transferredAmount: totalTransferredSum
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to transfer group charges to owner' });
     }
 });
 
@@ -1303,6 +1433,91 @@ router.get('/folios/:id/audit-trail', async (req: Request, res: Response) => {
 });
 
 // POST /api/accounting/folios/:id/payments - Post payment/settlement to Folio
+// POST /api/accounting/folios/group-payment - Take a Payment For a Group (Yanolja PMS Specification)
+router.post('/folios/group-payment', async (req: Request, res: Response) => {
+    try {
+        const {
+            allocations = [],
+            paymentMethod = 'CASH',
+            referenceCode = 'GROUP_PAYMENT',
+            userName = 'Front Desk'
+        } = req.body;
+        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || null;
+
+        if (!Array.isArray(allocations) || allocations.length === 0) {
+            return res.status(400).json({ success: false, error: 'No folio allocations provided' });
+        }
+
+        const validAllocations = allocations
+            .map(a => ({ folioId: a.folioId, amount: Number(a.amount || 0), roomNumber: a.roomNumber }))
+            .filter(a => !isNaN(a.amount) && a.amount > 0);
+
+        if (validAllocations.length === 0) {
+            return res.status(400).json({ success: false, error: 'Total allocated payment must be greater than 0' });
+        }
+
+        const groupPaymentRef = `GPAY-${Date.now().toString().slice(-8)}`;
+        let processedCount = 0;
+        let processedSum = 0;
+
+        for (const item of validAllocations) {
+            const targetFolio = await findFolioByIdOrRef(item.folioId);
+            if (!targetFolio) continue;
+
+            const fId = Number(targetFolio.id);
+            const amt = item.amount;
+            const subPaymentNo = `PAY-${Date.now().toString().slice(-6)}-${fId}`;
+
+            await db.prepare(`
+                INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).run(fId, propertyId, subPaymentNo, paymentMethod.toUpperCase(), amt, `${referenceCode} (${groupPaymentRef})`);
+
+            await db.prepare(`
+                UPDATE folios 
+                SET balance = GREATEST(0, balance - ?),
+                    status = CASE WHEN (balance - ?) <= 0 THEN 'SETTLED' ELSE 'OPEN' END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(amt, amt, fId);
+
+            await db.prepare(`
+                INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
+                VALUES (?, ?, 'GROUP_PAYMENT_RECEIVED', ?, ?)
+            `).run(
+                fId,
+                targetFolio.reservation_id,
+                `Group payment of ৳${amt.toFixed(2)} received via ${paymentMethod} [Group Ref: ${groupPaymentRef}]`,
+                userName
+            );
+
+            processedCount++;
+            processedSum += amt;
+        }
+
+        try {
+            broadcastServerEvent({
+                type: 'FOLIO_UPDATED',
+                propertyId,
+                reference: groupPaymentRef,
+                amount: processedSum
+            });
+        } catch (err) {
+            console.warn('Failed to broadcast group payment update', err);
+        }
+
+        res.json({
+            success: true,
+            message: `Group payment of ৳${processedSum.toFixed(2)} recorded successfully across ${processedCount} folio(s)`,
+            groupPaymentRef,
+            totalAllocated: processedSum,
+            foliosCount: processedCount
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to process group payment' });
+    }
+});
+
 router.post('/folios/:id/payments', async (req: Request, res: Response) => {
     try {
         const folioId = Number(req.params.id);
