@@ -11,8 +11,8 @@
 
 export interface ParsedIdentityDocument {
     rawLines: string[];
-    format: 'TD3' | 'TD1' | 'TD2' | 'MANUAL';
-    documentType: 'Passport' | 'National ID' | 'Visa' | 'Other';
+    format: 'TD3' | 'TD1' | 'TD2' | 'MANUAL' | 'OCR';
+    documentType: 'Passport' | 'National ID' | 'Driving License' | 'Visa' | 'Other' | string;
     documentNumber: string;
     issuingCountryCode: string;
     issuingCountryName: string;
@@ -28,12 +28,13 @@ export interface ParsedIdentityDocument {
     isExpired: boolean;
     personalNumber?: string;
     isChecksumValid: boolean;
-    checksumDetails: {
+    checksumDetails?: {
         docNumberValid: boolean;
         dobValid: boolean;
         expiryValid: boolean;
         compositeValid: boolean;
     };
+    extractedFields?: Record<string, string>;
 }
 
 // ISO 3166-1 alpha-3 country code dictionary
@@ -142,10 +143,10 @@ export const parseIcaoDate = (yymmdd: string, isExpiry: boolean = false): string
     return `${fullYear}-${pad(Math.min(12, Math.max(1, mm)))}-${pad(Math.min(31, Math.max(1, dd)))}`;
 };
 
-const calculateAge = (dobString: string): number => {
-    if (!dobString) return 30;
+export const calculateAge = (dobString: string): number => {
+    if (!dobString) return 0;
     const dob = new Date(dobString);
-    if (isNaN(dob.getTime())) return 30;
+    if (isNaN(dob.getTime())) return 0;
     const today = new Date();
     let age = today.getFullYear() - dob.getFullYear();
     const m = today.getMonth() - dob.getMonth();
@@ -153,6 +154,13 @@ const calculateAge = (dobString: string): number => {
         age--;
     }
     return Math.max(0, age);
+};
+
+export const isDateExpired = (expDateString?: string): boolean => {
+    if (!expDateString) return false;
+    const exp = new Date(expDateString);
+    if (isNaN(exp.getTime())) return false;
+    return exp.getTime() < new Date().getTime();
 };
 
 /**

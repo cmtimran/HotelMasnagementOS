@@ -13,10 +13,11 @@ import {
     Sparkles
 } from 'lucide-react';
 import {
-    parseTD3,
-    parseTD1,
+    runTesseractOcr,
+    parseUniversalIdentityDocument,
     type ParsedIdentityDocument
-} from '../../utils/mrzParser';
+} from '../../utils/universalIdParser';
+import { parseTD3, parseTD1 } from '../../utils/mrzParser';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
 
@@ -36,10 +37,13 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
     reservationNumber
 }) => {
     const currency = getCurrencySymbol();
-    const [scanMode, setScanMode] = useState<'camera' | 'upload' | 'sample'>('sample');
+    const [scanMode, setScanMode] = useState<'camera' | 'upload' | 'sample'>('upload');
     const [isScanning, setIsScanning] = useState(false);
+    const [ocrProgress, setOcrProgress] = useState<string>('');
     const [parsedDoc, setParsedDoc] = useState<ParsedIdentityDocument | null>(null);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [guestPhone, setGuestPhone] = useState<string>('');
 
     // Camera Stream States
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -117,6 +121,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
             if (data?.success && data?.guest) {
                 setMatchedGuest(data.guest);
                 setMatchType(data.matchType);
+                if (data.guest.phone) setGuestPhone(data.guest.phone);
             } else {
                 setMatchedGuest(null);
                 setMatchType('NONE');
@@ -130,54 +135,89 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
     };
 
     // Camera Capture Handler
-    const handleCaptureCamera = () => {
+    const handleCaptureCamera = async () => {
         if (!videoRef.current) return;
         setIsScanning(true);
+        setOcrProgress('Capturing camera frame...');
 
         const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth || 640;
-        canvas.height = videoRef.current.videoHeight || 480;
+        canvas.width = videoRef.current.videoWidth || 1280;
+        canvas.height = videoRef.current.videoHeight || 720;
         const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
             setCapturedImage(dataUrl);
 
-            // In production, OCR can be passed to Tesseract/Vision API.
-            // For instantaneous demonstration, parse TD3 standard sample:
-            setTimeout(() => {
-                const sampleDoc = parseTD3(
-                    'P<BGDLANGDON<<ROBERT<<<<<<<<<<<<<<<<<<<<<<<',
-                    'A049281721BGD8806154M3209205<<<<<<<<<<<<<<4'
-                );
-                setParsedDoc(sampleDoc);
+            try {
+                setOcrProgress('Running Universal Document OCR engine...');
+                const extractedText = await runTesseractOcr(dataUrl, (pct, status) => {
+                    setOcrProgress(`${status} (${pct}%)`);
+                });
+
+                setOcrProgress('Dynamically parsing identity fields...');
+                const doc = parseUniversalIdentityDocument(extractedText);
+                setParsedDoc(doc);
                 setIsScanning(false);
-                lookupExistingProfile(sampleDoc);
-            }, 600);
+                setOcrProgress('');
+                lookupExistingProfile(doc);
+            } catch (err: any) {
+                setIsScanning(false);
+                setOcrProgress('');
+                setStatusToast({
+                    type: 'error',
+                    text: 'OCR error: ' + (err?.message || 'Could not recognize document.')
+                });
+            }
         }
     };
 
-    // File Upload Handler
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    // Universal File Processor (handles both Browse and Drag & Drop)
+    const processFile = (file: File) => {
         if (!file) return;
 
         setIsScanning(true);
+        setOcrProgress('Reading uploaded document image...');
+
         const reader = new FileReader();
-        reader.onload = () => {
-            setCapturedImage(reader.result as string);
-            // Simulate OCR document parse
-            setTimeout(() => {
-                const sampleDoc = parseTD3(
-                    'P<BGDRAHMAN<<ANISUR<<<<<<<<<<<<<<<<<<<<<<<<',
-                    'B098412563BGD9011248M3012156<<<<<<<<<<<<<<2'
-                );
-                setParsedDoc(sampleDoc);
+        reader.onload = async () => {
+            const dataUrl = reader.result as string;
+            setCapturedImage(dataUrl);
+
+            try {
+                setOcrProgress('Running Universal Document OCR engine...');
+                const extractedText = await runTesseractOcr(file, (pct, status) => {
+                    setOcrProgress(`${status} (${pct}%)`);
+                });
+
+                setOcrProgress('Dynamically parsing identity fields...');
+                const doc = parseUniversalIdentityDocument(extractedText);
+                setParsedDoc(doc);
                 setIsScanning(false);
-                lookupExistingProfile(sampleDoc);
-            }, 500);
+                setOcrProgress('');
+                lookupExistingProfile(doc);
+            } catch (err: any) {
+                setIsScanning(false);
+                setOcrProgress('');
+                setStatusToast({
+                    type: 'error',
+                    text: 'OCR error: ' + (err?.message || 'Could not recognize document text.')
+                });
+            }
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFile(file);
+    };
+
+    const handleFileDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) processFile(file);
     };
 
     // Fast Preset Samples
@@ -222,7 +262,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
         try {
             // Update reservation with existing guest ID
             if (reservationNumber || reservationId) {
-                await fetch(`${getApiBaseUrl()}/api/guests/scan-auto-create-or-update`, {
+                const res = await fetch(`${getApiBaseUrl()}/api/guests/scan-auto-create-or-update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -232,10 +272,15 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         documentData: {
                             idNumber: parsedDoc?.documentNumber,
                             idExpiryDate: parsedDoc?.expiryDate,
-                            passportVisaNumber: parsedDoc?.documentNumber
+                            passportVisaNumber: parsedDoc?.documentNumber,
+                            phone: guestPhone.trim() || undefined
                         }
                     })
                 });
+                const data = await res.json();
+                if (!data?.success) {
+                    throw new Error(data?.error || 'Failed to attach existing guest');
+                }
             }
 
             setStatusToast({
@@ -278,27 +323,30 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         gender: parsedDoc.gender,
                         idExpiryDate: parsedDoc.expiryDate,
                         idIssueCountry: parsedDoc.issuingCountryName,
-                        phone: `+8801${Math.floor(10000000 + Math.random() * 90000000)}`
+                        phone: guestPhone.trim() || undefined
                     }
                 })
             });
 
             const data = await res.json();
             if (data?.success) {
+                const isExisting = Boolean(data.isExisting);
                 setStatusToast({
                     type: 'success',
-                    text: `Created new guest profile #${data.guest?.id || ''} and linked to stay!`
+                    text: isExisting
+                        ? `Linked existing verified profile #${data.guest?.id || ''} (${data.guest?.fullName || ''}) to stay!`
+                        : `Created new guest profile #${data.guest?.id || ''} and linked to stay!`
                 });
 
                 if (onProfileResolved) {
-                    onProfileResolved(data.guest, true);
+                    onProfileResolved(data.guest, !isExisting);
                 }
                 setTimeout(() => onClose(), 800);
             } else {
-                setStatusToast({ type: 'error', text: data?.error || 'Failed to create profile' });
+                setStatusToast({ type: 'error', text: data?.error || 'Failed to process profile' });
             }
         } catch (e: any) {
-            setStatusToast({ type: 'error', text: e?.message || 'Error creating profile' });
+            setStatusToast({ type: 'error', text: e?.message || 'Error processing profile' });
         } finally {
             setActionLoading(false);
         }
@@ -444,12 +492,61 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         </div>
                     )}
 
-                    {scanMode === 'upload' && (
-                        <div className="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/50">
-                            <UploadCloud size={36} className="text-blue-500 mb-2" />
-                            <h4 className="text-xs font-bold text-gray-800">Drag &amp; Drop Passport or ID Card Image</h4>
-                            <p className="text-[11px] text-gray-500 mb-3">Supports JPG, PNG, WEBP, PDF (Max 10MB)</p>
-                            <label className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs">
+                    {scanMode === 'upload' && parsedDoc && (
+                        <div
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={handleFileDrop}
+                            className={`border border-dashed rounded-lg px-3 py-1.5 flex items-center justify-between text-xs transition-all ${
+                                isDragging
+                                    ? 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30'
+                                    : 'border-gray-300 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-5 h-5 rounded bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                    <UploadCloud size={12} />
+                                </div>
+                                <span className="text-[11px] text-gray-600 truncate">
+                                    Document parsed. Drag &amp; drop another photo or click to re-scan.
+                                </span>
+                            </div>
+                            <label className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 hover:border-blue-400 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors shrink-0">
+                                <span>Change / Re-upload File</span>
+                                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            </label>
+                        </div>
+                    )}
+
+                    {scanMode === 'upload' && !parsedDoc && (
+                        <div
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={handleFileDrop}
+                            className={`border-2 border-dashed rounded-xl px-4 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-left transition-all ${
+                                isDragging
+                                    ? 'border-blue-500 bg-blue-100/60 ring-2 ring-blue-400/40'
+                                    : 'border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60'
+                            } shadow-2xs`}
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                    <UploadCloud size={18} />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                        <span>Drag &amp; drop Passport or ID Card image</span>
+                                        <span className="text-[9.5px] text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-semibold">
+                                            All Countries
+                                        </span>
+                                    </h4>
+                                    <p className="text-[10px] text-gray-500 mt-0.5">
+                                        Supports NID, Smart Card, Passport, Driver's License &bull; JPG, PNG, WEBP, PDF (Max 10MB)
+                                    </p>
+                                </div>
+                            </div>
+                            <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs transition-colors shrink-0 flex items-center gap-1.5">
+                                <UploadCloud size={12} />
                                 <span>Browse Files</span>
                                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                             </label>
@@ -505,6 +602,17 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         </div>
                     )}
 
+                    {/* SCANNING / OCR PROGRESS INDICATOR */}
+                    {isScanning && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-center text-xs text-emerald-900 flex items-center justify-center gap-2.5 shadow-sm animate-pulse">
+                            <RefreshCw size={16} className="animate-spin text-emerald-600 shrink-0" />
+                            <div>
+                                <p className="font-bold">{ocrProgress || 'Analyzing document image with Universal OCR engine...'}</p>
+                                <p className="text-[10px] text-emerald-700">Extracting names, ID numbers, and dates dynamically with zero hardcoding...</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* EXTRACTED IDENTITY DOCUMENT DETAILS */}
                     {parsedDoc && (
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 animate-in fade-in zoom-in-95 duration-150">
@@ -519,53 +627,130 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                                     </h3>
                                     {parsedDoc.isChecksumValid ? (
                                         <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <CheckCircle2 size={10} /> ICAO Verified
+                                            <CheckCircle2 size={10} /> Verified
                                         </span>
                                     ) : (
                                         <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <AlertTriangle size={10} /> Checksum Check Needed
+                                            <AlertTriangle size={10} /> Visual OCR
                                         </span>
                                     )}
                                 </div>
                                 <span className="text-xs font-mono font-bold text-gray-700">
-                                    Doc #: <strong className="text-blue-700">{parsedDoc.documentNumber}</strong>
+                                    Doc #: <strong className="text-blue-700">{parsedDoc.documentNumber || 'Detected'}</strong>
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            {/* Editable Fields Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 text-xs">
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Full Name</span>
-                                    <span className="font-bold text-gray-800">{parsedDoc.fullName}</span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.fullName}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, fullName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded font-bold text-gray-800 bg-white outline-none focus:border-blue-500 text-xs"
+                                        placeholder="Guest Full Name..."
+                                    />
                                 </div>
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Nationality</span>
-                                    <span className="font-bold text-gray-800">{parsedDoc.nationalityName} ({parsedDoc.nationalityCode})</span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Document #</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.documentNumber}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setParsedDoc({ ...parsedDoc, documentNumber: val });
+                                            lookupExistingProfile({ ...parsedDoc, documentNumber: val });
+                                        }}
+                                        className="w-full h-8 px-2 border border-blue-300 rounded font-bold font-mono text-blue-700 bg-white outline-none focus:border-blue-500 text-xs"
+                                        placeholder="Passport / NID No..."
+                                    />
                                 </div>
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Date of Birth</span>
-                                    <span className="font-bold font-mono text-gray-800">{parsedDoc.dateOfBirth} ({parsedDoc.age} yrs)</span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Date of Birth</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.dateOfBirth}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, dateOfBirth: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded font-mono text-gray-800 bg-white outline-none focus:border-blue-500 text-xs"
+                                        placeholder="YYYY-MM-DD"
+                                    />
                                 </div>
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Gender</span>
-                                    <span className="font-bold text-gray-800">{parsedDoc.gender}</span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Nationality</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.nationalityName}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, nationalityName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none focus:border-blue-500 text-xs"
+                                        placeholder="Nationality..."
+                                    />
                                 </div>
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Expiry Date</span>
-                                    <span className={`font-bold font-mono ${parsedDoc.isExpired ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                        {parsedDoc.expiryDate} {parsedDoc.isExpired ? '(EXPIRED)' : ''}
-                                    </span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Gender</label>
+                                    <select
+                                        value={parsedDoc.gender}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, gender: e.target.value as any })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                    >
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <span className="text-gray-400 text-[10px] uppercase block">Issuing Authority</span>
-                                    <span className="font-bold text-gray-800">{parsedDoc.issuingCountryName}</span>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Expiry Date</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.expiryDate}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, expiryDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded font-mono text-gray-800 bg-white outline-none text-xs"
+                                        placeholder="YYYY-MM-DD"
+                                    />
                                 </div>
-                                <div className="col-span-2">
-                                    <span className="text-gray-400 text-[10px] uppercase block">Raw MRZ String</span>
-                                    <span className="font-mono text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200 block truncate">
-                                        {parsedDoc.rawLines.join(' ')}
-                                    </span>
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Document Type</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.documentType}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, documentType: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Issuing Authority</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.issuingCountryName}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, issuingCountryName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Contact Phone</label>
+                                    <input
+                                        type="tel"
+                                        value={guestPhone}
+                                        onChange={e => setGuestPhone(e.target.value)}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                        placeholder="Optional phone"
+                                    />
                                 </div>
                             </div>
+
+                            {/* Collapsible Raw Extracted Document Text */}
+                            {parsedDoc.rawLines.length > 0 && (
+                                <div className="pt-2 border-t border-gray-200">
+                                    <details className="text-[11px] text-gray-500 cursor-pointer">
+                                        <summary className="font-semibold text-gray-700 hover:text-blue-600">
+                                            View Raw Extracted Text ({parsedDoc.rawLines.length} lines detected)
+                                        </summary>
+                                        <div className="mt-2 p-2.5 bg-white border border-gray-200 rounded font-mono text-[10.5px] text-gray-700 whitespace-pre-wrap max-h-36 overflow-y-auto">
+                                            {parsedDoc.rawLines.join('\n')}
+                                        </div>
+                                    </details>
+                                </div>
+                            )}
                         </div>
                     )}
 

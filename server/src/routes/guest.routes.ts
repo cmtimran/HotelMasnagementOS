@@ -728,10 +728,10 @@ router.post('/lookup-by-document', async (req: Request, res: Response) => {
         const all = await db.prepare(`
             SELECT 
                 g.*,
-                (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_stays,
-                (SELECT COALESCE(SUM(r.total_amount), 0) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_spend,
+                (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOIDED')) as total_stays,
+                (SELECT COALESCE(SUM(r.total_amount), 0) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOIDED')) as total_spend,
                 (SELECT MAX(rr.check_in_date) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_stay_date,
-                (SELECT MAX(rr.room_number) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_room_number
+                (SELECT rm.room_number FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id JOIN rooms rm ON rm.id = rr.room_id WHERE r.booker_guest_id = g.id ORDER BY rr.check_in_date DESC LIMIT 1) as last_room_number
             FROM guests g
         `).all() as any[];
 
@@ -820,6 +820,28 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
         const action = body.action || 'CREATE'; // 'CREATE' | 'UPDATE_EXISTING'
         const actor = body.staffName || 'Front Desk Scanner';
 
+        // Helper to cleanly link the guest to the target reservation without referencing nonexistent columns
+        const linkReservationGuest = async (guestId: number) => {
+            const resIdent = body.reservationNumber || body.reservationId;
+            if (!resIdent) return;
+
+            let resRecord: any = null;
+            // 1. Check by reservation_number (e.g. 'RES-681508')
+            resRecord = await db.prepare('SELECT id FROM reservations WHERE reservation_number = ?').get(String(resIdent));
+
+            // 2. Fallback check by numeric id if not found by number
+            if (!resRecord && !isNaN(Number(resIdent))) {
+                resRecord = await db.prepare('SELECT id FROM reservations WHERE id = ?').get(Number(resIdent));
+            }
+
+            if (resRecord && resRecord.id) {
+                // Update booker on reservations table (schema column: booker_guest_id)
+                await db.prepare('UPDATE reservations SET booker_guest_id = ? WHERE id = ?').run(guestId, resRecord.id);
+                // Update guest on reservation_rooms table (schema columns: guest_id, reservation_id)
+                await db.prepare('UPDATE reservation_rooms SET guest_id = ? WHERE reservation_id = ?').run(guestId, resRecord.id);
+            }
+        };
+
         if (action === 'UPDATE_EXISTING' && body.guestId) {
             const guestId = Number(body.guestId);
             const updates = body.documentData || {};
@@ -859,26 +881,102 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
                 JSON.stringify(updates)
             );
 
-            const updatedGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId);
+            // Link reservation if requested
+            await linkReservationGuest(guestId);
+
+            const updatedGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId) as any;
+            const normalizedUpdated = updatedGuest ? {
+                ...updatedGuest,
+                name: `${updatedGuest.first_name || ''} ${updatedGuest.last_name || ''}`.trim(),
+                fullName: `${updatedGuest.first_name || ''} ${updatedGuest.last_name || ''}`.trim()
+            } : null;
 
             broadcastServerEvent({ type: 'GUEST_UPDATED', guestId, updatedBy: actor });
 
             return res.json({
                 success: true,
                 message: `Guest profile #${guestId} updated successfully with scanned passport/ID.`,
-                guest: updatedGuest
+                guest: normalizedUpdated
             });
         }
 
-        // CREATE NEW GUEST PROFILE
+        // CREATE NEW GUEST PROFILE (With Strict Deduplication Pre-flight Check)
         const doc = body.documentData || body;
         const fullName = String(doc.fullName || doc.name || 'Valued Guest').trim();
         const parts = fullName.split(' ');
         const salutation = doc.salutation || (doc.gender === 'Female' ? 'Ms' : 'Mr');
         const firstName = doc.firstName || parts[0] || 'Guest';
         const lastName = doc.lastName || parts.slice(1).join(' ') || firstName;
-        const phone = doc.phone || `+8801${Math.floor(10000000 + Math.random() * 90000000)}`;
+        const phone = doc.phone && String(doc.phone).trim().length > 3 ? String(doc.phone).trim() : null;
 
+        // Atomic Deduplication Guard: Check if guest with this ID or Demographics already exists in DB
+        const cleanDocNo = String(doc.idNumber || doc.documentNumber || '').replace(/[\s\-_]/g, '').trim();
+        let existingGuest: any = null;
+
+        if (cleanDocNo && cleanDocNo.length >= 4) {
+            existingGuest = await db.prepare(`
+                SELECT * FROM guests 
+                WHERE REPLACE(REPLACE(REPLACE(LOWER(COALESCE(id_number, '')), ' ', ''), '-', ''), '_', '') = LOWER(?)
+                   OR REPLACE(REPLACE(REPLACE(LOWER(COALESCE(passport_visa_number, '')), ' ', ''), '-', ''), '_', '') = LOWER(?)
+                LIMIT 1
+            `).get(cleanDocNo, cleanDocNo);
+        }
+
+        if (!existingGuest && doc.dob && fullName.length >= 4) {
+            existingGuest = await db.prepare(`
+                SELECT * FROM guests 
+                WHERE dob = ? AND (
+                    LOWER(first_name || ' ' || last_name) = LOWER(?) OR
+                    LOWER(last_name || ' ' || first_name) = LOWER(?)
+                )
+                LIMIT 1
+            `).get(doc.dob, fullName, fullName);
+        }
+
+        if (existingGuest) {
+            const guestId = Number(existingGuest.id);
+            // Update any missing KYC attributes on the existing master profile
+            await db.prepare(`
+                UPDATE guests 
+                SET id_number = COALESCE(?, id_number),
+                    id_type = COALESCE(?, id_type),
+                    id_expiry_date = COALESCE(?, id_expiry_date),
+                    id_issue_country = COALESCE(?, id_issue_country),
+                    dob = COALESCE(?, dob),
+                    gender = COALESCE(?, gender),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(
+                doc.idNumber || null,
+                doc.idType || null,
+                doc.idExpiryDate || null,
+                doc.idIssueCountry || null,
+                doc.dob || null,
+                doc.gender || null,
+                guestId
+            );
+
+            // Link reservation if requested
+            await linkReservationGuest(guestId);
+
+            const refreshed = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId) as any;
+            const normalized = refreshed ? {
+                ...refreshed,
+                name: `${refreshed.first_name || ''} ${refreshed.last_name || ''}`.trim(),
+                fullName: `${refreshed.first_name || ''} ${refreshed.last_name || ''}`.trim()
+            } : null;
+
+            broadcastServerEvent({ type: 'GUEST_UPDATED', guestId, updatedBy: actor });
+
+            return res.json({
+                success: true,
+                isExisting: true,
+                message: `Existing guest profile #${guestId} (${normalized?.fullName}) found and linked to stay.`,
+                guest: normalized
+            });
+        }
+
+        // Truly New Guest: Insert clean record
         const result = await db.prepare(`
             INSERT INTO guests (
                 organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number,
@@ -910,30 +1008,23 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
 
         const newGuestId = Number(result.lastInsertRowid);
 
-        // If a reservationId is passed, link this guest profile directly to the reservation
-        if (body.reservationNumber || body.reservationId) {
-            const resNo = body.reservationNumber || body.reservationId;
-            await db.prepare('UPDATE reservations SET booker_guest_id = ?, guest_name = ? WHERE reservation_number = ? OR id = ?').run(
-                newGuestId,
-                `${salutation} ${firstName} ${lastName}`.trim(),
-                resNo,
-                resNo
-            );
-            await db.prepare('UPDATE reservation_rooms SET guest_id = ?, guest_name = ? WHERE reservation_number = ? OR reservation_id = ?').run(
-                newGuestId,
-                `${salutation} ${firstName} ${lastName}`.trim(),
-                resNo,
-                resNo
-            );
-        }
+        // Link reservation if requested
+        await linkReservationGuest(newGuestId);
 
-        const createdGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newGuestId);
+        const createdGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newGuestId) as any;
+        const normalizedCreated = createdGuest ? {
+            ...createdGuest,
+            name: `${createdGuest.first_name || ''} ${createdGuest.last_name || ''}`.trim(),
+            fullName: `${createdGuest.first_name || ''} ${createdGuest.last_name || ''}`.trim()
+        } : null;
+
         broadcastServerEvent({ type: 'GUEST_CREATED', guestId: newGuestId, name: `${firstName} ${lastName}` });
 
         return res.json({
             success: true,
+            isExisting: false,
             message: `New guest profile #${newGuestId} automatically created from document scan.`,
-            guest: createdGuest
+            guest: normalizedCreated
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to auto-create guest profile' });
