@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, CheckCircle2, DoorClosed, User, AlertCircle, Plus } from 'lucide-react';
+import { Save, Trash2, CheckCircle2, DoorClosed, User, AlertCircle, Plus, Camera } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import { broadcastPMSEvent } from '../../../utils/roomInventoryEngine';
 import type { FolioData } from '../folioTypes';
 import type { AmendBookingData } from '../../modals/AmendStayModal';
+import { PassportIdScannerModal } from '../../modals/PassportIdScannerModal';
 
 interface GuestRow {
     id: string;
@@ -32,6 +33,7 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     const initialRoom = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || '101';
 
@@ -87,6 +89,48 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
 
     const handleUpdateGuest = (id: string, field: keyof GuestRow, value: any) => {
         setGuests(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
+    };
+
+    const handlePassportResolved = (guest: any, isNew: boolean) => {
+        if (!guest) return;
+        const rawName = guest.name || guest.fullName || '';
+        let salutation = 'Mr';
+        let cleanName = rawName;
+        const titleMatch = rawName.match(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i);
+        if (titleMatch) {
+            salutation = titleMatch[1];
+            cleanName = rawName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim();
+        }
+
+        setGuests(prev => {
+            if (prev.length === 1 && (!prev[0].guestName || prev[0].guestName === 'Valued Guest')) {
+                return [{
+                    ...prev[0],
+                    salutation,
+                    guestName: cleanName,
+                    mobile: guest.phone || prev[0].mobile,
+                    email: guest.email || prev[0].email
+                }];
+            }
+            return [
+                ...prev,
+                {
+                    id: String(Date.now()),
+                    roomNumber: initialRoom,
+                    salutation,
+                    guestName: cleanName,
+                    mobile: guest.phone || '',
+                    email: guest.email || '',
+                    isChargeable: false
+                }
+            ];
+        });
+
+        setFeedbackMsg(
+            isNew
+                ? `Scanned & registered ${cleanName}!`
+                : `Verified guest record attached: ${cleanName} (${guest.vip_status || 'Regular'})`
+        );
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -199,14 +243,25 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-gray-800 tracking-wide uppercase">Add Guest List</h4>
-                        <button
-                            type="button"
-                            onClick={handleAddSharer}
-                            className="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center gap-1 cursor-pointer bg-blue-50/70 border border-blue-200/70 px-2 py-0.5 rounded shadow-2xs hover:bg-blue-100 transition-colors"
-                        >
-                            <Plus size={12} />
-                            <span>Add Sharer (+ Share)</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => setIsScannerOpen(true)}
+                                className="text-emerald-700 hover:text-emerald-900 font-semibold text-xs flex items-center gap-1 cursor-pointer bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded shadow-2xs hover:bg-emerald-100 transition-colors"
+                                title="Scan Passport or National ID card to auto-populate guest"
+                            >
+                                <Camera size={12} className="text-emerald-600" />
+                                <span>Scan Passport / ID</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAddSharer}
+                                className="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center gap-1 cursor-pointer bg-blue-50/70 border border-blue-200/70 px-2 py-0.5 rounded shadow-2xs hover:bg-blue-100 transition-colors"
+                            >
+                                <Plus size={12} />
+                                <span>Add Sharer (+ Share)</span>
+                            </button>
+                        </div>
                     </div>
 
                     {feedbackMsg && (
@@ -336,6 +391,15 @@ export const TabGuestDetails: React.FC<TabGuestDetailsProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Passport & ID Card Fast Auto-Scanner Modal */}
+            <PassportIdScannerModal
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                reservationNumber={booking?.reservationNumber || folio?.reservation_number}
+                reservationId={booking?.id || folio?.id}
+                onProfileResolved={handlePassportResolved}
+            />
         </form>
     );
 };

@@ -20,10 +20,12 @@ import {
     Sparkles,
     CheckCircle2,
     AlertTriangle,
-    Split
+    Split,
+    Camera
 } from 'lucide-react';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './MultiRoomSelectorModal';
+import { PassportIdScannerModal } from './PassportIdScannerModal';
 import { useProperty } from '../../context/PropertyContext';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
 import type {
@@ -525,6 +527,41 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const [occupation, setOccupation] = useState('');
     const [purposeOfVisit, setPurposeOfVisit] = useState('Business');
     const [idType, setIdType] = useState('National ID (NID)');
+
+    // Fast Passport & ID Card Scanner State
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [verifiedGuestCard, setVerifiedGuestCard] = useState<any | null>(null);
+
+    const handlePassportResolvedInModal = (guest: any, isNew: boolean) => {
+        if (!guest) return;
+        const rawName = guest.name || guest.fullName || '';
+        let sal = 'Mr';
+        let cleanName = rawName;
+        const titleMatch = rawName.match(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i);
+        if (titleMatch) {
+            sal = titleMatch[1];
+            cleanName = rawName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim();
+        }
+        setSalutation(sal);
+        setGuestName(cleanName);
+        if (guest.phone) {
+            setPhone(guest.phone);
+            setMobile(guest.phone);
+        }
+        if (guest.email) setEmail(guest.email);
+        if (guest.nationality) setNationality(guest.nationality);
+        if (guest.id_type) setIdType(guest.id_type);
+        if (guest.vip_status) setVipStatus(guest.vip_status);
+        if (guest.gender) setGender(guest.gender);
+        if (guest.dob) setDob(guest.dob);
+
+        setVerifiedGuestCard(guest);
+        toast.success(
+            isNew
+                ? `New profile auto-created for ${cleanName}!`
+                : `Returning guest profile loaded: ${cleanName} (${guest.vip_status || 'Regular'})`
+        );
+    };
 
     // Remarks & Preferences Tabs
     const [activePrefTab, setActivePrefTab] = useState<'Guest' | 'Check In' | 'Check Out' | 'House Keeping' | 'Payment Note'>('Guest');
@@ -2160,13 +2197,54 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <p className="text-[11px] text-gray-500">Identity, contact and travel information</p>
                                         </div>
                                     </div>
-                                    <div className="text-gray-400">
-                                        {openGuestProfile ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsScannerOpen(true);
+                                            }}
+                                            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                            title="Scan Passport or National ID card to instantly auto-fill Guest Profile"
+                                        >
+                                            <Camera size={13} />
+                                            <span>Scan Passport / ID</span>
+                                        </button>
+                                        <div className="text-gray-400">
+                                            {openGuestProfile ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {openGuestProfile && (
                                     <div className="p-5 bg-[#f8fafc] space-y-4">
+                                        {/* Verified Guest Chip Banner */}
+                                        {verifiedGuestCard && (
+                                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-900 shadow-2xs">
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                                    <div>
+                                                        <span className="font-bold">Verified Returning Guest:</span>{' '}
+                                                        <span className="font-semibold">{verifiedGuestCard.name}</span>{' '}
+                                                        <span className="bg-emerald-200/80 text-emerald-800 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                                                            {verifiedGuestCard.vip_status || 'VIP'}
+                                                        </span>
+                                                        {verifiedGuestCard.stay_history && (
+                                                            <span className="text-[11px] text-emerald-700 ml-2">
+                                                                • {verifiedGuestCard.stay_history.total_stays || 1} Stays (Lifetime: {currencySymbol} {Number(verifiedGuestCard.stay_history.lifetime_spend || 0).toFixed(0)})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setVerifiedGuestCard(null)}
+                                                    className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline cursor-pointer"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                            </div>
+                                        )}
                                         {/* Row 1: Name, Phone, Mobile, Email */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                                             <div className="flex flex-col gap-1">
@@ -3011,6 +3089,13 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     isAutoMode={multiRoomModal.isAutoMode}
                 />
             )}
+
+            {/* Fast Passport & National ID Card Scanner Modal */}
+            <PassportIdScannerModal
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onProfileResolved={handlePassportResolvedInModal}
+            />
         </div>
     );
 };

@@ -39,7 +39,8 @@ import {
     Undo2,
     Clock,
     LogOut,
-    Percent
+    Percent,
+    Camera
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
@@ -62,12 +63,14 @@ import {
     getDynamicRoomTypes,
     getDynamicRatePlans,
     getDynamicPackages,
-    syncRatePlansAndPackagesFromDB
+    syncRatePlansAndPackagesFromDB,
+    broadcastPMSEvent
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
 import { DrawerFolioOperations } from '../folio/DrawerFolioOperations';
 import { DigitalRegCardModal } from './DigitalRegCardModal';
+import { PassportIdScannerModal } from './PassportIdScannerModal';
 
 export type DrawerMode =
     | 'overview'
@@ -93,7 +96,8 @@ export type DrawerMode =
     | 'change_owner'
     | 'checkout'
     | 'checkin'
-    | 'tax_exemption';
+    | 'tax_exemption'
+    | 'scan_id';
 
 export interface ReservationActionDrawerProps {
     isOpen: boolean;
@@ -250,6 +254,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     // 5c. Digital Reg Card Modal State
     const [isRegCardModalOpen, setIsRegCardModalOpen] = useState(false);
+
+    // 5d. Passport & ID Card Auto-Scanner Modal State
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     // 6. Add New Booking Form States
     const [newBookingFolio, setNewBookingFolio] = useState<string>('');
@@ -741,6 +748,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
                     { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
                     { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                    { key: 'scan_id', label: 'Scan Passport / ID (Fast Profile)', icon: Camera, badge: 'Fast ID', badgeColor: 'bg-emerald-100 text-emerald-800' },
                     { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                     { key: 'add_booking', label: 'Add Companion Room', icon: CalendarPlus }
                 ]
@@ -798,6 +806,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     { key: 'move', label: 'Change Held Room', icon: DoorOpen },
                     { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
                     { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                    { key: 'scan_id', label: 'Scan Passport / ID (Fast Profile)', icon: Camera, badge: 'Fast ID', badgeColor: 'bg-emerald-100 text-emerald-800' },
                     { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                     { key: 'unassign', label: 'Unassign Room', icon: DoorClosed },
                     { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus }
@@ -847,6 +856,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
                 { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                { key: 'scan_id', label: 'Scan Passport / ID (Fast Profile)', icon: Camera, badge: 'Fast ID', badgeColor: 'bg-emerald-100 text-emerald-800' },
                 { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
                 { key: 'unassign', label: 'Unassign Room', icon: DoorClosed }
@@ -1348,6 +1358,32 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         }
     };
 
+    const handlePassportProfileResolved = (guest: any, isNew: boolean) => {
+        if (!guest) return;
+        const resolvedName = guest.name || guest.fullName;
+        if (resolvedName) {
+            if (booking) {
+                booking.guestName = resolvedName;
+                if (guest.phone) booking.phone = guest.phone;
+                if (guest.nationality) (booking as any).nationality = guest.nationality;
+                if (guest.id_number) (booking as any).idNumber = guest.id_number;
+                if (guest.vip_status) (booking as any).vipStatus = guest.vip_status;
+            }
+            if (activeRoom) {
+                activeRoom.guestName = resolvedName;
+            }
+        }
+        toast.success(
+            isNew
+                ? `New profile created and attached for ${resolvedName}!`
+                : `Verified guest ${resolvedName} (${guest.vip_status || 'Regular'}) attached to this reservation!`
+        );
+        broadcastPMSEvent({
+            type: 'RESERVATION_UPDATED',
+            reservationId: booking?.id
+        });
+    };
+
     return createPortal(
         <div className="fixed inset-0 z-[99999] overflow-hidden select-none font-sans">
             {/* Backdrop Overlay */}
@@ -1393,6 +1429,15 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         <span className="text-[11px] font-bold text-gray-900 tracking-wide uppercase truncate font-sans">
                             {activeGuestName}
                         </span>
+                        <button
+                            type="button"
+                            onClick={() => setIsScannerOpen(true)}
+                            className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Fast Scan Passport or National ID card to verify / attach guest profile"
+                        >
+                            <Camera size={9} className="text-emerald-700" />
+                            <span>Scan ID</span>
+                        </button>
                         {activeRegNo && (
                             <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono shadow-2xs ml-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold" title="Registration Number">
                                 {activeRegNo}
@@ -1419,6 +1464,16 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
                     {/* Right: Top Action Buttons (Folio + Edit + Dynamic Action Dropdown) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setIsScannerOpen(true)}
+                            className="h-5 px-2 rounded text-[8px] flex items-center gap-1 shadow-2xs transition-colors bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 font-semibold cursor-pointer"
+                            title="Scan Passport or National ID Card to auto-fill guest profile"
+                        >
+                            <Camera size={10} className="text-emerald-700" />
+                            <span>Scan ID</span>
+                        </button>
+
                         <button
                             type="button"
                             onClick={() => {
@@ -1524,6 +1579,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                     if (opt.key === 'tax_exemption') {
                                                                         setMode('folio');
                                                                         setIsTaxExemptionModalOpen(true);
+                                                                        return;
+                                                                    }
+                                                                    if (opt.key === 'scan_id') {
+                                                                        setIsScannerOpen(true);
+                                                                        return;
+                                                                    }
+                                                                    if (opt.key === 'reg_card') {
+                                                                        setIsRegCardModalOpen(true);
                                                                         return;
                                                                     }
                                                                     setMode(opt.key);
@@ -4481,6 +4544,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     if (booking) {
                         (booking as any).registrationCardSigned = true;
                     }
+                }}
+            />
+
+            {/* Passport & ID Card Fast Auto-Scanner Modal */}
+            <PassportIdScannerModal
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                reservationNumber={booking?.reservationNumber}
+                reservationId={booking?.id}
+                onProfileResolved={(guest, isNew) => {
+                    handlePassportProfileResolved(guest, isNew);
                 }}
             />
         </div>

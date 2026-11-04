@@ -711,6 +711,235 @@ router.get('/lookup', async (req: Request, res: Response) => {
     }
 });
 
+// POST /api/guests/lookup-by-document - Real-Time Passport & National ID Deduplication Engine
+router.post('/lookup-by-document', async (req: Request, res: Response) => {
+    try {
+        const body = req.body || {};
+        const docNumber = String(body.documentNumber || '').replace(/[\s\-_]/g, '').trim();
+        const docType = String(body.documentType || 'Passport').trim();
+        const fullName = String(body.fullName || '').trim().toLowerCase();
+        const dob = String(body.dob || '').trim();
+        const phone = String(body.phone || '').trim();
+
+        if (!docNumber && !fullName && !phone) {
+            return res.json({ success: true, matchType: 'NONE', guest: null });
+        }
+
+        const all = await db.prepare(`
+            SELECT 
+                g.*,
+                (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_stays,
+                (SELECT COALESCE(SUM(r.total_amount), 0) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_spend,
+                (SELECT MAX(rr.check_in_date) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_stay_date,
+                (SELECT MAX(rr.room_number) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_room_number
+            FROM guests g
+        `).all() as any[];
+
+        let match: any = null;
+        let matchType: 'EXACT_ID' | 'PHONE' | 'DEMOGRAPHICS' | 'NONE' = 'NONE';
+
+        // 1. Exact Document Number Match
+        if (docNumber && docNumber.length >= 4) {
+            match = all.find(g => {
+                const cleanId = String(g.id_number || '').replace(/[\s\-_]/g, '').toLowerCase();
+                const cleanPass = String(g.passport_visa_number || '').replace(/[\s\-_]/g, '').toLowerCase();
+                const target = docNumber.toLowerCase();
+                return cleanId === target || cleanPass === target;
+            });
+            if (match) matchType = 'EXACT_ID';
+        }
+
+        // 2. Phone Number Match (if provided)
+        if (!match && phone && phone.length >= 6) {
+            match = all.find(g => isSamePhoneNumber(phone, g.phone));
+            if (match) matchType = 'PHONE';
+        }
+
+        // 3. Demographic Match (DOB + Full Name)
+        if (!match && dob && fullName && fullName.length >= 4) {
+            match = all.find(g => {
+                const gDob = g.dob ? String(g.dob).slice(0, 10) : '';
+                const gName = `${g.first_name || ''} ${g.last_name || ''}`.trim().toLowerCase();
+                const dobMatch = gDob === dob;
+                const nameMatch = gName.includes(fullName) || fullName.includes(gName);
+                return dobMatch && nameMatch;
+            });
+            if (match) matchType = 'DEMOGRAPHICS';
+        }
+
+        if (!match) {
+            return res.json({ success: true, matchType: 'NONE', guest: null });
+        }
+
+        const spend = Number(match.total_spend) || 0;
+        const stays = Number(match.total_stays) || 0;
+        const points = Math.round(spend / 20);
+
+        res.json({
+            success: true,
+            matchType,
+            guest: {
+                id: Number(match.id),
+                salutation: match.salutation || 'Mr',
+                firstName: match.first_name,
+                lastName: match.last_name,
+                name: `${match.salutation ? match.salutation + ' ' : ''}${match.first_name} ${match.last_name}`.trim(),
+                email: match.email || '',
+                phone: match.phone || '',
+                nationality: match.nationality || 'Bangladeshi',
+                idType: match.id_type || docType,
+                idNumber: match.id_number || docNumber,
+                vipStatus: match.vip_status || (spend > 50000 ? 'VVIP' : spend > 20000 ? 'VIP' : 'STANDARD'),
+                address: match.address || '',
+                city: match.city || '',
+                country: match.country || 'Bangladesh',
+                totalStays: stays,
+                totalSpend: spend,
+                loyaltyPoints: points,
+                lastStayDate: match.last_stay_date || null,
+                lastRoomNumber: match.last_room_number || null,
+                isBlacklisted: Boolean(match.is_blacklisted),
+                blacklistReason: match.blacklist_reason || null,
+                dob: match.dob ? String(match.dob).slice(0, 10) : null,
+                gender: match.gender || 'Male',
+                idIssueCountry: match.id_issue_country || null,
+                idExpiryDate: match.id_expiry_date ? String(match.id_expiry_date).slice(0, 10) : null,
+                passportVisaNumber: match.passport_visa_number || null,
+                identityMetadata: typeof match.identity_metadata === 'object' ? match.identity_metadata : {}
+            }
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Document lookup failed' });
+    }
+});
+
+// POST /api/guests/scan-auto-create-or-update - Seamless Auto-Create or Update from Scanner
+router.post('/scan-auto-create-or-update', async (req: Request, res: Response) => {
+    try {
+        const body = req.body || {};
+        const action = body.action || 'CREATE'; // 'CREATE' | 'UPDATE_EXISTING'
+        const actor = body.staffName || 'Front Desk Scanner';
+
+        if (action === 'UPDATE_EXISTING' && body.guestId) {
+            const guestId = Number(body.guestId);
+            const updates = body.documentData || {};
+
+            await db.prepare(`
+                UPDATE guests
+                SET id_number = COALESCE(?, id_number),
+                    id_type = COALESCE(?, id_type),
+                    id_expiry_date = COALESCE(?, id_expiry_date),
+                    id_issue_country = COALESCE(?, id_issue_country),
+                    passport_visa_number = COALESCE(?, passport_visa_number),
+                    nationality = COALESCE(?, nationality),
+                    dob = COALESCE(?, dob),
+                    gender = COALESCE(?, gender),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(
+                updates.idNumber || null,
+                updates.idType || null,
+                updates.idExpiryDate || null,
+                updates.idIssueCountry || null,
+                updates.passportVisaNumber || updates.idNumber || null,
+                updates.nationality || null,
+                updates.dob || null,
+                updates.gender || null,
+                guestId
+            );
+
+            // Audit history
+            await db.prepare(`
+                INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
+                VALUES (?, ?, ?, ?)
+            `).run(
+                guestId,
+                actor,
+                'Updated identity document via Passport/ID Scanner',
+                JSON.stringify(updates)
+            );
+
+            const updatedGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId);
+
+            broadcastServerEvent({ type: 'GUEST_UPDATED', guestId, updatedBy: actor });
+
+            return res.json({
+                success: true,
+                message: `Guest profile #${guestId} updated successfully with scanned passport/ID.`,
+                guest: updatedGuest
+            });
+        }
+
+        // CREATE NEW GUEST PROFILE
+        const doc = body.documentData || body;
+        const fullName = String(doc.fullName || doc.name || 'Valued Guest').trim();
+        const parts = fullName.split(' ');
+        const salutation = doc.salutation || (doc.gender === 'Female' ? 'Ms' : 'Mr');
+        const firstName = doc.firstName || parts[0] || 'Guest';
+        const lastName = doc.lastName || parts.slice(1).join(' ') || firstName;
+        const phone = doc.phone || `+8801${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+        const result = await db.prepare(`
+            INSERT INTO guests (
+                organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number,
+                vip_status, address, city, country, dob, gender, id_issue_date, id_expiry_date, id_issue_country,
+                passport_visa_number, identity_metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            1,
+            salutation,
+            firstName,
+            lastName,
+            doc.email || null,
+            phone,
+            doc.nationality || 'Bangladeshi',
+            doc.idType || 'Passport',
+            doc.idNumber || null,
+            'STANDARD',
+            doc.address || null,
+            doc.city || null,
+            doc.country || doc.nationality || 'Bangladesh',
+            doc.dob || null,
+            doc.gender || 'Male',
+            doc.idIssueDate || null,
+            doc.idExpiryDate || null,
+            doc.idIssueCountry || doc.nationality || null,
+            doc.idType === 'Passport' ? doc.idNumber : null,
+            JSON.stringify({ source: 'PASSPORT_SCANNER', scannedAt: new Date().toISOString() })
+        );
+
+        const newGuestId = Number(result.lastInsertRowid);
+
+        // If a reservationId is passed, link this guest profile directly to the reservation
+        if (body.reservationNumber || body.reservationId) {
+            const resNo = body.reservationNumber || body.reservationId;
+            await db.prepare('UPDATE reservations SET booker_guest_id = ?, guest_name = ? WHERE reservation_number = ? OR id = ?').run(
+                newGuestId,
+                `${salutation} ${firstName} ${lastName}`.trim(),
+                resNo,
+                resNo
+            );
+            await db.prepare('UPDATE reservation_rooms SET guest_id = ?, guest_name = ? WHERE reservation_number = ? OR reservation_id = ?').run(
+                newGuestId,
+                `${salutation} ${firstName} ${lastName}`.trim(),
+                resNo,
+                resNo
+            );
+        }
+
+        const createdGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newGuestId);
+        broadcastServerEvent({ type: 'GUEST_CREATED', guestId: newGuestId, name: `${firstName} ${lastName}` });
+
+        return res.json({
+            success: true,
+            message: `New guest profile #${newGuestId} automatically created from document scan.`,
+            guest: createdGuest
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to auto-create guest profile' });
+    }
+});
+
 // POST /api/guests/merge - Profile Merge Engine: Consolidates duplicate profiles into a master profile
 router.post('/merge', async (req: Request, res: Response) => {
     try {
