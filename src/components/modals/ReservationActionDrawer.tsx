@@ -796,6 +796,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 items: [
                     { key: 'amend', label: 'Amend Dates & Pax', icon: Calendar },
                     { key: 'move', label: 'Change Held Room', icon: DoorOpen },
+                    { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                    { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                    { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                     { key: 'unassign', label: 'Unassign Room', icon: DoorClosed },
                     { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus }
                 ]
@@ -840,7 +843,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             title: 'Room & Stay Operations',
             items: [
                 { key: 'amend', label: 'Amend Stay (Dates/Pax)', icon: Calendar },
-                { key: 'move', label: 'Assign / Change Room', icon: DoorOpen },
+                { key: 'move', label: 'Assign / Change Room', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
+                { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
+                { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
+                { key: 'reg_card', label: 'Digital Reg Card (e-Reg Card)', icon: FileText, badge: 'e-Sign', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { key: 'add_booking', label: 'Add New Booking', icon: CalendarPlus },
                 { key: 'unassign', label: 'Unassign Room', icon: DoorClosed }
             ]
