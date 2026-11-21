@@ -1,69 +1,85 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import Dashboard from './components/Dashboard';
-import POSDashboard from './components/POSDashboard';
-import ManagerDashboard from './components/ManagerDashboard';
 import Sidebar from './components/Sidebar';
-import AddProductMockup from './components/AddProductMockup';
-import ConfigurationPage from './components/ConfigurationPage';
-import POSPage from './components/POSPage';
-import TableFormModal from './components/TableFormModal';
-import GenericSectionModal, { type FormSection } from './components/GenericSectionModal';
 import Header from './components/Header';
 import Login from './components/Login';
-import AddProperty from './components/AddProperty';
-import HotelInfoView from './components/HotelInfoView';
-import FrontDesk from './components/FrontDesk';
-import RatePlanManagement from './components/RatePlanManagement';
-import MealPlanManagement from './components/MealPlanManagement';
-import Reports from './components/Reports';
-import MasterDataConfig from './components/MasterDataConfig';
-import RoomRack from './components/RoomRack';
-import ReservationsView from './components/reservations/ReservationsView';
-import ReservationSleepOut from './components/reservations/ReservationSleepOut';
-import ReservationHold from './components/reservations/ReservationHold';
-import ReservationUnassigned from './components/reservations/ReservationUnassigned';
-import ReservationCancel from './components/reservations/ReservationCancel';
-import HousekeepingGrid from './components/HousekeepingGrid';
-import LostAndFoundManagement from './components/LostAndFoundManagement';
-import RateCalendar from './components/RateCalendar';
-import OccupancyHeatmap from './components/OccupancyHeatmap';
-import RevenueDashboard from './components/RevenueDashboard';
-import KitchenDisplay from './components/KitchenDisplay';
-import StayView from './components/StayView';
-import MaintenanceKanban from './components/MaintenanceKanban';
-import FloorPlan from './components/FloorPlan';
-import TableLayout from './components/TableLayout';
-import CorporateProfileManagement from './components/CorporateProfileManagement';
-import BusinessOriginManagement from './components/BusinessOriginManagement';
-import AdvancedReports from './components/AdvancedReports';
-import AddReservation from './components/AddReservation';
-import FolioOperations from './components/FolioOperations';
-import FolioHub from './components/FolioHub';
-import GuestProfile from './components/GuestProfile';
-import PackageManagement from './components/PackageManagement';
-import ServiceManagement from './components/ServiceManagement';
-import NightAuditAutomation from './components/NightAuditAutomation';
-import GuestVoucherSystem from './components/GuestVoucherSystem';
-import GeneralSettings from './components/GeneralSettings';
-import BankingManagement from './components/BankingManagement';
-import RevenueManagement from './components/RevenueManagement';
-import ExtraChargesManagement from './components/ExtraChargesManagement';
-import DiscountManagement from './components/DiscountManagement';
-import DepartmentManagement from './components/DepartmentManagement';
-import ShiftManagement from './components/ShiftManagement';
-import RolesPermissionsManagement from './components/RolesPermissionsManagement';
-import UserStaffManagement from './components/UserStaffManagement';
-import RelationalDatabaseExplorer from './components/database/RelationalDatabaseExplorer';
-import AdvanceAccountingDashboard from './components/accounting/AdvanceAccountingDashboard';
-import HRMManagementDashboard from './components/hrm/HRMManagementDashboard';
-import MultiPropertyConsole from './components/chain/MultiPropertyConsole';
-import TenantIsolationHub from './components/chain/TenantIsolationHub';
-import TenantOnboardingWizard from './components/chain/TenantOnboardingWizard';
+import GenericSectionModal, { type FormSection } from './components/GenericSectionModal';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { initNetworkSync } from './utils/pmsNetworkSync';
-import { syncReservationsFromDB } from './utils/roomInventoryEngine';
+import { syncReservationsFromDB, syncRatesAndPlansFromDB } from './utils/roomInventoryEngine';
 import { Devnotation } from 'devnotation';
 import 'devnotation/style.css';
+
+// Lazy-loaded feature modules & management consoles (Optimized On-Demand Bundling)
+const POSDashboard = lazy(() => import('./components/POSDashboard'));
+const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
+const FrontDesk = lazy(() => import('./components/FrontDesk'));
+const StayView = lazy(() => import('./components/StayView'));
+const AddProperty = lazy(() => import('./components/AddProperty'));
+const HotelInfoView = lazy(() => import('./components/HotelInfoView'));
+const RatePlanManagement = lazy(() => import('./components/RatePlanManagement'));
+const MealPlanManagement = lazy(() => import('./components/MealPlanManagement'));
+const Reports = lazy(() => import('./components/Reports'));
+const MasterDataConfig = lazy(() => import('./components/MasterDataConfig'));
+const RoomRack = lazy(() => import('./components/RoomRack'));
+const ReservationsView = lazy(() => import('./components/reservations/ReservationsView'));
+const ReservationSleepOut = lazy(() => import('./components/reservations/ReservationSleepOut'));
+const ReservationHold = lazy(() => import('./components/reservations/ReservationHold'));
+const ReservationUnassigned = lazy(() => import('./components/reservations/ReservationUnassigned'));
+const ReservationCancel = lazy(() => import('./components/reservations/ReservationCancel'));
+const HousekeepingGrid = lazy(() => import('./components/HousekeepingGrid'));
+const LostAndFoundManagement = lazy(() => import('./components/LostAndFoundManagement'));
+const RateCalendar = lazy(() => import('./components/RateCalendar'));
+const OccupancyHeatmap = lazy(() => import('./components/OccupancyHeatmap'));
+const RevenueDashboard = lazy(() => import('./components/RevenueDashboard'));
+const MaintenanceKanban = lazy(() => import('./components/MaintenanceKanban'));
+const FloorPlan = lazy(() => import('./components/FloorPlan'));
+const CorporateProfileManagement = lazy(() => import('./components/CorporateProfileManagement'));
+const BusinessOriginManagement = lazy(() => import('./components/BusinessOriginManagement'));
+const AdvancedReports = lazy(() => import('./components/AdvancedReports'));
+const AddReservation = lazy(() => import('./components/AddReservation'));
+const GuestProfile = lazy(() => import('./components/GuestProfile'));
+const PackageManagement = lazy(() => import('./components/PackageManagement'));
+const ServiceManagement = lazy(() => import('./components/ServiceManagement'));
+const NightAuditAutomation = lazy(() => import('./components/NightAuditAutomation'));
+const ChannelManagerView = lazy(() => import('./components/ChannelManagerView'));
+const GuestVoucherSystem = lazy(() => import('./components/GuestVoucherSystem'));
+const GeneralSettings = lazy(() => import('./components/GeneralSettings'));
+const BankingManagement = lazy(() => import('./components/BankingManagement'));
+const RevenueManagement = lazy(() => import('./components/RevenueManagement'));
+const ExtraChargesManagement = lazy(() => import('./components/ExtraChargesManagement'));
+const DiscountManagement = lazy(() => import('./components/DiscountManagement'));
+const DepartmentManagement = lazy(() => import('./components/DepartmentManagement'));
+const ShiftManagement = lazy(() => import('./components/ShiftManagement'));
+const RolesPermissionsManagement = lazy(() => import('./components/RolesPermissionsManagement'));
+const UserStaffManagement = lazy(() => import('./components/UserStaffManagement'));
+const RelationalDatabaseExplorer = lazy(() => import('./components/database/RelationalDatabaseExplorer'));
+const AdvanceAccountingDashboard = lazy(() => import('./components/accounting/AdvanceAccountingDashboard'));
+const HRMManagementDashboard = lazy(() => import('./components/hrm/HRMManagementDashboard'));
+const MultiPropertyConsole = lazy(() => import('./components/chain/MultiPropertyConsole'));
+const TenantIsolationHub = lazy(() => import('./components/chain/TenantIsolationHub'));
+const TenantOnboardingWizard = lazy(() => import('./components/chain/TenantOnboardingWizard'));
+const ConfigurationPage = lazy(() => import('./components/ConfigurationPage'));
+const GuestFlowInbox = lazy(() => import('./components/guestflow/GuestFlowInbox'));
+const ExpressCheckInView = lazy(() => import('./components/guestflow/ExpressCheckInView'));
+
+// Restaurant & F&B Suite (Thesis Architecture Integration)
+const RestaurantOutletsPage = lazy(() => import('./components/restaurant/outlets/OutletsPage').then(m => ({ default: m.OutletsPage })));
+const RestaurantPOSPage = lazy(() => import('./components/restaurant/pos/POSPage').then(m => ({ default: m.POSPage })));
+const RestaurantCategoriesPage = lazy(() => import('./components/restaurant/categories/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+const RestaurantMenuItemsPage = lazy(() => import('./components/restaurant/menu-items/MenuItemsPage').then(m => ({ default: m.MenuItemsPage })));
+const RestaurantAddonsPage = lazy(() => import('./components/restaurant/addons/AddonsPage').then(m => ({ default: m.AddonsPage })));
+const RestaurantTablesPage = lazy(() => import('./components/restaurant/tables/TablesPage').then(m => ({ default: m.TablesPage })));
+const RestaurantFloorsPage = lazy(() => import('./components/restaurant/floors/FloorsPage').then(m => ({ default: m.FloorsPage })));
+const RestaurantKitchenStationsPage = lazy(() => import('./components/restaurant/kitchens/KitchenStationsPage').then(m => ({ default: m.KitchenStationsPage })));
+const RestaurantKitchenDisplayPage = lazy(() => import('./components/restaurant/kds/KitchenDisplayPage').then(m => ({ default: m.KitchenDisplayPage })));
+const BanquetVenuesPage = lazy(() => import('./components/banquet/BanquetVenuesPage').then(m => ({ default: m.BanquetVenuesPage })));
+const BanquetPOSPage = lazy(() => import('./components/banquet/BanquetPOSPage').then(m => ({ default: m.BanquetPOSPage })));
+const SpaPOSPage = lazy(() => import('./components/spa/SpaPOSPage').then(m => ({ default: m.SpaPOSPage })));
+const SpaServicesPage = lazy(() => import('./components/spa/SpaServicesPage').then(m => ({ default: m.SpaServicesPage })));
+const RetailPOSPage = lazy(() => import('./components/retail/RetailPOSPage').then(m => ({ default: m.RetailPOSPage })));
+const RetailInventoryPage = lazy(() => import('./components/retail/RetailInventoryPage').then(m => ({ default: m.RetailInventoryPage })));
+const FitnessPOSPage = lazy(() => import('./components/fitness/FitnessPOSPage').then(m => ({ default: m.FitnessPOSPage })));
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
@@ -73,11 +89,12 @@ function App() {
   const { activePage, setActivePage } = useNavigation();
   const { updateUserSession } = usePortal();
   const { properties, activeProperty } = useProperty();
-  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  // Session Management: Synchronous initialization eliminates login screen flash/flicker on reload
+  // Session Management: Synchronous initialization verifies both active token and user record
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      return Boolean(localStorage.getItem('auth_token'));
+      const token = localStorage.getItem('auth_token');
+      const user = localStorage.getItem('user_data');
+      return Boolean(token && user);
     } catch {
       return false;
     }
@@ -95,8 +112,9 @@ function App() {
   // Global Event-Driven Realtime Network Sync & PostgreSQL Database Hydration on Application Boot
   useEffect(() => {
     initNetworkSync();
-    if (localStorage.getItem('auth_token')) {
+    if (localStorage.getItem('auth_token') || localStorage.getItem('user_data')) {
       syncReservationsFromDB().catch(console.error);
+      syncRatesAndPlansFromDB().catch(console.error);
     }
 
     // Auto-heal Devnotation toolbar position if dragged off-screen or corrupted in localStorage
@@ -125,14 +143,17 @@ function App() {
   // Sync session across multiple browser tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth_token') {
-        setIsAuthenticated(Boolean(e.newValue));
-      }
-      if (e.key === 'user_data') {
-        try {
-          setCurrentUser(e.newValue ? JSON.parse(e.newValue) : null);
-        } catch {
+      if (e.key === 'auth_token' || e.key === 'user_data') {
+        const hasAuth = Boolean(localStorage.getItem('auth_token') || localStorage.getItem('user_data'));
+        setIsAuthenticated(hasAuth);
+        if (!hasAuth) {
           setCurrentUser(null);
+        } else if (e.key === 'user_data' && e.newValue) {
+          try {
+            setCurrentUser(JSON.parse(e.newValue));
+          } catch {
+            // Keep existing
+          }
         }
       }
     };
@@ -141,29 +162,95 @@ function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Auto-Logout on Inactivity
+  // Enterprise Shift-Aware Inactivity Session Tracker (Cross-Tab Synchronized)
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    let timeoutId: number;
-
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        handleLogout();
-      }, 15 * 60 * 1000); // 15 Minutes
+    // Configurable timeout: reads from property settings or localStorage, defaults to 12 Hours (720 min)
+    // 0 means auto-logout is disabled (keep logged in).
+    const getTimeoutMs = (): number => {
+      try {
+        const propSetting = (activeProperty as any)?.settings?.sessionTimeoutMinutes;
+        if (typeof propSetting === 'number') {
+          if (propSetting === 0) return 0;
+          return propSetting * 60 * 1000;
+        }
+        const customMinutes = localStorage.getItem('hotel_session_timeout_minutes');
+        if (customMinutes !== null) {
+          const parsed = Number(customMinutes);
+          if (parsed === 0) return 0;
+          if (!isNaN(parsed) && parsed > 0) return parsed * 60 * 1000;
+        }
+      } catch {}
+      // Standard 12 Hours (covers an entire 8-12 hour hotel operational shift)
+      return 12 * 60 * 60 * 1000;
     };
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(event => document.addEventListener(event, resetTimer));
+    // Update last activity timestamp in shared storage
+    const markActivity = () => {
+      try {
+        localStorage.setItem('hotel_last_activity_time', String(Date.now()));
+      } catch {}
+    };
 
-    resetTimer(); // Start timer
+    if (!localStorage.getItem('hotel_last_activity_time')) {
+      markActivity();
+    }
+
+    let lastRecorded = 0;
+    const handleUserActivity = () => {
+      const now = Date.now();
+      // Throttle localStorage writes to at most once every 15 seconds to avoid overhead
+      if (now - lastRecorded > 15000) {
+        lastRecorded = now;
+        markActivity();
+      }
+    };
+
+    // Listen to comprehensive user interaction events across the entire window
+    const activityEvents = [
+      'mousedown',
+      'mouseup',
+      'mousemove',
+      'click',
+      'keydown',
+      'keyup',
+      'input',
+      'change',
+      'focus',
+      'scroll',
+      'wheel',
+      'touchstart',
+      'touchend',
+      'pointerdown'
+    ];
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, handleUserActivity, { passive: true, capture: true });
+    });
+
+    // Check every 60 seconds if the shared cross-tab session has truly expired
+    const intervalId = window.setInterval(() => {
+      const timeoutMs = getTimeoutMs();
+      if (timeoutMs <= 0) return; // Inactivity timeout disabled
+
+      const lastActivityStr = localStorage.getItem('hotel_last_activity_time');
+      const lastActivity = lastActivityStr ? Number(lastActivityStr) : Date.now();
+      const elapsed = Date.now() - lastActivity;
+
+      if (elapsed >= timeoutMs) {
+        console.warn(`[Session Management] Inactivity auto-logout triggered after ${Math.round(elapsed / (60 * 1000))} minutes of complete inactivity across all tabs.`);
+        handleLogout();
+      }
+    }, 60 * 1000);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event => document.removeEventListener(event, resetTimer));
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, handleUserActivity, { capture: true });
+      });
+      clearInterval(intervalId);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeProperty]);
 
   // New Modal States
   const [modalConfig, setModalConfig] = useState<{
@@ -183,13 +270,8 @@ function App() {
 
 
   // Dynamic Master Configuration Data (Clean Zero-Mock State)
-  const [categoriesData] = useState<any[]>([]);
-  const [tablesData] = useState<any[]>([]);
-  const [addonsData] = useState<any[]>([]);
   const [unitsData] = useState<any[]>([]);
-  const [floorPlanData] = useState<any[]>([]);
   const [countersData] = useState<any[]>([]);
-  const [kitchensData] = useState<any[]>([]);
   const [waitersData] = useState<any[]>([]);
 
   const livePropertiesData = useMemo(() => {
@@ -218,37 +300,6 @@ function App() {
     return [];
   }, [properties]);
 
-  const categorySections: FormSection[] = [
-    {
-      title: 'Basic Information',
-      fields: [
-        { name: 'name', label: 'Category Name', type: 'text', placeholder: 'e.g. Burger', required: true, colSpan: 2 },
-        { name: 'parent', label: 'Parent Category', type: 'select', options: ['None', 'Fast Food', 'Beverage', 'Main Course'] },
-        { name: 'image', label: 'Category Image', type: 'file', colSpan: 3 },
-      ]
-    },
-    {
-      title: 'Operations & Display',
-      fields: [
-        { name: 'kitchen', label: 'Default Kitchen', type: 'select', options: ['Main Kitchen', 'Bar', 'Grill Section'] },
-        { name: 'sortOrder', label: 'Sort Order', type: 'number', placeholder: '1' },
-        { name: 'printKot', label: 'Print KOT?', type: 'checkbox', defaultValue: true },
-        { name: 'status', label: 'Active Status', type: 'checkbox', defaultValue: true }
-      ]
-    }
-  ];
-
-  const addonSections: FormSection[] = [
-    {
-      title: 'Addon Details',
-      fields: [
-        { name: 'name', label: 'Addon Name', type: 'text', placeholder: 'e.g. Extra Cheese', required: true, colSpan: 2 },
-        { name: 'price', label: 'Price', type: 'number', placeholder: '0.00', required: true },
-        { name: 'group', label: 'Addon Group', type: 'select', options: ['Toppings', 'Crusts', 'Sauces', 'Drinks'], required: true },
-      ]
-    }
-  ];
-
   const unitSections: FormSection[] = [
     {
       title: 'Unit Details',
@@ -260,33 +311,12 @@ function App() {
     }
   ];
 
-  const floorSections: FormSection[] = [
-    {
-      title: 'Floor Info',
-      fields: [
-        { name: 'name', label: 'Floor Name', type: 'text', placeholder: 'e.g. 1st Floor', required: true },
-        { name: 'number', label: 'Floor Number', type: 'number', placeholder: '1', required: true },
-        { name: 'outlet', label: 'Outlet / Branch', type: 'select', options: ['Main Branch', 'Downtown'], required: true },
-      ]
-    }
-  ];
-
   const counterSections: FormSection[] = [
     {
       title: 'Counter Identity',
       fields: [
         { name: 'name', label: 'Counter Name', type: 'text', placeholder: 'e.g. Main Counter', required: true, colSpan: 2 },
         { name: 'outlet', label: 'Outlet', type: 'select', options: ['Main Branch'], required: true },
-      ]
-    }
-  ];
-
-  const kitchenSections: FormSection[] = [
-    {
-      title: 'Kitchen Info',
-      fields: [
-        { name: 'name', label: 'Kitchen Name', type: 'text', placeholder: 'e.g. Indian Kitchen', required: true, colSpan: 2 },
-        { name: 'outlet', label: 'Outlet', type: 'select', options: ['Main Branch', 'Downtown', 'Airport'], required: true },
       ]
     }
   ];
@@ -335,6 +365,11 @@ function App() {
         );
       case 'front-desk':
         return <FrontDesk />;
+      case 'guestflow':
+      case 'staypulse':
+        return <GuestFlowInbox />;
+      case 'express-checkin':
+        return <ExpressCheckInView />;
       case 'edit-property':
         return (
           <AddProperty
@@ -350,48 +385,26 @@ function App() {
       case 'all-properties':
       case 'properties':
         return <MultiPropertyConsole />;
+      case 'restaurant-outlets':
+      case 'dining-outlets':
+      case 'outlets':
+        return <RestaurantOutletsPage onNavigate={setActivePage} />;
       case 'pos':
-        return <POSPage />;
+      case 'restaurant-pos':
+        return <RestaurantPOSPage />;
       case 'products':
-        return <AddProductMockup />;
+      case 'menu-items':
+      case 'menu':
+        return <RestaurantMenuItemsPage />;
       case 'tables':
-        return (
-          <>
-            <ConfigurationPage
-              title="Tables"
-              description="Setup restaurant tables and seating areas"
-              columns={[
-                { key: 'id', header: 'Table No' },
-                { key: 'name', header: 'Table Name' },
-                { key: 'capacity', header: 'Capacity' },
-                { key: 'area', header: 'Area' }
-              ]}
-              data={tablesData}
-              onAdd={() => setIsTableModalOpen(true)}
-            />
-            <TableFormModal isOpen={isTableModalOpen} onClose={() => setIsTableModalOpen(false)} />
-          </>
-        );
+      case 'table-layout':
+      case 'table-management':
+        return <RestaurantTablesPage />;
       case 'categories':
-        return (
-          <ConfigurationPage
-            title="Categories"
-            description="Manage Food Categories"
-            columns={[{ key: 'name', header: 'Name' }, { key: 'type', header: 'Type' }, { key: 'status', header: 'Status' }]}
-            data={categoriesData}
-            onAdd={() => openModal('Add New Category', 'Organize menu', categorySections)}
-          />
-        );
+        return <RestaurantCategoriesPage />;
       case 'addons':
-        return (
-          <ConfigurationPage
-            title="Addons"
-            description="Manage Extra Items"
-            columns={[{ key: 'name', header: 'Name' }, { key: 'price', header: 'Price' }, { key: 'status', header: 'Status' }]}
-            data={addonsData}
-            onAdd={() => openModal('Add New Addon', 'Create toppings', addonSections)}
-          />
-        );
+      case 'modifiers':
+        return <RestaurantAddonsPage />;
       case 'units':
         return (
           <ConfigurationPage
@@ -403,15 +416,10 @@ function App() {
           />
         );
       case 'floor':
-        return (
-          <ConfigurationPage
-            title="Floor Plan"
-            description="Manage Areas"
-            columns={[{ key: 'name', header: 'Floor Name' }, { key: 'area', header: 'Type' }, { key: 'tables', header: 'Tables' }]}
-            data={floorPlanData}
-            onAdd={() => openModal('Add New Floor/Area', 'Define zones', floorSections)}
-          />
-        );
+      case 'dining-floor':
+      case 'dining-floors':
+      case 'restaurant-floors':
+        return <RestaurantFloorsPage />;
       case 'counters':
         return (
           <ConfigurationPage
@@ -423,15 +431,28 @@ function App() {
           />
         );
       case 'kitchens':
-        return (
-          <ConfigurationPage
-            title="Kitchens"
-            description="Manage Kitchen Stations"
-            columns={[{ key: 'name', header: 'Kitchen Name' }, { key: 'floor', header: 'Floor' }, { key: 'printer', header: 'Printer IP' }]}
-            data={kitchensData}
-            onAdd={() => openModal('Add New Kitchen', 'Setup production', kitchenSections)}
-          />
-        );
+      case 'kitchen-stations':
+        return <RestaurantKitchenStationsPage />;
+      case 'banquet-venues':
+      case 'banquet-halls':
+        return <BanquetVenuesPage onNavigate={setActivePage} />;
+      case 'banquet-pos':
+      case 'banquet-events':
+        return <BanquetPOSPage />;
+      case 'spa-pos':
+        return <SpaPOSPage />;
+      case 'spa-services':
+      case 'spa-treatments':
+        return <SpaServicesPage />;
+      case 'retail-pos':
+      case 'giftshop-pos':
+        return <RetailPOSPage />;
+      case 'retail-inventory':
+      case 'giftshop-inventory':
+        return <RetailInventoryPage />;
+      case 'fitness-pos':
+      case 'pool-pos':
+        return <FitnessPOSPage />;
       case 'waiters':
         return (
           <ConfigurationPage
@@ -502,6 +523,25 @@ function App() {
         return <RatePlanManagement />;
       case 'rate-calendar':
         return <RateCalendar />;
+      case 'channel-manager':
+      case 'channels':
+      case 'ota':
+        return <ChannelManagerView activeView="channels" onNavigate={setActivePage} />;
+      case 'channel-manager-ari':
+      case 'channel-ari':
+        return <ChannelManagerView activeView="ari-matrix" onNavigate={setActivePage} />;
+      case 'channel-manager-wizard':
+      case 'channel-wizard':
+        return <ChannelManagerView activeView="bulk-update" onNavigate={setActivePage} />;
+      case 'channel-manager-mappings':
+      case 'channel-mappings':
+        return <ChannelManagerView activeView="mappings" onNavigate={setActivePage} />;
+      case 'channel-manager-bookings':
+      case 'channel-bookings':
+        return <ChannelManagerView activeView="bookings" onNavigate={setActivePage} />;
+      case 'channel-manager-logs':
+      case 'channel-logs':
+        return <ChannelManagerView activeView="logs" onNavigate={setActivePage} />;
       case 'meal-plans':
       case 'meal-plan':
         return <MealPlanManagement />;
@@ -515,9 +555,8 @@ function App() {
       case 'revenue-dashboard':
         return <RevenueDashboard />;
       case 'kds':
-        return <KitchenDisplay />;
-      case 'table-layout':
-        return <TableLayout />;
+      case 'kitchen-display':
+        return <RestaurantKitchenDisplayPage />;
       case 'out-of-order':
       case 'maintenance':
         return <MaintenanceKanban />;
@@ -532,9 +571,8 @@ function App() {
         return <AddReservation />;
       case 'folio-operations':
       case 'allowance-checker':
-        return <FolioOperations />;
       case 'folio-hub':
-        return <FolioHub />;
+        return <StayView />;
       case 'guest-profile':
         return <GuestProfile />;
       case 'night-audit':
@@ -615,8 +653,9 @@ function App() {
     setIsAuthenticated(true);
     setCurrentUser(user);
     if (!localStorage.getItem('auth_token')) {
-      localStorage.setItem('auth_token', 'valid_session');
+      localStorage.setItem('auth_token', 'hotel_session_' + Date.now());
     }
+    localStorage.setItem('hotel_last_activity_time', String(Date.now()));
     localStorage.setItem('user_data', JSON.stringify(user));
     updateUserSession(user);
     setActivePage('front-desk');
@@ -628,9 +667,19 @@ function App() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
     localStorage.removeItem('hotel_portal_mode');
+    localStorage.removeItem('hotel_last_activity_time');
     updateUserSession(null);
     setActivePage('dashboard');
   };
+
+  // Public Guest-Facing Route Bypass: Pre-Arrival KYC Fast-Pass doesn't require staff login
+  if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/express-checkin') || window.location.search.includes('token='))) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading Fast-Pass...</div>}>
+        <ExpressCheckInView />
+      </Suspense>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -654,7 +703,18 @@ function App() {
           <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
           <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0 [&>*]:w-full [&>*]:min-w-0">
             <ErrorBoundary onReset={() => setActivePage('dashboard')}>
-              {renderContent()}
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center min-h-[400px]">
+                    <div className="flex flex-col items-center gap-2.5">
+                      <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-slate-400 font-medium">Loading workspace module...</span>
+                    </div>
+                  </div>
+                }
+              >
+                {renderContent()}
+              </Suspense>
             </ErrorBoundary>
           </div>
         </div>

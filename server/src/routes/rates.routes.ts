@@ -1,15 +1,17 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
+import { getDefaultActivePropertyId } from '../database/postgres.js';
 
 const router = Router();
 
-export const getReqPropertyId = (req: Request): number | null => {
-    const raw = req.query.propertyId || req.headers['x-property-id'] || req.body?.propertyId;
+export const getReqPropertyId = (req: Request): number => {
+    const raw = req.query.propertyId || req.headers['x-property-id'] || (req as any).propertyId || (req as any).user?.propertyId || req.body?.propertyId;
     if (raw !== undefined && raw !== null && raw !== '') {
         const num = Number(raw);
         if (!isNaN(num) && num > 0) return num;
     }
-    return null;
+    const def = Number(getDefaultActivePropertyId());
+    return !isNaN(def) && def > 0 ? def : 0;
 };
 
 // ============================================================================
@@ -23,9 +25,10 @@ router.get('/plans', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const rows = await db.prepare(`
-            SELECT * FROM rate_plans WHERE property_id = ? ORDER BY id ASC
-        `).all(propertyId) as any[];
+        const rowsRes = await pgPool.query(`
+            SELECT * FROM rate_plans WHERE property_id = $1 ORDER BY id ASC
+        `, [propertyId]);
+        const rows = rowsRes.rows as any[];
 
         const mapped = rows.map(r => {
             if (r.raw_json) {
@@ -100,17 +103,16 @@ router.post('/plans', async (req: Request, res: Response) => {
         const name = body.name || 'New Rate Plan';
         const shortCode = (body.shortCode || `RP-${Date.now().toString().slice(-4)}`).toUpperCase();
 
-        const insertStmt = db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO rate_plans (
                 property_id, name, short_code, market_segment, currency, description, status,
                 meal_plan, package_id, tax_included, promo_code, policies_json, activation_date, expiration_date,
                 stay_date_start, stay_date_end, is_seasonal, season_name, season_start, season_end,
                 valid_days_json, min_nights, max_nights, cut_off_days, closed_to_arrival,
                 closed_to_departure, stop_sell, pricing_json, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        const result = await insertStmt.run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+            RETURNING id
+        `, [
             propertyId,
             name,
             shortCode,
@@ -140,9 +142,9 @@ router.post('/plans', async (req: Request, res: Response) => {
             Boolean(body.stopSell),
             JSON.stringify(body.pricing || []),
             JSON.stringify({ ...body, shortCode, name })
-        );
+        ]);
 
-        const newId = Number(result.lastInsertRowid);
+        const newId = Number(result.rows[0]?.id);
         res.status(201).json({ success: true, data: { ...body, id: newId, shortCode, name } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create rate plan' });
@@ -157,23 +159,23 @@ router.put('/plans/:id', async (req: Request, res: Response) => {
         const name = body.name;
         const shortCode = body.shortCode ? body.shortCode.toUpperCase() : undefined;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rate_plans
-            SET name = COALESCE(?, name),
-                short_code = COALESCE(?, short_code),
-                market_segment = COALESCE(?, market_segment),
-                currency = COALESCE(?, currency),
-                description = COALESCE(?, description),
-                status = COALESCE(?, status),
-                meal_plan = COALESCE(?, meal_plan),
-                package_id = COALESCE(?, package_id),
-                tax_included = COALESCE(?, tax_included),
-                policies_json = COALESCE(?, policies_json),
-                pricing_json = COALESCE(?, pricing_json),
-                raw_json = COALESCE(?, raw_json),
+            SET name = COALESCE($1, name),
+                short_code = COALESCE($2, short_code),
+                market_segment = COALESCE($3, market_segment),
+                currency = COALESCE($4, currency),
+                description = COALESCE($5, description),
+                status = COALESCE($6, status),
+                meal_plan = COALESCE($7, meal_plan),
+                package_id = COALESCE($8, package_id),
+                tax_included = COALESCE($9, tax_included),
+                policies_json = COALESCE($10, policies_json),
+                pricing_json = COALESCE($11, pricing_json),
+                raw_json = COALESCE($12, raw_json),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $13
+        `, [
             name || null,
             shortCode || null,
             body.marketSegment || null,
@@ -187,7 +189,7 @@ router.put('/plans/:id', async (req: Request, res: Response) => {
             body.pricing ? JSON.stringify(body.pricing) : null,
             JSON.stringify({ ...body, id, ...(shortCode ? { shortCode } : {}), ...(name ? { name } : {}) }),
             id
-        );
+        ]);
 
         res.json({ success: true, message: 'Rate plan updated' });
     } catch (e: any) {
@@ -199,7 +201,7 @@ router.put('/plans/:id', async (req: Request, res: Response) => {
 router.delete('/plans/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM rate_plans WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM rate_plans WHERE id = $1', [id]);
         res.json({ success: true, message: 'Rate plan deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete rate plan' });
@@ -217,9 +219,10 @@ router.get('/meal-plans', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const rows = await db.prepare(`
-            SELECT * FROM meal_plans WHERE property_id = ? ORDER BY id ASC
-        `).all(propertyId) as any[];
+        const rowsRes = await pgPool.query(`
+            SELECT * FROM meal_plans WHERE property_id = $1 ORDER BY id ASC
+        `, [propertyId]);
+        const rows = rowsRes.rows as any[];
 
         const mapped = rows.map(r => {
             if (r.raw_json) {
@@ -305,7 +308,7 @@ router.post('/meal-plans', async (req: Request, res: Response) => {
         const name = body.name || 'New Meal Plan';
         const shortCode = (body.shortCode || `MP-${Date.now().toString().slice(-4)}`).toUpperCase();
 
-        const insertStmt = db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO meal_plans (
                 property_id, name, marketing_name, short_code, description, status,
                 has_breakfast, breakfast_menu, breakfast_style, breakfast_venue, breakfast_cuisine,
@@ -314,10 +317,9 @@ router.post('/meal-plans', async (req: Request, res: Response) => {
                 has_brunch, has_cupole, has_snacks, serving_type, internal_cost,
                 selling_price_adult, selling_price_child, infant_meals_free, max_infant_age,
                 posting_frequency, revenue_code, tax_inclusive, start_time, end_time, venue, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        const result = await insertStmt.run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37)
+            RETURNING id
+        `, [
             propertyId,
             name,
             body.marketingName || name,
@@ -355,9 +357,9 @@ router.post('/meal-plans', async (req: Request, res: Response) => {
             body.endTime || '23:00',
             body.venue || 'Main Restaurant',
             JSON.stringify({ ...body, shortCode, name })
-        );
+        ]);
 
-        const newId = Number(result.lastInsertRowid);
+        const newId = Number(result.rows[0]?.id);
         res.status(201).json({ success: true, data: { ...body, id: newId, shortCode, name } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create meal plan' });
@@ -372,19 +374,19 @@ router.put('/meal-plans/:id', async (req: Request, res: Response) => {
         const name = body.name;
         const shortCode = body.shortCode ? body.shortCode.toUpperCase() : undefined;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE meal_plans
-            SET name = COALESCE(?, name),
-                marketing_name = COALESCE(?, marketing_name),
-                short_code = COALESCE(?, short_code),
-                description = COALESCE(?, description),
-                status = COALESCE(?, status),
-                selling_price_adult = COALESCE(?, selling_price_adult),
-                selling_price_child = COALESCE(?, selling_price_child),
-                raw_json = COALESCE(?, raw_json),
+            SET name = COALESCE($1, name),
+                marketing_name = COALESCE($2, marketing_name),
+                short_code = COALESCE($3, short_code),
+                description = COALESCE($4, description),
+                status = COALESCE($5, status),
+                selling_price_adult = COALESCE($6, selling_price_adult),
+                selling_price_child = COALESCE($7, selling_price_child),
+                raw_json = COALESCE($8, raw_json),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $9
+        `, [
             name || null,
             body.marketingName || null,
             shortCode || null,
@@ -394,7 +396,7 @@ router.put('/meal-plans/:id', async (req: Request, res: Response) => {
             body.sellingPriceChild !== undefined ? Number(body.sellingPriceChild) : null,
             JSON.stringify({ ...body, id, ...(shortCode ? { shortCode } : {}), ...(name ? { name } : {}) }),
             id
-        );
+        ]);
 
         res.json({ success: true, message: 'Meal plan updated' });
     } catch (e: any) {
@@ -406,7 +408,7 @@ router.put('/meal-plans/:id', async (req: Request, res: Response) => {
 router.delete('/meal-plans/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM meal_plans WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM meal_plans WHERE id = $1', [id]);
         res.json({ success: true, message: 'Meal plan deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete meal plan' });
@@ -424,9 +426,10 @@ router.get('/packages', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const rows = await db.prepare(`
-            SELECT * FROM hotel_packages WHERE property_id = ? ORDER BY id ASC
-        `).all(propertyId) as any[];
+        const rowsRes = await pgPool.query(`
+            SELECT * FROM hotel_packages WHERE property_id = $1 ORDER BY id ASC
+        `, [propertyId]);
+        const rows = rowsRes.rows as any[];
 
         const mapped = rows.map(r => {
             if (r.raw_json) {
@@ -472,12 +475,11 @@ router.post('/packages', async (req: Request, res: Response) => {
         const name = body.name || 'New Package';
         const shortCode = (body.shortCode || `PKG-${Date.now().toString().slice(-4)}`).toUpperCase();
 
-        const insertStmt = db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO hotel_packages (property_id, name, short_code, package_type, status, color, description, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        const result = await insertStmt.run(
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        `, [
             propertyId,
             name,
             shortCode,
@@ -486,9 +488,9 @@ router.post('/packages', async (req: Request, res: Response) => {
             body.color || '#3B82F6',
             body.description || '',
             JSON.stringify({ ...body, shortCode, name })
-        );
+        ]);
 
-        const newId = Number(result.lastInsertRowid);
+        const newId = Number(result.rows[0]?.id);
         res.status(201).json({ success: true, data: { ...body, id: newId, shortCode, name } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create package' });
@@ -503,18 +505,18 @@ router.put('/packages/:id', async (req: Request, res: Response) => {
         const name = body.name;
         const shortCode = body.shortCode ? body.shortCode.toUpperCase() : undefined;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE hotel_packages
-            SET name = COALESCE(?, name),
-                short_code = COALESCE(?, short_code),
-                package_type = COALESCE(?, package_type),
-                status = COALESCE(?, status),
-                color = COALESCE(?, color),
-                description = COALESCE(?, description),
-                raw_json = COALESCE(?, raw_json),
+            SET name = COALESCE($1, name),
+                short_code = COALESCE($2, short_code),
+                package_type = COALESCE($3, package_type),
+                status = COALESCE($4, status),
+                color = COALESCE($5, color),
+                description = COALESCE($6, description),
+                raw_json = COALESCE($7, raw_json),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $8
+        `, [
             name || null,
             shortCode || null,
             body.packageType || null,
@@ -523,7 +525,7 @@ router.put('/packages/:id', async (req: Request, res: Response) => {
             body.description || null,
             JSON.stringify({ ...body, id, ...(shortCode ? { shortCode } : {}), ...(name ? { name } : {}) }),
             id
-        );
+        ]);
 
         res.json({ success: true, message: 'Package updated' });
     } catch (e: any) {
@@ -535,7 +537,7 @@ router.put('/packages/:id', async (req: Request, res: Response) => {
 router.delete('/packages/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM hotel_packages WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM hotel_packages WHERE id = $1', [id]);
         res.json({ success: true, message: 'Package deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete package' });
@@ -555,16 +557,17 @@ router.get('/calendar', async (req: Request, res: Response) => {
         }
         const roomType = req.query.roomType as string | undefined;
 
-        let query = 'SELECT * FROM rate_calendar_overrides WHERE property_id = ?';
+        let query = 'SELECT * FROM rate_calendar_overrides WHERE property_id = $1';
         const params: any[] = [propertyId];
 
         if (roomType) {
-            query += ' AND room_type_name = ?';
+            query += ' AND room_type_name = $2';
             params.push(roomType);
         }
         query += ' ORDER BY date ASC';
 
-        const rows = await db.prepare(query).all(...params) as any[];
+        const rowsRes = await pgPool.query(query, params);
+        const rows = rowsRes.rows as any[];
 
         // Group by room_type_name -> { date: DayRate }
         const ratesByRoomType: Record<string, Record<string, any>> = {};
@@ -601,9 +604,9 @@ router.post('/calendar/override', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'roomType, date, and rate are required' });
         }
 
-        await db.prepare(`
+        await pgPool.query(`
             INSERT INTO rate_calendar_overrides (property_id, room_type_name, date, rate, occupancy, is_weekend, is_holiday, event_name, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
             ON CONFLICT(property_id, room_type_name, date) DO UPDATE SET
                 rate = excluded.rate,
                 occupancy = excluded.occupancy,
@@ -611,7 +614,7 @@ router.post('/calendar/override', async (req: Request, res: Response) => {
                 is_holiday = excluded.is_holiday,
                 event_name = excluded.event_name,
                 updated_at = CURRENT_TIMESTAMP
-        `).run(propertyId, roomType, date, Number(rate), Number(occupancy || 0), Boolean(isWeekend), Boolean(isHoliday), eventName || null);
+        `, [propertyId, roomType, date, Number(rate), Number(occupancy || 0), Boolean(isWeekend), Boolean(isHoliday), eventName || null]);
 
         res.json({ success: true, message: `Override saved for ${roomType} on ${date}` });
     } catch (e: any) {
@@ -636,14 +639,14 @@ router.post('/calendar/bulk-override', async (req: Request, res: Response) => {
         const end = new Date(endDate);
         const targetRate = Number(rate);
 
-        const stmt = db.prepare(`
+        const upsertQuery = `
             INSERT INTO rate_calendar_overrides (property_id, room_type_name, date, rate, is_weekend, updated_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
             ON CONFLICT(property_id, room_type_name, date) DO UPDATE SET
                 rate = excluded.rate,
                 is_weekend = excluded.is_weekend,
                 updated_at = CURRENT_TIMESTAMP
-        `);
+        `;
 
         let count = 0;
         const current = new Date(start);
@@ -657,7 +660,7 @@ router.post('/calendar/bulk-override', async (req: Request, res: Response) => {
 
             if (shouldApply) {
                 const dateStr = current.toISOString().split('T')[0];
-                await stmt.run(propertyId, roomType, dateStr, targetRate, isWeekend);
+                await pgPool.query(upsertQuery, [propertyId, roomType, dateStr, targetRate, isWeekend]);
                 count++;
             }
 

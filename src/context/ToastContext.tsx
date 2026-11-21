@@ -305,17 +305,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         'top-center': 'top-5 left-1/2 -translate-x-1/2 flex-col items-center'
     }[position];
 
+    const contextValue = React.useMemo(() => ({
+        toasts,
+        showToast,
+        dismissToast,
+        dismissAll,
+        position,
+        setPosition
+    }), [toasts, showToast, dismissToast, dismissAll, position, setPosition]);
+
     return (
-        <ToastContext.Provider
-            value={{
-                toasts,
-                showToast,
-                dismissToast,
-                dismissAll,
-                position,
-                setPosition
-            }}
-        >
+        <ToastContext.Provider value={contextValue}>
             {children}
 
             {/* Toaster Viewport Container */}

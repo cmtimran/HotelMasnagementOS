@@ -16,6 +16,9 @@ interface DayRate {
     isWeekend: boolean;
     isHoliday: boolean;
     eventName?: string;
+    extraAdultRate?: number;
+    extraChildRate?: number;
+    extraBedRate?: number;
 }
 
 const STORAGE_KEY = 'hotel_rate_calendar_v2';
@@ -72,6 +75,9 @@ export default function RateCalendar() {
     const [bulkStartDate, setBulkStartDate] = useState('2026-07-01');
     const [bulkEndDate, setBulkEndDate] = useState('2026-07-31');
     const [bulkRate, setBulkRate] = useState('3500');
+    const [bulkExtraAdultRate, setBulkExtraAdultRate] = useState('1000');
+    const [bulkExtraChildRate, setBulkExtraChildRate] = useState('500');
+    const [bulkExtraBedRate, setBulkExtraBedRate] = useState('1000');
     const [bulkDayFilter, setBulkDayFilter] = useState<'all' | 'weekends' | 'weekdays'>('all');
 
     // Room-type scoped rates state
@@ -283,6 +289,10 @@ export default function RateCalendar() {
             return;
         }
 
+        const extraAdultVal = parseInt(bulkExtraAdultRate, 10) || 0;
+        const extraChildVal = parseInt(bulkExtraChildRate, 10) || 0;
+        const extraBedVal = parseInt(bulkExtraBedRate, 10) || 0;
+
         const start = parseDateString(bulkStartDate);
         const end = parseDateString(bulkEndDate);
 
@@ -310,6 +320,9 @@ export default function RateCalendar() {
                     occupancy: newRates[dateKey]?.occupancy || 0,
                     isWeekend,
                     isHoliday: newRates[dateKey]?.isHoliday || false,
+                    extraAdultRate: extraAdultVal,
+                    extraChildRate: extraChildVal,
+                    extraBedRate: extraBedVal,
                 };
             }
 
@@ -630,63 +643,128 @@ export default function RateCalendar() {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-700">Start Date</label>
-                                    <input
-                                        type="date"
-                                        value={bulkStartDate}
-                                        onChange={(e) => setBulkStartDate(e.target.value)}
-                                        className="input-standard text-xs py-1.5"
-                                    />
+                        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                            {/* Pillar 1: Schedule & Date Scope */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-slate-800">
+                                    <Calendar className="size-3.5 text-primary" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                                        Pillar 1: Date Range & Applicable Days
+                                    </span>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-700">End Date</label>
-                                    <input
-                                        type="date"
-                                        value={bulkEndDate}
-                                        onChange={(e) => setBulkEndDate(e.target.value)}
-                                        className="input-standard text-xs py-1.5"
-                                    />
+                                <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-slate-700">Start Date</label>
+                                        <input
+                                            type="date"
+                                            value={bulkStartDate}
+                                            onChange={(e) => setBulkStartDate(e.target.value)}
+                                            className="input-standard text-xs py-1.5 bg-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-slate-700">End Date</label>
+                                        <input
+                                            type="date"
+                                            value={bulkEndDate}
+                                            onChange={(e) => setBulkEndDate(e.target.value)}
+                                            className="input-standard text-xs py-1.5 bg-white"
+                                        />
+                                    </div>
+                                    <div className="col-span-2 pt-1">
+                                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">Applicable Days</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'all', label: 'All Days' },
+                                                { id: 'weekends', label: 'Fri & Sat' },
+                                                { id: 'weekdays', label: 'Sun - Thu' },
+                                            ].map(filter => (
+                                                <button
+                                                    key={filter.id}
+                                                    type="button"
+                                                    onClick={() => setBulkDayFilter(filter.id as any)}
+                                                    className={`py-1.5 text-xs font-semibold rounded-xl border transition ${
+                                                        bulkDayFilter === filter.id
+                                                            ? 'bg-primary text-white border-primary shadow-xs'
+                                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {filter.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-700">Target Rate ({currency})</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2 text-slate-400 text-xs">{currSym}</span>
-                                    <input
-                                        type="number"
-                                        value={bulkRate}
-                                        onChange={(e) => setBulkRate(e.target.value)}
-                                        className="input-standard pl-7 font-mono font-bold"
-                                        placeholder="e.g. 3500"
-                                    />
+                            {/* Pillar 2: Extra Bedding Daily Policy */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-slate-800">
+                                    <BedDouble className="size-3.5 text-primary" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                                        Pillar 2: Extra Bedding Daily Policy
+                                    </span>
+                                </div>
+                                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
+                                    <div>
+                                        <span className="text-xs font-semibold text-slate-800 block">Rollaway Bed Tariff</span>
+                                        <span className="text-[10px] text-slate-500">Daily rate for extra rollaway bed</span>
+                                    </div>
+                                    <div className="relative w-36">
+                                        <span className="absolute left-2.5 top-1.5 text-slate-400 font-bold text-xs">{currSym}</span>
+                                        <input
+                                            type="number"
+                                            value={bulkExtraBedRate}
+                                            onChange={(e) => setBulkExtraBedRate(e.target.value)}
+                                            className="input-standard pl-7 !py-1.5 font-mono font-bold text-xs bg-white"
+                                            placeholder="1000"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-700">Days Applicable</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[
-                                        { id: 'all', label: 'All Days' },
-                                        { id: 'weekends', label: 'Fri & Sat' },
-                                        { id: 'weekdays', label: 'Sun - Thu' },
-                                    ].map(filter => (
-                                        <button
-                                            key={filter.id}
-                                            type="button"
-                                            onClick={() => setBulkDayFilter(filter.id as any)}
-                                            className={`py-2 text-xs font-semibold rounded-xl border transition ${
-                                                bulkDayFilter === filter.id
-                                                    ? 'bg-primary text-white border-primary shadow-xs'
-                                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                            }`}
-                                        >
-                                            {filter.label}
-                                        </button>
-                                    ))}
+                            {/* Pillar 3: Base Pricing & Surcharges */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-slate-800">
+                                    <DollarSign className="size-3.5 text-primary" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                                        Pillar 3: Base Pricing & Daily Surcharges
+                                    </span>
+                                </div>
+                                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-slate-700">Base Nightly Rate ({currency})</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2 text-slate-400 text-xs font-bold">{currSym}</span>
+                                            <input
+                                                type="number"
+                                                value={bulkRate}
+                                                onChange={(e) => setBulkRate(e.target.value)}
+                                                className="input-standard pl-7 font-mono font-bold bg-white"
+                                                placeholder="e.g. 3500"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
+                                        <div className="space-y-1">
+                                            <label className="text-[10.5px] font-semibold text-slate-700">Extra Adult ({currSym})</label>
+                                            <input
+                                                type="number"
+                                                value={bulkExtraAdultRate}
+                                                onChange={(e) => setBulkExtraAdultRate(e.target.value)}
+                                                className="input-standard !py-1 font-mono text-xs bg-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10.5px] font-semibold text-slate-700">Extra Child ({currSym})</label>
+                                            <input
+                                                type="number"
+                                                value={bulkExtraChildRate}
+                                                onChange={(e) => setBulkExtraChildRate(e.target.value)}
+                                                className="input-standard !py-1 font-mono text-xs bg-white"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -62,10 +62,10 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
 
     const allRoomsForDrawer = useMemo(() => {
-        return getCanonicalRooms().map(r => ({
+        return getCanonicalRooms().filter(r => !isRoomUnassigned(r.number)).map(r => ({
             id: String(r.id),
             roomNumber: String(r.number),
-            type: r.name || 'Standard',
+            type: r.roomTypeName || r.name || 'Standard',
             status: r.status || 'Available'
         }));
     }, [isActionDrawerOpen]);
@@ -212,7 +212,12 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
         'quick-reservation': 'Quick Reservation',
         'reservations': 'Reservations',
         'room-rack': 'Room Rack',
-        'folio-operations': 'Billing & Folios',
+        'channel-manager': 'Connected Channels (OTA)',
+        'channel-manager-ari': 'Rates & Inventory Grid (ARI)',
+        'channel-manager-wizard': 'Distribution Wizard (Bulk Update)',
+        'channel-manager-mappings': 'Channel Room & Rate Mappings',
+        'channel-manager-bookings': 'Inbound OTA Bookings',
+        'channel-manager-logs': 'Channel Sync & Audit Logs',
         'floor-plan': 'Floor Plan',
         'occupancy-heatmap': 'Occupancy Matrix',
         'night-audit': 'Night Audit',
@@ -829,8 +834,11 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     await syncReservationsFromDB();
                 }}
                 onCheckOut={async (resNo) => {
-                    await updateReservationStatusInDB(resNo, 'checked-out');
-                    await syncReservationsFromDB();
+                    const ok = await updateReservationStatusInDB(resNo, 'checked-out');
+                    if (ok) {
+                        toast.success(`Reservation ${resNo} checked out successfully.`);
+                        await syncReservationsFromDB();
+                    }
                 }}
             />
 

@@ -5,7 +5,14 @@ import {
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import PageHeader from '../common/PageHeader';
-import { getAllStoredReservations } from '../../utils/roomInventoryEngine';
+import {
+    getAllStoredReservations,
+    saveStoredReservations,
+    isRoomUnassigned,
+    syncReservationsFromDB,
+    moveRoomInDB,
+    broadcastPMSEvent
+} from '../../utils/roomInventoryEngine';
 
 export interface UnassignedItem {
     id: string | number;
@@ -81,13 +88,13 @@ export const ReservationUnassigned: React.FC = () => {
                 const st = String(res?.status || '').toLowerCase();
                 if (st === 'cancelled' || st === 'checked out' || st === 'checked-out' || st === 'voided') return;
                 const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
-                const flatRoomNo = res?.roomNumber ? String(res.roomNumber) : '';
+                const flatRoomNo = res?.roomNumber ? String(res.roomNumber).trim() : '';
+                const isFlatUnassigned = isRoomUnassigned(flatRoomNo, res?.allocatedRooms);
                 const unassignedRooms = rooms.filter((rm: any) => {
                     const rNo = rm?.roomNo || rm?.roomNumber || (Array.isArray(rm?.assignedRooms) ? rm.assignedRooms[0] : '');
-                    return !rNo || rNo === 'Unassigned' || rNo === 'TBA';
+                    return isRoomUnassigned(rNo);
                 });
-                const isFlatUnassigned = !flatRoomNo || flatRoomNo === 'Unassigned' || flatRoomNo === 'TBA';
-                if (unassignedRooms.length > 0 || (rooms.length === 0 && isFlatUnassigned)) {
+                if (isFlatUnassigned || unassignedRooms.length > 0) {
                     const firstRm = unassignedRooms[0] || rooms[0] || {};
                     list.push({
                         id: res?.id || res?.reservationNumber,
@@ -95,13 +102,13 @@ export const ReservationUnassigned: React.FC = () => {
                         guestName: res?.guestName || res?.guest?.fullName || 'Guest',
                         phone: res?.phone || res?.guest?.phone || '',
                         email: res?.email || res?.guest?.email || '',
-                        roomType: firstRm?.roomType || firstRm?.category || res?.roomType || 'Standard Room',
-                        checkIn: firstRm?.checkInDate || res?.checkIn || '2026-07-01',
-                        checkOut: firstRm?.checkOutDate || res?.checkOut || '2026-07-02',
+                        roomType: firstRm?.roomType || firstRm?.category || res?.roomType || 'Deluxe Suite',
+                        checkIn: firstRm?.checkInDate || firstRm?.checkIn || res?.checkIn || res?.arrivalDate || '2026-07-01',
+                        checkOut: firstRm?.checkOutDate || firstRm?.checkOut || res?.checkOut || res?.departureDate || '2026-07-02',
                         nights: Number(firstRm?.nights || res?.nights) || 1,
                         adults: Number(res?.adults) || 1,
                         children: Number(res?.children) || 0,
-                        source: res?.source || 'Direct',
+                        source: res?.source || res?.channel || 'Direct',
                         totalAmount: Number(res?.totalAmount) || 0,
                         paidAmount: Number(res?.paidAmount) || 0,
                         vip: res?.vip || 'Regular'
@@ -159,18 +166,20 @@ export const ReservationUnassigned: React.FC = () => {
         }
     }, [unassignedList]);
 
-    // Force purge on mount if residual exists
+    // Force sync and refresh on mount
     useEffect(() => {
         const purgeTarget = 'RES-202610290007';
-        setUnassignedList(prev => {
-            const cleaned = prev.filter(u =>
-                u.reservationNumber !== purgeTarget &&
-                String(u.id || '') !== purgeTarget &&
-                !String(u.id || '').includes('202610290007') &&
-                !String(u.reservationNumber || '').includes('202610290007') &&
-                !String(u.reservationNumber || '').startsWith('RES-00929')
-            );
-            return cleaned;
+        const isClean = (u: any) =>
+            u?.reservationNumber !== purgeTarget &&
+            String(u?.id || '') !== purgeTarget &&
+            !String(u?.id || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').startsWith('RES-00929');
+
+        syncReservationsFromDB().then(() => {
+            setUnassignedList(deriveLiveUnassigned().filter(isClean));
+        }).catch(() => {
+            setUnassignedList(deriveLiveUnassigned().filter(isClean));
         });
     }, []);
 
@@ -203,32 +212,53 @@ export const ReservationUnassigned: React.FC = () => {
 
         // 2. Sync to active reservations
         try {
-            const existingResStr = localStorage.getItem('hotel_reservations_v2');
-            const existingRes = existingResStr ? JSON.parse(existingResStr) : [];
-            const newRes = {
-                id: Date.now(),
-                reservationNumber: assignTarget.reservationNumber,
-                guestName: assignTarget.guestName,
-                phone: assignTarget.phone || '+880 1711-000000',
-                email: assignTarget.email || 'guest@hospitality.com',
-                roomNumber: targetRoom,
-                roomType: assignTarget.roomType,
-                roomStatus: 'clean',
-                checkIn: assignTarget.checkIn,
-                checkOut: assignTarget.checkOut,
-                nights: assignTarget.nights,
-                adults: assignTarget.adults || 1,
-                children: assignTarget.children || 0,
-                totalAmount: assignTarget.totalAmount,
-                paidAmount: assignTarget.paidAmount || assignTarget.totalAmount,
-                dueAmount: Math.max(0, assignTarget.totalAmount - (assignTarget.paidAmount || assignTarget.totalAmount)),
-                status: 'arriving',
-                source: assignTarget.source,
-                vip: assignTarget.vip || 'None',
-                specialRequests: assignTarget.specialRequests || ''
-            };
-            existingRes.unshift(newRes);
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(existingRes));
+            const allStored = getAllStoredReservations();
+            const existingIdx = allStored.findIndex(r => r.reservationNumber === assignTarget.reservationNumber || String(r.id) === String(assignTarget.id));
+            let updatedList: any[];
+            if (existingIdx !== -1) {
+                const existing = allStored[existingIdx];
+                updatedList = allStored.map((r, i) => i === existingIdx ? {
+                    ...existing,
+                    roomNumber: targetRoom,
+                    allocatedRooms: [targetRoom],
+                    status: 'confirmed',
+                    roomsList: [{
+                        ...((existing.roomsList && existing.roomsList[0]) || {}),
+                        roomNumber: targetRoom,
+                        assignedRooms: [targetRoom],
+                        status: 'ASSIGNED'
+                    }]
+                } : r);
+            } else {
+                const newRes = {
+                    id: Date.now(),
+                    reservationNumber: assignTarget.reservationNumber,
+                    guestName: assignTarget.guestName,
+                    phone: assignTarget.phone || '+880 1711-000000',
+                    email: assignTarget.email || 'guest@hospitality.com',
+                    roomNumber: targetRoom,
+                    roomType: assignTarget.roomType,
+                    allocatedRooms: [targetRoom],
+                    roomStatus: 'clean',
+                    checkIn: assignTarget.checkIn,
+                    checkOut: assignTarget.checkOut,
+                    nights: assignTarget.nights,
+                    adults: assignTarget.adults || 1,
+                    children: assignTarget.children || 0,
+                    totalAmount: assignTarget.totalAmount,
+                    paidAmount: assignTarget.paidAmount || assignTarget.totalAmount,
+                    dueAmount: Math.max(0, assignTarget.totalAmount - (assignTarget.paidAmount || assignTarget.totalAmount)),
+                    status: 'confirmed',
+                    source: assignTarget.source,
+                    vip: assignTarget.vip || 'None',
+                    specialRequests: assignTarget.specialRequests || ''
+                };
+                updatedList = [newRes, ...allStored];
+            }
+            saveStoredReservations(updatedList);
+            moveRoomInDB(assignTarget.reservationNumber, targetRoom, assignTarget.checkIn, assignTarget.checkOut, 'UNASSIGNED').catch(console.warn);
+            const committedRes = updatedList.find(r => r.reservationNumber === assignTarget.reservationNumber) || ({} as any);
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: committedRes });
         } catch (e) {
             console.error('Failed to sync to hotel_reservations_v2', e);
         }
@@ -285,11 +315,16 @@ export const ReservationUnassigned: React.FC = () => {
     // Filter Logic
     const filtered = useMemo(() => {
         return unassignedList.filter(u => {
+            const q = searchQuery.toLowerCase().trim();
             const matchesQuery =
-                u.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                u.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                u.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                u.source.toLowerCase().includes(searchQuery.toLowerCase());
+                !q ||
+                u.guestName.toLowerCase().includes(q) ||
+                u.reservationNumber.toLowerCase().includes(q) ||
+                u.roomType.toLowerCase().includes(q) ||
+                u.source.toLowerCase().includes(q) ||
+                Boolean((u as any).phone && String((u as any).phone).toLowerCase().includes(q)) ||
+                Boolean((u as any).otaBookingReference && String((u as any).otaBookingReference).toLowerCase().includes(q)) ||
+                Boolean((u as any).specialRequests && String((u as any).specialRequests).toLowerCase().includes(q));
             
             const matchesCategory = filterCategory === 'all' || u.roomType === filterCategory;
             const matchesDate = 

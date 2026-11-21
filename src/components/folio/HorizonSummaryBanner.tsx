@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { FolioData, FolioSubTab } from './folioTypes';
 import type { AmendBookingData } from '../modals/AmendStayModal';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 
 interface HorizonSummaryBannerProps {
     folio: FolioData | null;
@@ -19,6 +20,7 @@ interface HorizonSummaryBannerProps {
     activeTab: FolioSubTab;
     onSelectTab: (tab: FolioSubTab) => void;
     onPrintFolio?: () => void;
+    onPrintExtraChargesVoucher?: () => void;
     onEmailFolio?: () => void;
     onExportExcel?: () => void;
     isLoading?: boolean;
@@ -30,10 +32,12 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
     activeTab,
     onSelectTab,
     onPrintFolio,
+    onPrintExtraChargesVoucher,
     onEmailFolio,
     onExportExcel,
     isLoading
 }) => {
+    const { currencySymbol } = useActiveCurrency();
     const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
 
     const firstRoom = folio?.rooms?.[0];
@@ -148,7 +152,7 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
 
                             {/* Room Type Badge */}
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
-                                <span className="font-bold text-[9px] text-emerald-600">$</span>
+                                <span className="font-bold text-[9px] text-emerald-600">{currencySymbol}</span>
                                 <span className="truncate max-w-[120px]">{roomTypeName}</span>
                             </span>
 
@@ -242,7 +246,7 @@ export const HorizonSummaryBanner: React.FC<HorizonSummaryBannerProps> = ({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => { setIsPrintMenuOpen(false); if (onPrintFolio) onPrintFolio(); }}
+                                        onClick={() => { setIsPrintMenuOpen(false); if (onPrintExtraChargesVoucher) onPrintExtraChargesVoucher(); else if (onPrintFolio) onPrintFolio(); }}
                                         className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
                                     >
                                         <FileText size={13} className="text-gray-400" />

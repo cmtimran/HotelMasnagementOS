@@ -1,17 +1,107 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import { broadcastServerEvent } from './realtime.routes.js';
 import { NightAuditService } from '../services/nightAudit.service.js';
 
 const router = Router();
 
+function toPgQuery(sql: string): string {
+    let out = '';
+    let paramIndex = 1;
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    for (let i = 0; i < sql.length; i++) {
+        const c = sql[i];
+        const next = sql[i + 1];
+
+        if (inSingleQuote) {
+            out += c;
+            if (c === "'" && next === "'") {
+                out += next;
+                i++;
+            } else if (c === "'") {
+                inSingleQuote = false;
+            }
+        } else if (inDoubleQuote) {
+            out += c;
+            if (c === '"' && next === '"') {
+                out += next;
+                i++;
+            } else if (c === '"') {
+                inDoubleQuote = false;
+            }
+        } else if (inLineComment) {
+            out += c;
+            if (c === '\n') {
+                inLineComment = false;
+            }
+        } else if (inBlockComment) {
+            out += c;
+            if (c === '*' && next === '/') {
+                out += next;
+                i++;
+                inBlockComment = false;
+            }
+        } else {
+            if (c === "'") {
+                inSingleQuote = true;
+                out += c;
+            } else if (c === '"') {
+                inDoubleQuote = true;
+                out += c;
+            } else if (c === '-' && next === '-') {
+                inLineComment = true;
+                out += c + next;
+                i++;
+            } else if (c === '/' && next === '*') {
+                inBlockComment = true;
+                out += c + next;
+                i++;
+            } else if (c === '?') {
+                out += '$' + (paramIndex++);
+            } else {
+                out += c;
+            }
+        }
+    }
+    return out;
+}
+
+async function queryRows<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    const formatted = toPgQuery(sql);
+    const res = await pgPool.query(formatted, params);
+    return res.rows as T[];
+}
+
+async function queryRow<T = any>(sql: string, params: any[] = []): Promise<T | null> {
+    const formatted = toPgQuery(sql);
+    const res = await pgPool.query(formatted, params);
+    return (res.rows[0] || null) as T | null;
+}
+
+async function queryExec(sql: string, params: any[] = []): Promise<{ lastInsertRowid: number; rowCount: number; rows: any[] }> {
+    let formatted = toPgQuery(sql);
+    if (/^\s*INSERT\s+INTO/i.test(formatted) && !/RETURNING/i.test(formatted)) {
+        formatted += ' RETURNING id';
+    }
+    const res = await pgPool.query(formatted, params);
+    return {
+        lastInsertRowid: Number(res.rows[0]?.id || 0),
+        rowCount: res.rowCount || 0,
+        rows: res.rows
+    };
+}
+
 // GET /api/accounting/chart-of-accounts - USALI Chart of Accounts
 router.get('/chart-of-accounts', async (req: Request, res: Response) => {
     try {
-        const accounts = await db.prepare(`
+        const accounts = await queryRows(`
             SELECT * FROM chart_of_accounts 
             ORDER BY account_code ASC
-        `).all();
+        `);
 
         const grouped = {
             ASSET: accounts.filter((a: any) => a.account_type === 'ASSET'),
@@ -35,9 +125,9 @@ router.get('/chart-of-accounts', async (req: Request, res: Response) => {
 // GET /api/accounting/revenue-heads - Active PMS Revenue Heads
 router.get('/revenue-heads', async (_req: Request, res: Response) => {
     try {
-        const heads = await db.prepare(`
+        const heads = await queryRows(`
             SELECT * FROM revenue_heads WHERE is_active = TRUE ORDER BY name ASC
-        `).all();
+        `);
         res.json({ success: true, data: heads });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch revenue heads' });
@@ -78,7 +168,7 @@ router.get('/folios', async (req: Request, res: Response) => {
         // If queried for a specific reservation and no folio exists yet, auto-create master folio & room charges!
         if (reservationIdParam || reservationNoParam) {
             const targetClean = (reservationNoParam || reservationIdParam || '').replace(/^(res|fol)[-_~]/i, '');
-            const targetRes = await db.prepare(`
+            const targetRes = await queryRow(`
                 SELECT r.*, g.first_name, g.last_name, g.phone, g.email 
                 FROM reservations r 
                 LEFT JOIN guests g ON g.id = r.booker_guest_id 
@@ -87,36 +177,31 @@ router.get('/folios', async (req: Request, res: Response) => {
                    OR UPPER(r.reservation_number) = UPPER(?)
                    OR r.reservation_number ILIKE ?
                 LIMIT 1
-            `).get(
-                reservationIdParam || '',
-                reservationIdParam || '',
-                reservationNoParam || '',
-                `%${targetClean}%`
-            ) as any;
+            `, [reservationIdParam || '', reservationIdParam || '', reservationNoParam || '', `%${targetClean}%`]) as any;
 
             if (targetRes) {
-                const existingFolio = await db.prepare(`SELECT id FROM folios WHERE reservation_id = ? LIMIT 1`).get(targetRes.id) as any;
+                const existingFolio = await queryRow(`SELECT id FROM folios WHERE reservation_id = ? LIMIT 1`, [targetRes.id]) as any;
                 if (!existingFolio) {
                     const guestName = [targetRes.first_name, targetRes.last_name].filter(Boolean).join(' ') || 'Valued Guest';
                     const genFolioNo = `FN~${targetRes.reservation_number || targetRes.id} - ${guestName}`;
-                    const createdFolio = await db.prepare(`
+                    const createdFolio = await queryExec(`
                         INSERT INTO folios (
                             reservation_id, guest_id, folio_number, folio_type, status, balance,
                             bill_to, business_source, generate_invoice_on_checkout
                         ) VALUES (?, ?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, TRUE)
                         RETURNING id, folio_number
-                    `).run(targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct');
+                    `, [targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct']);
 
                     const newFolioId = createdFolio.lastInsertRowid;
 
                     // Automatically generate night-by-night room accommodation charges from reservation_rooms
-                    const resRooms = await db.prepare(`
+                    const resRooms = await queryRows(`
                         SELECT rr.*, rm.room_number, rt.name as room_type_name
                         FROM reservation_rooms rr
                         JOIN rooms rm ON rm.id = rr.room_id
                         LEFT JOIN room_types rt ON rt.id = rr.room_type_id
                         WHERE rr.reservation_id = ?
-                    `).all(targetRes.id) as any[];
+                    `, [targetRes.id]) as any[];
 
                     let runningTotal = 0;
                     for (const rr of resRooms) {
@@ -137,36 +222,24 @@ router.get('/folios', async (req: Request, res: Response) => {
                             const grandAmt = baseAmt + totalTax;
                             runningTotal += grandAmt;
 
-                            await db.prepare(`
+                            await queryExec(`
                                 INSERT INTO folio_charges (
                                     folio_id, reservation_room_id, charge_code, revenue_head, ref_no,
                                     description, amount, discount_amount, service_charge, vat, city_tax,
                                     total_tax, total_amount, charge_date, is_tax_applicable, user_name
                                 ) VALUES (?, ?, 'ROOM_CHG', 'Room Charges', ?, ?, ?, 0.00, ?, ?, ?, ?, ?, ?, TRUE, 'System Auditor')
-                            `).run(
-                                newFolioId,
-                                rr.id,
-                                String(d + 1),
-                                `Room Charge - Room ${rr.room_number} (${rr.room_type_name || 'Standard'})`,
-                                baseAmt,
-                                svcCharge,
-                                vatAmt,
-                                cityTaxAmt,
-                                totalTax,
-                                grandAmt,
-                                chargeDateStr
-                            );
+                            `, [newFolioId, rr.id, String(d + 1), `Room Charge - Room ${rr.room_number} (${rr.room_type_name || 'Standard'})`, baseAmt, svcCharge, vatAmt, cityTaxAmt, totalTax, grandAmt, chargeDateStr]);
                         }
                     }
 
                     // Update folio balance
-                    await db.prepare(`UPDATE folios SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(runningTotal, newFolioId);
+                    await queryExec(`UPDATE folios SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [runningTotal, newFolioId]);
 
                     // Add initial audit log
-                    await db.prepare(`
+                    await queryExec(`
                         INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                         VALUES (?, ?, 'FOLIO_CREATED', ?, 'Front Desk')
-                    `).run(newFolioId, targetRes.id, `Master Folio ${genFolioNo} created for reservation ${targetRes.reservation_number}`);
+                    `, [newFolioId, targetRes.id, `Master Folio ${genFolioNo} created for reservation ${targetRes.reservation_number}`]);
                 }
 
                 // If this reservation is part of a group, expand query to fetch all folios of the entire group!
@@ -208,11 +281,11 @@ router.get('/folios', async (req: Request, res: Response) => {
             ORDER BY f.id DESC
         `;
 
-        const folios = (params.length > 0 ? await db.prepare(sql).all(...params) : await db.prepare(sql).all()) as any[];
+        const folios = (params.length > 0 ? await queryRows(sql, params) : await queryRows(sql)) as any[];
 
         // Fetch charges, payments, rooms and audit logs for each folio
         const enrichedFolios = await Promise.all(folios.map(async f => {
-            const charges = await db.prepare(`
+            const charges = await queryRows(`
                 SELECT 
                     id, folio_id, reservation_room_id, charge_code, revenue_head,
                     COALESCE(ref_no, id::text) as ref_no,
@@ -223,9 +296,9 @@ router.get('/folios', async (req: Request, res: Response) => {
                 FROM folio_charges 
                 WHERE folio_id = ? 
                 ORDER BY charge_date ASC, id ASC
-            `).all(f.id);
+            `, [f.id]);
 
-            const payments = await db.prepare(`
+            const payments = await queryRows(`
                 SELECT 
                     id, folio_id, property_id, payment_number, payment_method,
                     amount, reference_code, transaction_date,
@@ -233,9 +306,9 @@ router.get('/folios', async (req: Request, res: Response) => {
                 FROM payments 
                 WHERE folio_id = ? 
                 ORDER BY transaction_date ASC, id ASC
-            `).all(f.id);
+            `, [f.id]);
 
-            const rooms = await db.prepare(`
+            const rooms = await queryRows(`
                 SELECT rr.id, rr.sub_booking_number, rr.folio_number, rm.room_number, rt.name as room_type,
                        rr.check_in_date, rr.check_out_date, rr.room_rate, rr.rate_amount, rr.adults, rr.children,
                        rr.nights
@@ -244,7 +317,7 @@ router.get('/folios', async (req: Request, res: Response) => {
                 LEFT JOIN room_types rt ON rt.id = rm.room_type_id
                 WHERE rr.reservation_id = ?
                 ORDER BY rm.room_number ASC
-            `).all(f.reservation_id);
+            `, [f.reservation_id]);
 
             // Calculate precise accounting totals
             let activeChargesSum = 0;
@@ -301,7 +374,7 @@ router.get('/folios/:id', async (req: Request, res: Response) => {
     try {
         const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
         const id = String(rawId || '');
-        const folio = await db.prepare(`
+        const folio = await queryRow(`
             SELECT 
                 f.*,
                 r.reservation_number,
@@ -316,22 +389,22 @@ router.get('/folios/:id', async (req: Request, res: Response) => {
             LEFT JOIN reservations r ON r.id = f.reservation_id
             LEFT JOIN guests g ON g.id = f.guest_id
             WHERE CAST(f.id AS TEXT) = ? OR f.folio_number = ?
-        `).get(id, id) as any;
+        `, [id, id]) as any;
 
         if (!folio) {
             return res.status(404).json({ success: false, error: 'Folio not found' });
         }
 
-        const charges = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? ORDER BY id DESC`).all(folio.id);
-        const payments = await db.prepare(`SELECT * FROM payments WHERE folio_id = ? ORDER BY id DESC`).all(folio.id);
-        const rooms = await db.prepare(`
+        const charges = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? ORDER BY id DESC`, [folio.id]);
+        const payments = await queryRows(`SELECT * FROM payments WHERE folio_id = ? ORDER BY id DESC`, [folio.id]);
+        const rooms = await queryRows(`
             SELECT rr.id, rr.sub_booking_number, rr.folio_number, rm.room_number, rt.name as room_type, rr.check_in_date, rr.check_out_date, rr.room_rate
             FROM reservation_rooms rr
             JOIN rooms rm ON rm.id = rr.room_id
             JOIN room_types rt ON rt.id = rm.room_type_id
             WHERE rr.reservation_id = ?
             ORDER BY rm.room_number ASC
-        `).all(folio.reservation_id);
+        `, [folio.reservation_id]);
 
         res.json({
             success: true,
@@ -365,15 +438,11 @@ router.post('/folios', async (req: Request, res: Response) => {
         let resRecord: any = null;
 
         if (reservationId || reservationNumber) {
-            resRecord = await db.prepare(`
+            resRecord = await queryRow(`
                 SELECT * FROM reservations
                 WHERE id::text = ? OR UPPER(reservation_number) = UPPER(?) OR reservation_number ILIKE ?
                 LIMIT 1
-            `).get(
-                reservationId || '',
-                reservationNumber || '',
-                `%${(reservationNumber || reservationId || '').replace(/^(res|fol)[-_~]/i, '')}%`
-            ) as any;
+            `, [reservationId || '', reservationNumber || '', `%${(reservationNumber || reservationId || '').replace(/^(res|fol)[-_~]/i, '')}%`]) as any;
 
             if (resRecord) {
                 resId = resRecord.id;
@@ -384,38 +453,27 @@ router.post('/folios', async (req: Request, res: Response) => {
         const cleanName = guestName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '').trim() || guestName;
 
         // Generate next sequential folio number (e.g. "79 - Ms. Jobel Yubos")
-        const maxIdResult = await db.prepare(`SELECT MAX(id) as max_id FROM folios`).get() as any;
+        const maxIdResult = await queryRow(`SELECT MAX(id) as max_id FROM folios`) as any;
         const nextNum = (maxIdResult?.max_id || 70) + 1;
         const folioNumber = `${nextNum} - ${guestName}`;
 
-        const insertRes = await db.prepare(`
+        const insertRes = await queryExec(`
             INSERT INTO folios (
                 reservation_id, folio_number, folio_type, status, balance,
                 bill_to, gstin_number, generate_invoice_on_checkout
             )
             VALUES (?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, ?)
             RETURNING *
-        `).run(
-            resId,
-            folioNumber,
-            guestName,
-            gstin || '',
-            generateInvoiceOnCheckout ? 1 : 0
-        ) as any;
+        `, [resId, folioNumber, guestName, gstin || '', generateInvoiceOnCheckout ? 1 : 0]) as any;
 
         const newFolioId = insertRes?.lastInsertRowid || insertRes?.id || nextNum;
 
         // Audit Trail Log
         try {
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'FOLIO_CREATED', ?, ?)
-            `).run(
-                newFolioId,
-                resId,
-                `New sub-folio [${folioNumber}] created for selected guest`,
-                userName
-            );
+            `, [newFolioId, resId, `New sub-folio [${folioNumber}] created for selected guest`, userName]);
         } catch {
             // Audit log optional
         }
@@ -479,9 +537,9 @@ router.post('/folios/route', async (req: Request, res: Response) => {
         }
 
         // Move existing matching charges from source to destination folio
-        const existingCharges = await db.prepare(`
+        const existingCharges = await queryRows(`
             SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)
-        `).all(sId) as any[];
+        `, [sId]) as any[];
 
         let movedCount = 0;
         let movedSum = 0;
@@ -513,28 +571,23 @@ router.post('/folios/route', async (req: Request, res: Response) => {
 
             if (shouldMove) {
                 const amt = Number(c.total_amount || c.amount || 0);
-                await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(dId, c.id);
+                await queryExec(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`, [dId, c.id]);
                 movedCount++;
                 movedSum += amt;
             }
         }
 
         if (movedSum > 0) {
-            await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedSum, sId);
-            await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedSum, dId);
+            await queryExec(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [movedSum, sId]);
+            await queryExec(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [movedSum, dId]);
         }
 
         // Log audit trail
         try {
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'FOLIO_ROUTING_CONFIGURED', ?, ?)
-            `).run(
-                sId,
-                sourceFolio.reservation_id,
-                `Folio routing configured: ${movedCount} extra charge(s) routed to [${destFolio.folio_number}].`,
-                userName
-            );
+            `, [sId, sourceFolio.reservation_id, `Folio routing configured: ${movedCount} extra charge(s) routed to [${destFolio.folio_number}].`, userName]);
         } catch {}
 
         res.json({
@@ -562,17 +615,23 @@ router.post('/folios/:id/charges', async (req: Request, res: Response) => {
             discount = 0,
             taxApplicable = true,
             chargeDate,
-            applyToGroup = false,
-            userName = 'Front Desk'
+            applyToGroup = false
         } = req.body;
+
+        const authenticatedName = (req as any).user?.name || 'Staff User';
 
         const rawAmount = Math.max(0, Number(amount) || 0);
         const discountAmt = Math.max(0, Number(discount) || 0);
-        const netBase = Math.max(0, rawAmount - discountAmt);
 
         if (rawAmount <= 0) {
             return res.status(400).json({ success: false, error: 'Charge amount must be greater than zero' });
         }
+
+        if (discountAmt > rawAmount) {
+            return res.status(400).json({ success: false, error: 'Discount amount cannot exceed charge amount' });
+        }
+
+        const netBase = Math.max(0, rawAmount - discountAmt);
 
         const isTaxActive = Boolean(taxApplicable);
         const svcCharge = isTaxActive ? Math.round(netBase * 0.10 * 100) / 100 : 0;
@@ -586,66 +645,79 @@ router.post('/folios/:id/charges', async (req: Request, res: Response) => {
         const code = chargeCode || revenueHead.toUpperCase().replace(/[^A-Z0-9]/g, '_').slice(0, 20);
 
         // Fetch parent reservation if applyToGroup is requested
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
+        const targetFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [folioId]) as any;
         if (!targetFolio) {
             return res.status(404).json({ success: false, error: 'Target folio not found' });
         }
 
-        const foliosToCharge: number[] = [folioId];
-        if (applyToGroup && targetFolio.reservation_id) {
-            const groupFolios = await db.prepare(`SELECT id FROM folios WHERE reservation_id = ? AND id != ?`).all(targetFolio.reservation_id, folioId) as any[];
+        let effectiveFolioId = folioId;
+        let isSupplementaryFolio = false;
+        let supplementaryFolioNumber = '';
+
+        if (targetFolio.status === 'CLOSED' || targetFolio.status === 'SETTLED') {
+            const existingSupp = await queryRow(`
+                SELECT id, folio_number FROM folios 
+                WHERE reservation_id = ? AND is_supplementary = true AND status = 'OPEN' 
+                LIMIT 1
+            `, [targetFolio.reservation_id]) as any;
+
+            if (existingSupp) {
+                effectiveFolioId = Number(existingSupp.id);
+                supplementaryFolioNumber = existingSupp.folio_number;
+                isSupplementaryFolio = true;
+            } else {
+                supplementaryFolioNumber = `${targetFolio.folio_number || 'FOL'}-LATE-${Date.now().toString().slice(-4)}`;
+                const suppInsert = await queryExec(`
+                    INSERT INTO folios (
+                        reservation_id, guest_id, corporate_account_id, folio_number,
+                        folio_type, status, balance, is_supplementary, parent_folio_id
+                    ) VALUES (?, ?, ?, ?, 'GUEST', 'OPEN', 0.00, true, ?)
+                `, [
+                    targetFolio.reservation_id,
+                    targetFolio.guest_id,
+                    targetFolio.corporate_account_id || null,
+                    supplementaryFolioNumber,
+                    targetFolio.id
+                ]);
+                effectiveFolioId = Number(suppInsert.lastInsertRowid);
+                isSupplementaryFolio = true;
+            }
+        }
+
+        const foliosToCharge: number[] = [effectiveFolioId];
+        if (applyToGroup && targetFolio.reservation_id && !isSupplementaryFolio) {
+            const groupFolios = await queryRows(`SELECT id FROM folios WHERE reservation_id = ? AND id != ?`, [targetFolio.reservation_id, folioId]) as any[];
             groupFolios.forEach(gf => foliosToCharge.push(Number(gf.id)));
         }
 
         let firstChargeId: any = null;
         for (const targetId of foliosToCharge) {
-            const chargeInsert = await db.prepare(`
+            const chargeInsert = await queryExec(`
                 INSERT INTO folio_charges (
                     folio_id, charge_code, revenue_head, ref_no, description,
                     amount, discount_amount, service_charge, vat, city_tax,
                     total_tax, total_amount, charge_date, is_tax_applicable, user_name
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-                targetId,
-                code,
-                revenueHead,
-                refNo,
-                description || `${revenueHead} Charge`,
-                rawAmount,
-                discountAmt,
-                svcCharge,
-                vatAmt,
-                cityTaxAmt,
-                totalTax,
-                totalAmount,
-                dateStr,
-                isTaxActive,
-                userName
-            );
+            `, [targetId, code, revenueHead, refNo, description || `${revenueHead} Charge`, rawAmount, discountAmt, svcCharge, vatAmt, cityTaxAmt, totalTax, totalAmount, dateStr, isTaxActive, authenticatedName]);
 
             if (!firstChargeId) firstChargeId = chargeInsert.lastInsertRowid;
 
             // Update Folio balance
-            await db.prepare(`
+            await queryExec(`
                 UPDATE folios 
                 SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).run(totalAmount, targetId);
+            `, [totalAmount, targetId]);
 
             // Audit Trail Log
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'CHARGE_POSTED', ?, ?)
-            `).run(
-                targetId,
-                targetFolio.reservation_id,
-                `Posted charge: ${revenueHead} (${description || ''}) - Net ৳${totalAmount.toFixed(2)} [Ref: ${refNo}]`,
-                userName
-            );
+            `, [targetId, targetFolio.reservation_id, `Posted charge: ${revenueHead} (${description || ''}) - Net ৳${totalAmount.toFixed(2)} [Ref: ${refNo}]`, authenticatedName]);
         }
 
         // Look up propertyId for targeted multi-tenant broadcast
-        const propLookup = await db.prepare(`SELECT r.property_id FROM folios f JOIN reservations r ON r.id = f.reservation_id WHERE f.id = ?`).get(folioId) as any;
+        const propLookup = await queryRow(`SELECT r.property_id FROM folios f JOIN reservations r ON r.id = f.reservation_id WHERE f.id = ?`, [folioId]) as any;
         const targetPropId = propLookup?.property_id || 1;
 
         // Emit real-time event
@@ -664,7 +736,9 @@ router.post('/folios/:id/charges', async (req: Request, res: Response) => {
             success: true,
             message: `Charge of ৳${totalAmount.toFixed(2)} posted successfully across ${foliosToCharge.length} folio(s)`,
             chargeId: firstChargeId,
-            refNo
+            refNo,
+            isSupplementaryFolio,
+            supplementaryFolioNumber: isSupplementaryFolio ? supplementaryFolioNumber : undefined
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to post charge' });
@@ -680,16 +754,28 @@ router.post('/folios/:id/discounts', async (req: Request, res: Response) => {
             revenueHead = 'Discount',
             taxApplicable = false,
             discountAmount = 0,
-            comment = '',
-            userName = 'Front Desk'
+            comment = ''
         } = req.body;
+
+        const user = (req as any).user;
+        const authenticatedName = user?.name || 'Staff User';
+        const role = user?.role;
+        const isPrivileged = role === 'super_admin' || role === 'hotel_admin' || role === 'general_manager' || role === 'accountant' || role === 'auditor';
 
         const discAmt = Math.max(0, Number(discountAmount) || 0);
         if (discAmt <= 0) {
             return res.status(400).json({ success: false, error: 'Discount amount must be greater than zero' });
         }
 
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
+        // Fraud Defense: Discounts exceeding ৳1,000 strictly require managerial authorization
+        if (!isPrivileged && discAmt > 1000) {
+            return res.status(403).json({
+                success: false,
+                error: 'Forbidden: Discounts exceeding ৳1,000 require managerial authorization'
+            });
+        }
+
+        const targetFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [folioId]) as any;
         if (!targetFolio) {
             return res.status(404).json({ success: false, error: 'Folio not found' });
         }
@@ -705,45 +791,26 @@ router.post('/folios/:id/discounts', async (req: Request, res: Response) => {
         const refNo = `DISC-${Date.now().toString().slice(-6)}`;
 
         // Post as discount transaction in folio_charges (with negative amount or discount flag)
-        const insertRes = await db.prepare(`
+        const insertRes = await queryExec(`
             INSERT INTO folio_charges (
                 folio_id, charge_code, revenue_head, ref_no, description,
                 amount, discount_amount, service_charge, vat, city_tax,
                 total_tax, total_amount, charge_date, is_tax_applicable, user_name
             ) VALUES (?, 'DISCOUNT', 'Discount', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-            folioId,
-            refNo,
-            comment || `Discount applied (${discountType})`,
-            -discAmt,
-            discAmt,
-            -svcCharge,
-            -vatAmt,
-            -cityTaxAmt,
-            -totalTax,
-            -netDiscount,
-            dateStr,
-            isTaxActive,
-            userName
-        );
+        `, [folioId, refNo, comment || `Discount applied (${discountType})`, -discAmt, discAmt, -svcCharge, -vatAmt, -cityTaxAmt, -totalTax, -netDiscount, dateStr, isTaxActive, authenticatedName]);
 
         // Update folio balance
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(netDiscount, folioId);
+        `, [netDiscount, folioId]);
 
         // Log audit trail
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'DISCOUNT_APPLIED', ?, ?)
-        `).run(
-            folioId,
-            targetFolio.reservation_id,
-            `Discount Applied: Discount of ৳${netDiscount.toFixed(2)} (${comment || discountType}) applied to folio ${targetFolio.folio_number}`,
-            userName
-        );
+        `, [folioId, targetFolio.reservation_id, `Discount Applied: Discount of ৳${netDiscount.toFixed(2)} (${comment || discountType}) applied to folio ${targetFolio.folio_number}`, authenticatedName]);
 
         res.json({
             success: true,
@@ -763,16 +830,28 @@ router.post('/folios/:id/adjustments', async (req: Request, res: Response) => {
             revenueHead = 'Adjustments',
             amount = 0,
             taxApplicable = false,
-            comment = '',
-            userName = 'Front Desk'
+            comment = ''
         } = req.body;
+
+        const user = (req as any).user;
+        const authenticatedName = user?.name || 'Staff User';
+        const role = user?.role;
+        const isPrivileged = role === 'super_admin' || role === 'hotel_admin' || role === 'general_manager' || role === 'accountant' || role === 'auditor';
 
         const adjAmount = Number(amount) || 0;
         if (adjAmount === 0) {
             return res.status(400).json({ success: false, error: 'Adjustment amount cannot be zero' });
         }
 
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
+        // Fraud Defense: Arbitrary balance write-offs/adjustments exceeding ৳500 require managerial authorization
+        if (!isPrivileged && Math.abs(adjAmount) > 500) {
+            return res.status(403).json({
+                success: false,
+                error: 'Forbidden: Balance adjustments exceeding ৳500 require managerial authorization'
+            });
+        }
+
+        const targetFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [folioId]) as any;
         if (!targetFolio) {
             return res.status(404).json({ success: false, error: 'Folio not found' });
         }
@@ -789,45 +868,26 @@ router.post('/folios/:id/adjustments', async (req: Request, res: Response) => {
         const dateStr = new Date().toISOString().split('T')[0];
         const refNo = `ADJ-${Date.now().toString().slice(-6)}`;
 
-        const insertRes = await db.prepare(`
+        const insertRes = await queryExec(`
             INSERT INTO folio_charges (
                 folio_id, charge_code, revenue_head, ref_no, description,
                 amount, discount_amount, service_charge, vat, city_tax,
                 total_tax, total_amount, charge_date, is_tax_applicable, user_name
             ) VALUES (?, 'ADJUSTMENT', ?, ?, ?, ?, 0.00, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-            folioId,
-            revenueHead,
-            refNo,
-            comment || `Balance Adjustment (${revenueHead})`,
-            adjAmount,
-            svcCharge,
-            vatAmt,
-            cityTaxAmt,
-            totalTax,
-            totalAmount,
-            dateStr,
-            isTaxActive,
-            userName
-        );
+        `, [folioId, revenueHead, refNo, comment || `Balance Adjustment (${revenueHead})`, adjAmount, svcCharge, vatAmt, cityTaxAmt, totalTax, totalAmount, dateStr, isTaxActive, authenticatedName]);
 
         // Update folio balance
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance + ?), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(totalAmount, folioId);
+        `, [totalAmount, folioId]);
 
-        // Audit Trail Log
-        await db.prepare(`
+        // Log audit trail
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'ADJUSTMENT_POSTED', ?, ?)
-        `).run(
-            folioId,
-            targetFolio.reservation_id,
-            `Adjustment Posted: ${adjAmount > 0 ? '+' : ''}৳${totalAmount.toFixed(2)} (${comment || revenueHead}) on folio ${targetFolio.folio_number}`,
-            userName
-        );
+        `, [folioId, targetFolio.reservation_id, `Balance adjustment of ৳${totalAmount.toFixed(2)} applied (${comment || revenueHead}) to folio ${targetFolio.folio_number}`, authenticatedName]);
 
         res.json({
             success: true,
@@ -844,7 +904,7 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
     try {
         const { sourceFolioId, destFolioId, chargeIds = [], transferToGroupOwner = false, userName = 'Front Desk' } = req.body;
 
-        const sourceFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(Number(sourceFolioId)) as any;
+        const sourceFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [Number(sourceFolioId)]) as any;
         if (!sourceFolio) {
             return res.status(404).json({ success: false, error: 'Source folio not found' });
         }
@@ -852,11 +912,11 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
         let targetDestId = Number(destFolioId);
         if (transferToGroupOwner) {
             // Find group owner folio for this reservation
-            const groupOwnerFolio = await db.prepare(`
+            const groupOwnerFolio = await queryRow(`
                 SELECT id, folio_number FROM folios 
                 WHERE reservation_id = ? AND (folio_type = 'MASTER' OR id != ?) 
                 ORDER BY id ASC LIMIT 1
-            `).get(sourceFolio.reservation_id, sourceFolio.id) as any;
+            `, [sourceFolio.reservation_id, sourceFolio.id]) as any;
 
             if (groupOwnerFolio) {
                 targetDestId = Number(groupOwnerFolio.id);
@@ -865,7 +925,7 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
             }
         }
 
-        const destFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(targetDestId) as any;
+        const destFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [targetDestId]) as any;
         if (!destFolio) {
             return res.status(404).json({ success: false, error: 'Destination folio not found' });
         }
@@ -874,9 +934,9 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
         let targetCharges: any[] = [];
         if (Array.isArray(chargeIds) && chargeIds.length > 0) {
             const placeholders = chargeIds.map(() => '?').join(',');
-            targetCharges = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`).all(sourceFolio.id, ...chargeIds);
+            targetCharges = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`, [sourceFolio.id, ...chargeIds]);
         } else {
-            targetCharges = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)`).all(sourceFolio.id);
+            targetCharges = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)`, [sourceFolio.id]);
         }
 
         if (targetCharges.length === 0) {
@@ -887,33 +947,23 @@ router.post('/folios/transfer', async (req: Request, res: Response) => {
         for (const c of targetCharges) {
             const amt = Number(c.total_amount || c.amount || 0);
             transferredSum += amt;
-            await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(destFolio.id, c.id);
+            await queryExec(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`, [destFolio.id, c.id]);
         }
 
         // Rebalance source and destination folios
-        await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(transferredSum, sourceFolio.id);
-        await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(transferredSum, destFolio.id);
+        await queryExec(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [transferredSum, sourceFolio.id]);
+        await queryExec(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [transferredSum, destFolio.id]);
 
         // Audit Trail
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'CHARGES_TRANSFERRED', ?, ?)
-        `).run(
-            sourceFolio.id,
-            sourceFolio.reservation_id,
-            `Transferred ${targetCharges.length} charge(s) totaling ৳${transferredSum.toFixed(2)} to Folio ${destFolio.folio_number}`,
-            userName
-        );
+        `, [sourceFolio.id, sourceFolio.reservation_id, `Transferred ${targetCharges.length} charge(s) totaling ৳${transferredSum.toFixed(2)} to Folio ${destFolio.folio_number}`, userName]);
 
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'CHARGES_RECEIVED', ?, ?)
-        `).run(
-            destFolio.id,
-            destFolio.reservation_id,
-            `Received ${targetCharges.length} charge(s) totaling ৳${transferredSum.toFixed(2)} transferred from Folio ${sourceFolio.folio_number}`,
-            userName
-        );
+        `, [destFolio.id, destFolio.reservation_id, `Received ${targetCharges.length} charge(s) totaling ৳${transferredSum.toFixed(2)} transferred from Folio ${sourceFolio.folio_number}`, userName]);
 
         res.json({
             success: true,
@@ -951,18 +1001,18 @@ router.post('/folios/transfer-to-owner', async (req: Request, res: Response) => 
             targetSourceIds = sourceFolioIds.map(id => Number(id)).filter(id => !isNaN(id) && id !== targetOwnerId);
         } else if (ownerFolio.reservation_id) {
             // Check if group reservation
-            const ownerRes = await db.prepare(`SELECT id, group_code FROM reservations WHERE id = ?`).get(ownerFolio.reservation_id) as any;
+            const ownerRes = await queryRow(`SELECT id, group_code FROM reservations WHERE id = ?`, [ownerFolio.reservation_id]) as any;
             if (ownerRes?.group_code) {
-                const groupFolios = await db.prepare(`
+                const groupFolios = await queryRows(`
                     SELECT f.id FROM folios f
                     JOIN reservations r ON r.id = f.reservation_id
                     WHERE r.group_code = ? AND f.id != ?
-                `).all(ownerRes.group_code, targetOwnerId) as any[];
+                `, [ownerRes.group_code, targetOwnerId]) as any[];
                 targetSourceIds = groupFolios.map(g => Number(g.id));
             } else {
-                const siblingFolios = await db.prepare(`
+                const siblingFolios = await queryRows(`
                     SELECT id FROM folios WHERE reservation_id = ? AND id != ?
-                `).all(ownerFolio.reservation_id, targetOwnerId) as any[];
+                `, [ownerFolio.reservation_id, targetOwnerId]) as any[];
                 targetSourceIds = siblingFolios.map(s => Number(s.id));
             }
         }
@@ -975,12 +1025,12 @@ router.post('/folios/transfer-to-owner', async (req: Request, res: Response) => 
         let totalTransferredSum = 0;
 
         for (const sId of targetSourceIds) {
-            const src = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(sId) as any;
+            const src = await queryRow(`SELECT * FROM folios WHERE id = ?`, [sId]) as any;
             if (!src) continue;
 
-            const charges = await db.prepare(`
+            const charges = await queryRows(`
                 SELECT * FROM folio_charges WHERE folio_id = ? AND (is_voided IS FALSE OR is_voided IS NULL)
-            `).all(sId) as any[];
+            `, [sId]) as any[];
 
             if (charges.length === 0) continue;
 
@@ -988,40 +1038,30 @@ router.post('/folios/transfer-to-owner', async (req: Request, res: Response) => 
             for (const c of charges) {
                 const amt = Number(c.total_amount || c.amount || 0);
                 folioChargesSum += amt;
-                await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(targetOwnerId, c.id);
+                await queryExec(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`, [targetOwnerId, c.id]);
             }
 
             totalTransferredCount += charges.length;
             totalTransferredSum += folioChargesSum;
 
             // Update source folio balance
-            await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(folioChargesSum, sId);
+            await queryExec(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [folioChargesSum, sId]);
 
             // Audit log on source
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'GROUP_CHARGES_TRANSFERRED_TO_OWNER', ?, ?)
-            `).run(
-                sId,
-                src.reservation_id,
-                `Transferred ${charges.length} group charge(s) totaling ৳${folioChargesSum.toFixed(2)} to Group Owner Folio [${ownerFolio.folio_number}]`,
-                userName
-            );
+            `, [sId, src.reservation_id, `Transferred ${charges.length} group charge(s) totaling ৳${folioChargesSum.toFixed(2)} to Group Owner Folio [${ownerFolio.folio_number}]`, userName]);
         }
 
         // Add transferred sum to owner folio balance
-        await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(totalTransferredSum, targetOwnerId);
+        await queryExec(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [totalTransferredSum, targetOwnerId]);
 
         // Audit log on owner
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'GROUP_CHARGES_RECEIVED_FROM_SUB_FOLIOS', ?, ?)
-        `).run(
-            targetOwnerId,
-            ownerFolio.reservation_id,
-            `Received ${totalTransferredCount} group charge(s) totaling ৳${totalTransferredSum.toFixed(2)} transferred from ${targetSourceIds.length} sub-folio(s)`,
-            userName
-        );
+        `, [targetOwnerId, ownerFolio.reservation_id, `Received ${totalTransferredCount} group charge(s) totaling ৳${totalTransferredSum.toFixed(2)} transferred from ${targetSourceIds.length} sub-folio(s)`, userName]);
 
         // Clean owner folio display name for the notification
         let displayOwner = ownerFolio.folio_number || String(targetOwnerId);
@@ -1047,7 +1087,7 @@ router.post('/folios/split', async (req: Request, res: Response) => {
     try {
         const { sourceFolioId, destFolioId, chargeIds = [], newFolioName, userName = 'Front Desk' } = req.body;
 
-        const sourceFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(Number(sourceFolioId)) as any;
+        const sourceFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [Number(sourceFolioId)]) as any;
         if (!sourceFolio) {
             return res.status(404).json({ success: false, error: 'Source folio not found' });
         }
@@ -1060,53 +1100,42 @@ router.post('/folios/split', async (req: Request, res: Response) => {
         let destFolio: any = null;
 
         if (targetDestId) {
-            destFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(targetDestId) as any;
+            destFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [targetDestId]) as any;
         }
 
         // If no destination folio was selected, auto-create a Cut Folio (Window 2) for this reservation
         if (!destFolio) {
             const cutNumber = `${sourceFolio.folio_number}-2`;
-            const created = await db.prepare(`
+            const created = await queryExec(`
                 INSERT INTO folios (
                     reservation_id, guest_id, folio_number, folio_type, status, balance,
                     bill_to, business_source, generate_invoice_on_checkout
                 ) VALUES (?, ?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, TRUE)
                 RETURNING id, folio_number
-            `).run(
-                sourceFolio.reservation_id,
-                sourceFolio.guest_id,
-                newFolioName || cutNumber,
-                sourceFolio.bill_to || 'Guest Folio 2',
-                sourceFolio.business_source || 'Direct'
-            );
+            `, [sourceFolio.reservation_id, sourceFolio.guest_id, newFolioName || cutNumber, sourceFolio.bill_to || 'Guest Folio 2', sourceFolio.business_source || 'Direct']);
             targetDestId = Number(created.lastInsertRowid);
-            destFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(targetDestId);
+            destFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [targetDestId]);
         }
 
         const placeholders = chargeIds.map(() => '?').join(',');
-        const chargesToMove = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`).all(sourceFolio.id, ...chargeIds) as any[];
+        const chargesToMove = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`, [sourceFolio.id, ...chargeIds]) as any[];
 
         let movedTotal = 0;
         for (const c of chargesToMove) {
             const amt = Number(c.total_amount || c.amount || 0);
             movedTotal += amt;
-            await db.prepare(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`).run(destFolio.id, c.id);
+            await queryExec(`UPDATE folio_charges SET folio_id = ? WHERE id = ?`, [destFolio.id, c.id]);
         }
 
         // Update balances
-        await db.prepare(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedTotal, sourceFolio.id);
-        await db.prepare(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(movedTotal, destFolio.id);
+        await queryExec(`UPDATE folios SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [movedTotal, sourceFolio.id]);
+        await queryExec(`UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [movedTotal, destFolio.id]);
 
         // Audit Trail Log
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'FOLIO_SPLIT', ?, ?)
-        `).run(
-            sourceFolio.id,
-            sourceFolio.reservation_id,
-            `Cut Folio: Split ${chargesToMove.length} charges (৳${movedTotal.toFixed(2)}) into Folio ${destFolio.folio_number}`,
-            userName
-        );
+        `, [sourceFolio.id, sourceFolio.reservation_id, `Cut Folio: Split ${chargesToMove.length} charges (৳${movedTotal.toFixed(2)}) into Folio ${destFolio.folio_number}`, userName]);
 
         res.json({
             success: true,
@@ -1127,7 +1156,7 @@ router.post('/folios/charges/:id/void', async (req: Request, res: Response) => {
         const chargeId = Number(req.params.id);
         const { voidReason = 'Erroneous posting', userName = 'Front Desk' } = req.body;
 
-        const charge = await db.prepare(`SELECT * FROM folio_charges WHERE id = ?`).get(chargeId) as any;
+        const charge = await queryRow(`SELECT * FROM folio_charges WHERE id = ?`, [chargeId]) as any;
         if (!charge) {
             return res.status(404).json({ success: false, error: 'Charge not found' });
         }
@@ -1136,32 +1165,28 @@ router.post('/folios/charges/:id/void', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Charge is already voided' });
         }
 
-        await db.prepare(`
+        await queryExec(`
             UPDATE folio_charges 
             SET is_voided = TRUE, void_reason = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(voidReason, chargeId).catch(() => {
-            return db.prepare(`UPDATE folio_charges SET is_voided = TRUE, void_reason = ? WHERE id = ?`).run(voidReason, chargeId);
+        `, [voidReason, chargeId]).catch(() => {
+            return queryExec(`UPDATE folio_charges SET is_voided = TRUE, void_reason = ? WHERE id = ?`, [voidReason, chargeId]);
         });
 
         const chargeTotal = Number(charge.total_amount || charge.amount || 0);
 
         // Deduct from folio balance
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(chargeTotal, charge.folio_id);
+        `, [chargeTotal, charge.folio_id]);
 
         // Audit Trail Log
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, action_type, description, user_name)
             VALUES (?, 'CHARGE_VOIDED', ?, ?)
-        `).run(
-            charge.folio_id,
-            `Voided Charge: ${charge.revenue_head || charge.charge_code} (৳${chargeTotal.toFixed(2)}) - Reason: ${voidReason}`,
-            userName
-        );
+        `, [charge.folio_id, `Voided Charge: ${charge.revenue_head || charge.charge_code} (৳${chargeTotal.toFixed(2)}) - Reason: ${voidReason}`, userName]);
 
         res.json({
             success: true,
@@ -1179,32 +1204,28 @@ router.post('/folios/payments/:id/void', async (req: Request, res: Response) => 
         const paymentId = Number(req.params.id);
         const { voidReason = 'Erroneous payment entry', userName = 'Front Desk' } = req.body;
 
-        const payment = await db.prepare(`SELECT * FROM payments WHERE id = ?`).get(paymentId) as any;
+        const payment = await queryRow(`SELECT * FROM payments WHERE id = ?`, [paymentId]) as any;
         if (!payment) {
             return res.status(404).json({ success: false, error: 'Payment not found' });
         }
 
         // Delete payment or mark void
-        await db.prepare(`DELETE FROM payments WHERE id = ?`).run(paymentId);
+        await queryExec(`DELETE FROM payments WHERE id = ?`, [paymentId]);
 
         const paymentAmt = Number(payment.amount || 0);
 
         // Restore folio balance
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = balance + ?, status = 'OPEN', updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(paymentAmt, payment.folio_id);
+        `, [paymentAmt, payment.folio_id]);
 
         // Audit Trail Log
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, action_type, description, user_name)
             VALUES (?, 'PAYMENT_VOIDED', ?, ?)
-        `).run(
-            payment.folio_id,
-            `Voided Payment: ${payment.payment_method} ৳${paymentAmt.toFixed(2)} [${payment.payment_number}] - Reason: ${voidReason}`,
-            userName
-        );
+        `, [payment.folio_id, `Voided Payment: ${payment.payment_method} ৳${paymentAmt.toFixed(2)} [${payment.payment_number}] - Reason: ${voidReason}`, userName]);
 
         res.json({
             success: true,
@@ -1222,7 +1243,7 @@ router.post('/folios/:id/tax-exempt', async (req: Request, res: Response) => {
         const folioId = Number(req.params.id);
         const { taxExemptionId = 'MILITARY_NGO_EXEMPT', chargeIds = [], userName = 'Front Desk' } = req.body;
 
-        const targetFolio = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(folioId) as any;
+        const targetFolio = await queryRow(`SELECT * FROM folios WHERE id = ?`, [folioId]) as any;
         if (!targetFolio) {
             return res.status(404).json({ success: false, error: 'Folio not found' });
         }
@@ -1230,9 +1251,9 @@ router.post('/folios/:id/tax-exempt', async (req: Request, res: Response) => {
         let chargesToExempt: any[] = [];
         if (Array.isArray(chargeIds) && chargeIds.length > 0) {
             const placeholders = chargeIds.map(() => '?').join(',');
-            chargesToExempt = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`).all(folioId, ...chargeIds);
+            chargesToExempt = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? AND id IN (${placeholders})`, [folioId, ...chargeIds]);
         } else {
-            chargesToExempt = await db.prepare(`SELECT * FROM folio_charges WHERE folio_id = ? AND is_tax_applicable = TRUE`).all(folioId);
+            chargesToExempt = await queryRows(`SELECT * FROM folio_charges WHERE folio_id = ? AND is_tax_applicable = TRUE`, [folioId]);
         }
 
         let totalTaxRelieved = 0;
@@ -1240,32 +1261,27 @@ router.post('/folios/:id/tax-exempt', async (req: Request, res: Response) => {
             const taxAmt = Number(c.total_tax || 0);
             totalTaxRelieved += taxAmt;
             const newTotal = Number(c.amount || 0) - Number(c.discount_amount || 0);
-            await db.prepare(`
+            await queryExec(`
                 UPDATE folio_charges 
                 SET is_tax_applicable = FALSE, tax_exemption_id = ?,
                     service_charge = 0.00, vat = 0.00, city_tax = 0.00, total_tax = 0.00,
                     total_amount = ?
                 WHERE id = ?
-            `).run(taxExemptionId, newTotal, c.id);
+            `, [taxExemptionId, newTotal, c.id]);
         }
 
         // Adjust folio balance
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance - ?), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(totalTaxRelieved, folioId);
+        `, [totalTaxRelieved, folioId]);
 
         // Audit Trail Log
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'TAX_EXEMPTION_APPLIED', ?, ?)
-        `).run(
-            folioId,
-            targetFolio.reservation_id,
-            `Tax Exemption Applied: Tax Exemption ID [${taxExemptionId}] applied across ${chargesToExempt.length} charges. Relieved ৳${totalTaxRelieved.toFixed(2)} in taxes.`,
-            userName
-        );
+        `, [folioId, targetFolio.reservation_id, `Tax Exemption Applied: Tax Exemption ID [${taxExemptionId}] applied across ${chargesToExempt.length} charges. Relieved ৳${totalTaxRelieved.toFixed(2)} in taxes.`, userName]);
 
         res.json({
             success: true,
@@ -1289,19 +1305,19 @@ async function findFolioByIdOrRef(rawId: any): Promise<any> {
     // 1. Direct match by numeric folio id
     const numId = Number(strId);
     if (!isNaN(numId) && isFinite(numId)) {
-        const byId = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(numId) as any;
+        const byId = await queryRow(`SELECT * FROM folios WHERE id = ?`, [numId]) as any;
         if (byId) return byId;
     }
 
     // 2. Direct match by clean numeric folio id (e.g. if passed 'fol-5' -> 5)
     const numClean = Number(cleanId);
     if (!isNaN(numClean) && isFinite(numClean) && numClean > 0) {
-        const byCleanId = await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(numClean) as any;
+        const byCleanId = await queryRow(`SELECT * FROM folios WHERE id = ?`, [numClean]) as any;
         if (byCleanId) return byCleanId;
     }
 
     // 3. Match against folio_number, reservation_id, or reservation_number (case-insensitive & clean)
-    const byRef = await db.prepare(`
+    const byRef = await queryRow(`
         SELECT f.* FROM folios f
         LEFT JOIN reservations r ON r.id = f.reservation_id
         WHERE f.folio_number ILIKE ? 
@@ -1313,21 +1329,11 @@ async function findFolioByIdOrRef(rawId: any): Promise<any> {
            OR f.reservation_id::text = ?
            OR (? != '' AND r.id::text = ?)
         LIMIT 1
-    `).get(
-        `%${strId}%`,
-        `%${cleanId}%`,
-        strId,
-        cleanId,
-        `%${cleanId}%`,
-        strId,
-        cleanId,
-        !isNaN(numClean) && numClean > 0 ? String(numClean) : '',
-        !isNaN(numClean) && numClean > 0 ? String(numClean) : ''
-    ) as any;
+    `, [`%${strId}%`, `%${cleanId}%`, strId, cleanId, `%${cleanId}%`, strId, cleanId, !isNaN(numClean) && numClean > 0 ? String(numClean) : '', !isNaN(numClean) && numClean > 0 ? String(numClean) : '']) as any;
     if (byRef) return byRef;
 
     // 4. Auto-create if reservation exists without a folio yet
-    const targetRes = await db.prepare(`
+    const targetRes = await queryRow(`
         SELECT r.*, g.first_name, g.last_name, g.phone, g.email 
         FROM reservations r 
         LEFT JOIN guests g ON g.id = r.booker_guest_id 
@@ -1337,32 +1343,25 @@ async function findFolioByIdOrRef(rawId: any): Promise<any> {
            OR r.id::text = ?
            OR (? != '' AND r.id::text = ?)
         LIMIT 1
-    `).get(
-        strId,
-        cleanId,
-        `%${cleanId}%`,
-        strId,
-        !isNaN(numClean) && numClean > 0 ? String(numClean) : '',
-        !isNaN(numClean) && numClean > 0 ? String(numClean) : ''
-    ) as any;
+    `, [strId, cleanId, `%${cleanId}%`, strId, !isNaN(numClean) && numClean > 0 ? String(numClean) : '', !isNaN(numClean) && numClean > 0 ? String(numClean) : '']) as any;
 
     if (targetRes) {
         // Double check if a folio exists for this reservation
-        const existing = await db.prepare(`SELECT * FROM folios WHERE reservation_id = ? LIMIT 1`).get(targetRes.id) as any;
+        const existing = await queryRow(`SELECT * FROM folios WHERE reservation_id = ? LIMIT 1`, [targetRes.id]) as any;
         if (existing) return existing;
 
         const guestName = [targetRes.first_name, targetRes.last_name].filter(Boolean).join(' ') || 'Valued Guest';
         const genFolioNo = `FN~${targetRes.reservation_number || targetRes.id} - ${guestName}`;
-        const created = await db.prepare(`
+        const created = await queryExec(`
             INSERT INTO folios (
                 reservation_id, guest_id, folio_number, folio_type, status, balance,
                 bill_to, business_source, generate_invoice_on_checkout
             ) VALUES (?, ?, ?, 'GUEST', 'OPEN', 0.00, ?, ?, TRUE)
             RETURNING id
-        `).run(targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct');
+        `, [targetRes.id, targetRes.booker_guest_id, genFolioNo, guestName, targetRes.source || 'Direct']);
 
         const newId = created.lastInsertRowid;
-        return await db.prepare(`SELECT * FROM folios WHERE id = ?`).get(newId) as any;
+        return await queryRow(`SELECT * FROM folios WHERE id = ?`, [newId]) as any;
     }
 
     return null;
@@ -1397,47 +1396,26 @@ router.put('/folios/:id/booking-details', async (req: Request, res: Response) =>
 
         const foliosToUpdate = [folioId];
         if (applyToGroup && targetFolio.reservation_id) {
-            const others = await db.prepare(`SELECT id FROM folios WHERE reservation_id = ? AND id != ?`).all(targetFolio.reservation_id, folioId) as any[];
+            const others = await queryRows(`SELECT id FROM folios WHERE reservation_id = ? AND id != ?`, [targetFolio.reservation_id, folioId]) as any[];
             others.forEach(o => foliosToUpdate.push(Number(o.id)));
         }
 
         for (const fid of foliosToUpdate) {
-            await db.prepare(`
+            await queryExec(`
                 UPDATE folios 
                 SET bill_to = ?, market_code = ?, business_source = ?, business_agent = ?,
                     voucher_no = ?, commission_plan = ?, plan_value = ?, sales_person = ?,
                     send_mail = ?, checkout_mail = ?, suppress_rate_qr = ?, display_inclusion_separate = ?,
                     generate_invoice_on_checkout = ?, gstin_number = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).run(
-                billTo || null,
-                marketCode || null,
-                businessSource || 'Direct',
-                businessAgent || null,
-                voucherNo || null,
-                commissionPlan || null,
-                Number(planValue) || 0,
-                salesPerson || null,
-                Boolean(sendMail),
-                Boolean(checkoutMail),
-                Boolean(suppressRateQr),
-                Boolean(displayInclusionSeparate),
-                Boolean(generateInvoiceOnCheckout),
-                gstinNumber || null,
-                fid
-            );
+            `, [billTo || null, marketCode || null, businessSource || 'Direct', businessAgent || null, voucherNo || null, commissionPlan || null, Number(planValue) || 0, salesPerson || null, Boolean(sendMail), Boolean(checkoutMail), Boolean(suppressRateQr), Boolean(displayInclusionSeparate), Boolean(generateInvoiceOnCheckout), gstinNumber || null, fid]);
         }
 
         // Audit Trail Log
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'BOOKING_DETAILS_UPDATED', ?, ?)
-        `).run(
-            folioId,
-            targetFolio.reservation_id,
-            `Booking Details Updated: Bill To [${billTo || 'Default'}], Source [${businessSource || 'Direct'}], GSTIN [${gstinNumber || 'None'}]`,
-            userName
-        );
+        `, [folioId, targetFolio.reservation_id, `Booking Details Updated: Bill To [${billTo || 'Default'}], Source [${businessSource || 'Direct'}], GSTIN [${gstinNumber || 'None'}]`, userName]);
 
         res.json({
             success: true,
@@ -1500,58 +1478,53 @@ router.put('/folios/:id/room-charges', async (req: Request, res: Response) => {
 
         let updatedChargesCount = 0;
         if (scope === 'SELECTED_DATES' && stayDate) {
-            const existingCharge = await db.prepare(`
+            const existingCharge = await queryRow(`
                 SELECT id FROM folio_charges 
                 WHERE folio_id = ? AND charge_date = ? 
                 AND (charge_code IN ('ROOM_CHG', 'ROOM_TARIFF') OR revenue_head IN ('Room Charges', 'Room Tariff'))
                 AND (is_voided IS FALSE OR is_voided IS NULL)
                 ORDER BY id ASC LIMIT 1
-            `).get(folioId, stayDate) as any;
+            `, [folioId, stayDate]) as any;
 
             if (existingCharge) {
-                await db.prepare(`
+                await queryExec(`
                     UPDATE folio_charges 
                     SET amount = ?, service_charge = ?, vat = ?, city_tax = ?, total_tax = ?, total_amount = ?
                     WHERE id = ?
-                `).run(baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, existingCharge.id);
+                `, [baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, existingCharge.id]);
                 updatedChargesCount = 1;
             } else {
-                await db.prepare(`
+                await queryExec(`
                     INSERT INTO folio_charges (
                         folio_id, charge_code, revenue_head, ref_no, description, amount, discount_amount,
                         service_charge, vat, city_tax, total_tax, total_amount, charge_date, is_tax_applicable, user_name
                     ) VALUES (?, 'ROOM_CHG', 'Room Charges', 'RC-UPD', 'Room Charge', ?, 0, ?, ?, ?, ?, ?, ?, TRUE, ?)
-                `).run(folioId, baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, stayDate, userName);
+                `, [folioId, baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, stayDate, userName]);
                 updatedChargesCount = 1;
             }
         } else {
-            const result = await db.prepare(`
+            const result = await queryExec(`
                 UPDATE folio_charges 
                 SET amount = ?, service_charge = ?, vat = ?, city_tax = ?, total_tax = ?, total_amount = ?
                 WHERE folio_id = ? 
                 AND (charge_code IN ('ROOM_CHG', 'ROOM_TARIFF') OR revenue_head IN ('Room Charges', 'Room Tariff'))
                 AND (is_voided IS FALSE OR is_voided IS NULL)
-            `).run(baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, folioId);
+            `, [baseAmount, serviceCharge, vat, cityTax, totalTax, grandTotal, folioId]);
             updatedChargesCount = result.rowCount || 0;
         }
 
         if (targetFolio.reservation_id) {
-            await db.prepare(`
+            await queryExec(`
                 UPDATE reservation_rooms 
                 SET room_rate = ?, adults = ?, children = ?
                 WHERE reservation_id = ?
-            `).run(grandTotal, safeAdults, safeChildren, targetFolio.reservation_id);
+            `, [grandTotal, safeAdults, safeChildren, targetFolio.reservation_id]);
         }
 
-        await db.prepare(`
+        await queryExec(`
             INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
             VALUES (?, ?, 'ROOM_CHARGES_UPDATED', ?, ?)
-        `).run(
-            folioId,
-            targetFolio.reservation_id,
-            `Room Charges Updated: Rate ${effectiveRate} (${scope === 'WHOLE_STAY' ? 'Whole Stay' : stayDate}), Adults: ${safeAdults}, Children: ${safeChildren}${isComplimentary ? ' [Complimentary]' : ''}`,
-            userName
-        );
+        `, [folioId, targetFolio.reservation_id, `Room Charges Updated: Rate ${effectiveRate} (${scope === 'WHOLE_STAY' ? 'Whole Stay' : stayDate}), Adults: ${safeAdults}, Children: ${safeChildren}${isComplimentary ? ' [Complimentary]' : ''}`, userName]);
 
         res.json({
             success: true,
@@ -1582,31 +1555,26 @@ router.put('/folios/:id/guest-details', async (req: Request, res: Response) => {
 
             // Update primary guest profile if linked
             if (targetFolio.guest_id) {
-                await db.prepare(`
+                await queryExec(`
                     UPDATE guests 
                     SET salutation = ?, first_name = ?, last_name = ?, phone = ?, email = ?, updated_at = NOW()
                     WHERE id = ?
-                `).run(salutation, firstName, lastName, primary.mobile || '', primary.email || '', targetFolio.guest_id);
+                `, [salutation, firstName, lastName, primary.mobile || '', primary.email || '', targetFolio.guest_id]);
             }
 
             // Update folio bill_to
             const fullGuestName = [salutation, firstName, lastName].filter(Boolean).join(' ');
-            await db.prepare(`
+            await queryExec(`
                 UPDATE folios 
                 SET bill_to = ?, updated_at = NOW()
                 WHERE id = ?
-            `).run(fullGuestName, targetFolio.id);
+            `, [fullGuestName, targetFolio.id]);
 
             // Audit Trail
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'GUEST_UPDATE', ?, ?)
-            `).run(
-                targetFolio.id,
-                targetFolio.reservation_id,
-                `Guest Details Updated: ${fullGuestName} (${primary.mobile || 'No Phone'}), Total Sharers: ${guests.length - 1}`,
-                userName
-            );
+            `, [targetFolio.id, targetFolio.reservation_id, `Guest Details Updated: ${fullGuestName} (${primary.mobile || 'No Phone'}), Total Sharers: ${guests.length - 1}`, userName]);
         }
 
         return res.json({ success: true, message: 'Guest roster and contact details saved successfully' });
@@ -1620,11 +1588,11 @@ router.put('/folios/:id/guest-details', async (req: Request, res: Response) => {
 router.get('/folios/:id/audit-trail', async (req: Request, res: Response) => {
     try {
         const folioId = Number(req.params.id);
-        const logs = await db.prepare(`
+        const logs = await queryRows(`
             SELECT * FROM folio_audit_trail 
             WHERE folio_id = ? OR reservation_id = (SELECT reservation_id FROM folios WHERE id = ?)
             ORDER BY created_at DESC, id DESC
-        `).all(folioId, folioId);
+        `, [folioId, folioId]);
 
         res.json({
             success: true,
@@ -1671,28 +1639,23 @@ router.post('/folios/group-payment', async (req: Request, res: Response) => {
             const amt = item.amount;
             const subPaymentNo = `PAY-${Date.now().toString().slice(-6)}-${fId}`;
 
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
                 VALUES (?, ?, ?, ?, ?, ?)
-            `).run(fId, propertyId, subPaymentNo, paymentMethod.toUpperCase(), amt, `${referenceCode} (${groupPaymentRef})`);
+            `, [fId, propertyId, subPaymentNo, paymentMethod.toUpperCase(), amt, `${referenceCode} (${groupPaymentRef})`]);
 
-            await db.prepare(`
+            await queryExec(`
                 UPDATE folios 
                 SET balance = GREATEST(0, balance - ?),
                     status = CASE WHEN (balance - ?) <= 0 THEN 'SETTLED' ELSE 'OPEN' END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).run(amt, amt, fId);
+            `, [amt, amt, fId]);
 
-            await db.prepare(`
+            await queryExec(`
                 INSERT INTO folio_audit_trail (folio_id, reservation_id, action_type, description, user_name)
                 VALUES (?, ?, 'GROUP_PAYMENT_RECEIVED', ?, ?)
-            `).run(
-                fId,
-                targetFolio.reservation_id,
-                `Group payment of ৳${amt.toFixed(2)} received via ${paymentMethod} [Group Ref: ${groupPaymentRef}]`,
-                userName
-            );
+            `, [fId, targetFolio.reservation_id, `Group payment of ৳${amt.toFixed(2)} received via ${paymentMethod} [Group Ref: ${groupPaymentRef}]`, userName]);
 
             processedCount++;
             processedSum += amt;
@@ -1727,6 +1690,13 @@ router.post('/folios/:id/payments', async (req: Request, res: Response) => {
         const { paymentMethod = 'CASH', amount, referenceCode = 'FRONT_DESK_SETTLE' } = req.body;
         const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || null;
 
+        let normalizedMethod = String(paymentMethod || 'CASH').toUpperCase().trim();
+        if (normalizedMethod === 'CARD' || normalizedMethod === 'CREDIT CARD' || normalizedMethod === 'DEBIT_CARD' || normalizedMethod === 'POS') {
+            normalizedMethod = 'CREDIT_CARD';
+        } else if (normalizedMethod === 'BANK' || normalizedMethod === 'TRANSFER') {
+            normalizedMethod = 'BANK_TRANSFER';
+        }
+
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount <= 0) {
             return res.status(400).json({ success: false, error: 'Invalid payment amount' });
@@ -1735,19 +1705,19 @@ router.post('/folios/:id/payments', async (req: Request, res: Response) => {
         const paymentNumber = `PAY-${Date.now().toString().slice(-8)}`;
 
         // 1. Insert payment
-        const payInsert = await db.prepare(`
+        const payInsert = await queryExec(`
             INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
             VALUES (?, ?, ?, ?, ?, ?)
-        `).run(folioId, propertyId, paymentNumber, paymentMethod.toUpperCase(), numAmount, referenceCode);
+        `, [folioId, propertyId, paymentNumber, normalizedMethod, numAmount, referenceCode]);
 
         // 2. Update Folio balance & status
-        await db.prepare(`
+        await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance - ?),
                 status = CASE WHEN (balance - ?) <= 0 THEN 'SETTLED' ELSE 'OPEN' END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(numAmount, numAmount, folioId);
+        `, [numAmount, numAmount, folioId]);
 
         // 3. Emit real-time event
         try {
@@ -1775,17 +1745,17 @@ router.post('/folios/:id/payments', async (req: Request, res: Response) => {
 // GET /api/accounting/journal-entries - Double-entry General Ledger audit journal
 router.get('/journal-entries', async (req: Request, res: Response) => {
     try {
-        const entries = await db.prepare(`
+        const entries = await queryRows(`
             SELECT * FROM journal_entries ORDER BY entry_date DESC, id DESC
-        `).all() as any[];
+        `) as any[];
 
         const entriesWithLines = await Promise.all(entries.map(async entry => {
-            const lines = await db.prepare(`
+            const lines = await queryRows(`
                 SELECT jl.*, coa.account_code, coa.account_name, coa.account_type
                 FROM journal_lines jl
                 JOIN chart_of_accounts coa ON coa.id = jl.account_id
                 WHERE jl.journal_entry_id = ?
-            `).all(entry.id);
+            `, [entry.id]);
 
             const totalDebit = lines.reduce((sum: number, l: any) => sum + Number(l.debit || 0), 0);
             const totalCredit = lines.reduce((sum: number, l: any) => sum + Number(l.credit || 0), 0);
@@ -1833,27 +1803,24 @@ router.post('/journal-entries', async (req: Request, res: Response) => {
         const dateStr = entryDate || new Date().toISOString().split('T')[0];
 
         // Insert Header
-        const insertEntry = db.prepare(`
+        const result = await queryExec(`
             INSERT INTO journal_entries (organization_id, property_id, entry_number, entry_date, description, reference_type, is_posted, created_by)
             VALUES (1, ?, ?, ?, ?, 'MANUAL', true, ?)
-        `);
-        const result = await insertEntry.run(propertyId, entryNumber, dateStr, description, createdBy);
+        `, [propertyId, entryNumber, dateStr, description, createdBy]);
         const entryId = Number(result.lastInsertRowid);
 
         // Insert Lines
-        const insertLine = db.prepare(`
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-
         for (const line of lines) {
-            await insertLine.run(
+            await queryExec(`
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
+                VALUES (?, ?, ?, ?, ?)
+            `, [
                 entryId,
                 line.accountId,
                 Number(line.debit || 0),
                 Number(line.credit || 0),
                 line.memo || description
-            );
+            ]);
         }
 
         res.json({
@@ -1873,7 +1840,7 @@ router.post('/journal-entries', async (req: Request, res: Response) => {
 // GET /api/accounting/trial-balance - Live General Ledger Trial Balance
 router.get('/trial-balance', async (req: Request, res: Response) => {
     try {
-        const rows = await db.prepare(`
+        const rows = await queryRows(`
             SELECT 
                 coa.id as account_id,
                 coa.account_code,
@@ -1886,7 +1853,7 @@ router.get('/trial-balance', async (req: Request, res: Response) => {
             LEFT JOIN journal_entries je ON je.id = jl.journal_entry_id AND (je.is_posted = 1 OR je.is_posted = TRUE)
             GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type
             ORDER BY coa.account_code ASC
-        `).all() as any[];
+        `) as any[];
 
         let grandDebit = 0;
         let grandCredit = 0;

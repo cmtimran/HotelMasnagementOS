@@ -9,6 +9,8 @@ import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { getCanonicalRooms, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 
 // ============================================================================
 // DATA MODELS & INTERFACES
@@ -659,14 +661,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         e.preventDefault();
         if (!editingBuilding) return;
         if (!editingBuilding.title.trim()) {
-            alert('Building Title is required');
+            toast.warning('Building Title is required');
             return;
         }
 
         // Duplicate code validation
         const origBuilding = buildings.find(b => b.id === editingBuilding.id);
         if (isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, origBuilding?.shortCode)) {
-            alert(`Short Code "${editingBuilding.shortCode}" is already in use by another building! Please provide a unique code.`);
+            toast.error(`Short Code "${editingBuilding.shortCode}" is already in use by another building! Please provide a unique code.`);
             return;
         }
 
@@ -694,7 +696,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     });
                 }
             } catch {}
-            showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
+            toast.success(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
         } else {
             let newId = editingBuilding.id;
             try {
@@ -709,7 +711,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                 }
             } catch {}
             updated = [...buildings, { ...editingBuilding, id: newId }];
-            showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
+            toast.success(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
         }
 
         saveBuildings(updated);
@@ -724,17 +726,24 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         const attachedFloors = floors.filter(f => f.buildingId === building.id);
         const attachedRooms = rooms.filter(r => r.buildingId === building.id);
 
+        let confirmMsg = `Are you sure you want to delete building "${building.title}"?`;
+        let variant: 'danger' | 'warning' = 'danger';
+
         if (attachedRooms.length > 0) {
-            if (!confirm(`Warning: Building "${building.title}" currently has ${attachedRooms.length} physical room(s) assigned. Deleting this building will orphan these room records. Are you sure you want to proceed?`)) {
-                return;
-            }
+            confirmMsg = `Warning: Building "${building.title}" currently has ${attachedRooms.length} physical room(s) assigned. Deleting this building will orphan these room records. Are you sure you want to proceed?`;
+            variant = 'warning';
         } else if (attachedFloors.length > 0) {
-            if (!confirm(`Building "${building.title}" has ${attachedFloors.length} configured floor(s). Are you sure you want to delete this building?`)) {
-                return;
-            }
-        } else {
-            if (!confirm(`Delete building "${building.title}"?`)) return;
+            confirmMsg = `Building "${building.title}" has ${attachedFloors.length} configured floor(s). Are you sure you want to delete this building?`;
+            variant = 'warning';
         }
+
+        const confirmed = await confirmModal({
+            title: `Delete Building "${building.title}"?`,
+            message: confirmMsg,
+            confirmText: 'Delete Building',
+            variant
+        });
+        if (!confirmed) return;
 
         const updatedBuildings = buildings.filter(b => b.id !== building.id);
         saveBuildings(updatedBuildings);
@@ -744,7 +753,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             }
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
-        showToast(`Building "${building.title}" removed.`);
+        toast.success(`Building "${building.title}" removed.`);
     };
 
     const handleJumpToFloorsForBuilding = (buildingId: string) => {
@@ -801,14 +810,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         e.preventDefault();
         if (!editingFloor) return;
         if (!editingFloor.name.trim()) {
-            alert('Floor Name is required');
+            toast.warning('Floor Name is required');
             return;
         }
 
         // Duplicate code validation
         const origFloor = floors.find(f => f.id === editingFloor.id);
         if (isShortCodeDuplicate(editingFloor.code, existingFloorCodes, origFloor?.code)) {
-            alert(`Floor Code "${editingFloor.code}" is already in use by another floor! Please provide a unique code.`);
+            toast.error(`Floor Code "${editingFloor.code}" is already in use by another floor! Please provide a unique code.`);
             return;
         }
 
@@ -836,7 +845,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     });
                 }
             } catch {}
-            showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
+            toast.success(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
         } else {
             let newId = editingFloor.id;
             try {
@@ -851,7 +860,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                 }
             } catch {}
             updated = [...floors, { ...editingFloor, id: newId }];
-            showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
+            toast.success(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
         }
 
         saveFloors(updated);
@@ -864,13 +873,21 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
     const handleDeleteFloor = async (floor: Floor) => {
         const attachedRooms = rooms.filter(r => r.floorId === floor.id);
+        let confirmMsg = `Are you sure you want to delete floor "${floor.name}"?`;
+        let variant: 'danger' | 'warning' = 'danger';
+
         if (attachedRooms.length > 0) {
-            if (!confirm(`Warning: Floor "${floor.name}" currently has ${attachedRooms.length} room(s) assigned (${attachedRooms.map(r => r.number).join(', ')}). Are you sure you want to delete this floor?`)) {
-                return;
-            }
-        } else {
-            if (!confirm(`Delete floor "${floor.name}"?`)) return;
+            confirmMsg = `Warning: Floor "${floor.name}" currently has ${attachedRooms.length} room(s) assigned (${attachedRooms.map(r => r.number).join(', ')}). Are you sure you want to delete this floor?`;
+            variant = 'warning';
         }
+
+        const confirmed = await confirmModal({
+            title: `Delete Floor "${floor.name}"?`,
+            message: confirmMsg,
+            confirmText: 'Delete Floor',
+            variant
+        });
+        if (!confirmed) return;
 
         const updatedFloors = floors.filter(f => f.id !== floor.id);
         saveFloors(updatedFloors);
@@ -880,7 +897,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             }
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
-        showToast(`Floor "${floor.name}" deleted.`);
+        toast.success(`Floor "${floor.name}" deleted.`);
     };
 
     // Toggle amenity selection on editing floor
@@ -935,14 +952,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         e.preventDefault();
         if (!editingAmenity) return;
         if (!editingAmenity.name.trim()) {
-            alert('Amenity / Safety Name is required');
+            toast.warning('Amenity / Safety Name is required');
             return;
         }
 
         // Duplicate code check
         const origAmenity = amenitiesCatalog.find(a => a.id === editingAmenity.id);
         if (isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, origAmenity?.id)) {
-            alert(`Short Code / ID "${editingAmenity.id}" is already in use by another item!`);
+            toast.error(`Short Code / ID "${editingAmenity.id}" is already in use by another item!`);
             return;
         }
 
@@ -950,10 +967,10 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         let updated: AmenityItem[];
         if (exists) {
             updated = amenitiesCatalog.map(a => a.id === editingAmenity.id ? editingAmenity : a);
-            showToast(`Asset "${editingAmenity.name}" (${editingAmenity.id}) updated!`);
+            toast.success(`Asset "${editingAmenity.name}" (${editingAmenity.id}) updated!`);
         } else {
             updated = [...amenitiesCatalog, editingAmenity];
-            showToast(`New Asset "${editingAmenity.name}" added to master library!`);
+            toast.success(`New Asset "${editingAmenity.name}" added to master library!`);
 
             // If user is currently editing a floor, auto-check it for that floor
             if (editingFloor) {
@@ -969,21 +986,29 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         setEditingAmenity(null);
     };
 
-    const handleDeleteAmenity = (item: AmenityItem) => {
+    const handleDeleteAmenity = async (item: AmenityItem) => {
         const floorsUsing = floors.filter(f => (f.amenityIds || []).includes(item.id)).length;
         const buildingsUsing = buildings.filter(b => (b.amenityIds || []).includes(item.id)).length;
 
+        let confirmMsg = `Are you sure you want to delete asset "${item.name}" from catalog?`;
+        let variant: 'danger' | 'warning' = 'danger';
+
         if (floorsUsing > 0 || buildingsUsing > 0) {
-            if (!confirm(`Warning: "${item.name}" is currently assigned to ${floorsUsing} floor(s) and ${buildingsUsing} building(s). Deleting will remove it from all configurations. Continue?`)) {
-                return;
-            }
-        } else {
-            if (!confirm(`Delete asset "${item.name}" from catalog?`)) return;
+            confirmMsg = `Warning: "${item.name}" is currently assigned to ${floorsUsing} floor(s) and ${buildingsUsing} building(s). Deleting will remove it from all configurations. Continue?`;
+            variant = 'warning';
         }
+
+        const confirmed = await confirmModal({
+            title: `Delete Asset "${item.name}"?`,
+            message: confirmMsg,
+            confirmText: 'Delete Asset',
+            variant
+        });
+        if (!confirmed) return;
 
         const updated = amenitiesCatalog.filter(a => a.id !== item.id);
         saveAmenitiesCatalog(updated);
-        showToast(`Asset "${item.name}" deleted.`);
+        toast.success(`Asset "${item.name}" deleted.`);
     };
 
     // Calculate usage of an amenity
@@ -1262,7 +1287,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             </button>
                         </div>
                     ) : viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                             {filteredBuildings.map((building) => {
                                 const buildingFloors = floors.filter(f => f.buildingId === building.id);
                                 const buildingRooms = getRoomsForBuilding(building.id);
@@ -1395,8 +1420,8 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     ) : (
                         /* Table View for Buildings */
                         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                            <div className="overflow-x-auto min-w-[760px]">
-                                <table className="w-full text-left text-xs text-gray-700 divide-y divide-gray-200">
+                            <div className="overflow-x-auto w-full">
+                                <table className="w-full min-w-[760px] text-left text-xs text-gray-700 divide-y divide-gray-200">
                                     <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
                                         <tr>
                                             <th className="py-2.5 px-3">Code</th>
@@ -1606,7 +1631,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             </button>
                         </div>
                     ) : viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                             {filteredFloors.map((floor) => {
                                 const parentBuilding = buildings.find(b => b.id === floor.buildingId);
                                 const floorRooms = getRoomsForFloor(floor.id);
@@ -1759,8 +1784,8 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     ) : (
                         /* Table View for Floors */
                         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                            <div className="overflow-x-auto min-w-[720px]">
-                                <table className="w-full text-left text-xs text-gray-700 divide-y divide-gray-200">
+                            <div className="overflow-x-auto w-full">
+                                <table className="w-full min-w-[720px] text-left text-xs text-gray-700 divide-y divide-gray-200">
                                     <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
                                         <tr>
                                             <th className="py-2.5 px-3">Level / Code</th>
@@ -1906,13 +1931,19 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
                         {/* Reset defaults helper */}
                         <button
-                            onClick={() => {
-                                if (confirm('Reset amenities catalog back to international hotel safety defaults?')) {
+                            onClick={async () => {
+                                const ok = await confirmModal({
+                                    title: 'Reset Amenities Catalog?',
+                                    message: 'Are you sure you want to restore the amenities catalog back to international hotel safety defaults? Custom additions will be reset.',
+                                    confirmText: 'Reset Defaults',
+                                    variant: 'warning'
+                                });
+                                if (ok) {
                                     saveAmenitiesCatalog(INITIAL_AMENITIES_SAFETY);
-                                    showToast('Amenities catalog restored to statutory defaults.');
+                                    toast.info('Amenities catalog restored to statutory defaults.');
                                 }
                             }}
-                            className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 font-semibold hover:underline"
+                            className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 font-semibold hover:underline cursor-pointer"
                         >
                             <RefreshCw size={12} /> Reset to Defaults
                         </button>
@@ -1926,7 +1957,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             <p className="text-xs text-gray-400 mt-1">Try refining your search keyword or reset filters.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                             {filteredAmenities.map((item) => {
                                 const usage = getAmenityUsage(item.id);
 

@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3409.3088749999997 882" width="3409.3088749999997" height="882" style="--bg:#FFFFFF;--fg:#1E293B;--line:#64748B;--muted:#475569;--surface:#F8FAFC;--border:#CBD5E1;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="Hub" data-label="Edit Property / General Settings (?tab=outlets)">
+  <rect x="1275.606875" y="40" width="1278.3179999999998" height="290.70000000000005" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="1275.606875" y="40" width="1278.3179999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1287.606875" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Edit Property / General Settings (?tab=outlets)</text>
+</g>
+<g class="subgraph" data-id="Config" data-label="Configuration Parameters per Outlet">
+  <rect x="1306.618" y="618.2" width="1786.8439999999996" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="1306.618" y="618.2" width="1786.8439999999996" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1318.618" y="632.2" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Configuration Parameters per Outlet</text>
+</g>
+<g class="subgraph" data-id="Dynamic_Sidebar" data-label="Dynamic Reactive Sidebar">
+  <rect x="40" y="435.00000000000006" width="1245.618" height="250.1" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="435.00000000000006" width="1245.618" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="449.00000000000006" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Dynamic Reactive Sidebar</text>
+</g>
+<g class="subgraph" data-id="Dedicated_POS" data-label="Dedicated POS Billing Terminals">
+  <rect x="99.25575000000026" y="745.1000000000001" width="1014.4259999999997" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="99.25575000000026" y="745.1000000000001" width="1014.4259999999997" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="111.25575000000026" y="759.1000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Dedicated POS Billing Terminals</text>
+</g>
+<g class="subgraph" data-id="Settlements" data-label="Folio &amp; Accounting Settlement">
+  <rect x="2581.9248749999997" y="314.1000000000001" width="787.3839999999998" height="250.1" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="2581.9248749999997" y="314.1000000000001" width="787.3839999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="2593.9248749999997" y="328.1000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Folio &amp; Accounting Settlement</text>
+<g class="subgraph" data-id="Dedicated_POS" data-label="Dedicated POS Billing Terminals">
+  <rect x="2892.3978749999997" y="358.1000000000001" width="135.31599999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="2892.3978749999997" y="358.1000000000001" width="135.31599999999997" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="2904.3978749999997" y="372.1000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Dedicated POS Billing Terminals</text>
+</g>
+</g>
+<polyline class="edge" data-from="Modal" data-to="TaxSync" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 2171.5114999999996,241.8 2171.5114999999996,662.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="PaySync" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 1494.0159999999998,241.8 1494.0159999999998,662.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="USALISync" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 2520.8185,241.8 2520.8185,662.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="RulesSync" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 2887.9094999999993,241.8 2887.9094999999993,662.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="DeptBq" data-to="BanquetVenue" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="2404.738375,314.70000000000005 2404.738375,588.2 1832.5784999999998,588.2 1832.5785,662.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="OutletHub" data-to="Sidebar" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Real-time Outlet Sync Event" points="1661.2010265151516,120.9 1661.2010265151516,132.9 1291.6068750000002,132.9 1291.606875,348.70000000000005 689.6702499999999,348.70000000000005 689.6702500000001,479.00000000000006" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SideBq" data-to="BanquetPOS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="212.20749999999998,669.1 212.20749999999998,727.1000000000001 225.89175000000023,727.1000000000001 225.8917500000002,789.1000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SideSpa" data-to="SpaPOS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="536.3204999999999,669.1 536.3204999999999,727.1000000000001 475.90475000000015,727.1000000000001 475.90475000000015,789.1000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SideRetail" data-to="RetailPOS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="843.0199999999998,669.1 843.02,727.1000000000001 725.5472500000001,727.1000000000001 725.5472500000001,789.1000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="DeptFB" data-to="RestPOS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="2123.603375,314.70000000000005 2123.6033749999997,576.2 1295.618,576.2 1295.618,727.1000000000001 980.7472499999999,727.1000000000001 980.7472499999999,789.1000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="OutletHub" data-to="Modal" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1741.6273598484847,120.9 1741.6273598484847,132.9 1996.7443749999998,132.9 1996.7443749999998,168.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptFO" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 1690.637875,241.8 1690.637875,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptFB" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 2123.6033749999997,241.8 2123.6033749999997,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptBq" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 2404.738375,241.8 2404.738375,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptSpa" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 1368.4123749999999,241.8 1368.4123749999999,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptGym" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 1517.6888749999998,241.8 1517.6888749999998,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Modal" data-to="DeptRetail" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1996.7443749999998,205.8 1996.7443749999998,241.8 1869.8853749999998,241.8 1869.8853749999998,277.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Sidebar" data-to="SideBq" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="If Banquet Active" points="656.63365,515.9000000000001 656.63365,527.9000000000001 212.20749999999998,527.9000000000001 212.20749999999998,632.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Sidebar" data-to="SideSpa" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="If Spa Active" points="678.65805,515.9000000000001 678.65805,539.9000000000001 536.3204999999999,539.9000000000001 536.3204999999999,632.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Sidebar" data-to="SideRetail" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="If Retail Active" points="700.68245,515.9000000000001 700.68245,539.9000000000001 843.02,539.9000000000001 843.0199999999998,632.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Sidebar" data-to="SideFit" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="If Fitness Active" points="722.70685,515.9000000000001 722.70685,527.9000000000001 1139.716,527.9000000000001 1139.716,632.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Dedicated_POS" data-to="RoomFolio" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Bill to Room" points="2960.0558749999996,395.0000000000001 2960.0558749999996,511.30000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Dedicated_POS" data-to="CorpLedger" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Bill to Company" points="2993.8848749999997,395.0000000000001 2993.8848749999997,407.0000000000001 3249.3418749999996,407.0000000000001 3249.3418749999996,511.30000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Dedicated_POS" data-to="CashCard" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Direct Pay" points="2926.226875,395.0000000000001 2926.226875,407.0000000000001 2686.3308749999997,407.0000000000001 2686.3308749999997,511.30000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="OutletHub" data-to="Sidebar" data-label="Real-time Outlet Sync Event">
+  <rect x="617.6702500000001" y="355.70000000000005" width="143.578" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="689.4592500000001" y="370.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Real-time Outlet Sync Event</text>
+</g>
+<g class="edge-label" data-from="Sidebar" data-to="SideBq" data-label="If Banquet Active">
+  <rect x="164.70749999999998" y="558.9000000000001" width="94.87" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="212.14249999999998" y="574.0500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">If Banquet Active</text>
+</g>
+<g class="edge-label" data-from="Sidebar" data-to="SideSpa" data-label="If Spa Active">
+  <rect x="498.8204999999999" y="558.9000000000001" width="74.674" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="536.1574999999999" y="574.0500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">If Spa Active</text>
+</g>
+<g class="edge-label" data-from="Sidebar" data-to="SideRetail" data-label="If Retail Active">
+  <rect x="802.02" y="558.9000000000001" width="81.80200000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="842.921" y="574.0500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">If Retail Active</text>
+</g>
+<g class="edge-label" data-from="Sidebar" data-to="SideFit" data-label="If Fitness Active">
+  <rect x="1093.716" y="558.9000000000001" width="91.30600000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1139.369" y="574.0500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">If Fitness Active</text>
+</g>
+<g class="edge-label" data-from="Dedicated_POS" data-to="RoomFolio" data-label="Bill to Room">
+  <rect x="2925.0558749999996" y="438.0000000000001" width="69.922" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="2960.0168749999993" y="453.1500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Bill to Room</text>
+</g>
+<g class="edge-label" data-from="Dedicated_POS" data-to="CorpLedger" data-label="Bill to Company">
+  <rect x="3205.341874999999" y="438.0000000000001" width="87.74200000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="3249.2128749999993" y="453.1500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Bill to Company</text>
+</g>
+<g class="edge-label" data-from="Dedicated_POS" data-to="CashCard" data-label="Direct Pay">
+  <rect x="2652.8308749999997" y="438.0000000000001" width="66.952" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="2686.3068749999998" y="453.1500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Direct Pay</text>
+</g>
+<g class="node" data-id="OutletHub" data-label="Universal Outlet Configuration Hub" data-shape="rectangle">
+  <rect x="1580.774693181818" y="84" width="241.27899999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1701.414193181818" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Universal Outlet Configuration Hub</text>
+</g>
+<g class="node" data-id="Modal" data-label="Universal Outlet Modal (OutletModal.tsx)" data-shape="rectangle">
+  <rect x="1860.5438749999998" y="168.9" width="272.4009999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1996.7443749999998" y="187.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Universal Outlet Modal (OutletModal.tsx)</text>
+</g>
+<g class="node" data-id="DeptFO" data-label="Front Office Mini POS" data-shape="rectangle">
+  <rect x="1608.1598749999998" y="277.8" width="164.95600000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1690.637875" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Front Office Mini POS</text>
+</g>
+<g class="node" data-id="DeptFB" data-label="Food &amp; Beverage (Dining, Bar, Pool, Juice Bar)" data-shape="rectangle">
+  <rect x="1966.654875" y="277.8" width="313.8969999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2123.6033749999997" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Food &amp; Beverage (Dining, Bar, Pool, Juice Bar)</text>
+</g>
+<g class="node" data-id="DeptBq" data-label="Banquets &amp; Event Spaces" data-shape="rectangle">
+  <rect x="2308.551875" y="277.8" width="192.373" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2404.738375" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Banquets &amp; Event Spaces</text>
+</g>
+<g class="node" data-id="DeptSpa" data-label="Wellness &amp; Spa" data-shape="rectangle">
+  <rect x="1302.606875" y="277.8" width="131.611" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1368.4123749999999" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Wellness &amp; Spa</text>
+</g>
+<g class="node" data-id="DeptGym" data-label="Fitness &amp; Pool" data-shape="rectangle">
+  <rect x="1455.2178749999998" y="277.8" width="124.942" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1517.6888749999998" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Fitness &amp; Pool</text>
+</g>
+<g class="node" data-id="DeptRetail" data-label="Retail &amp; Gift Shop" data-shape="rectangle">
+  <rect x="1801.115875" y="277.8" width="137.539" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1869.8853749999998" y="296.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Retail &amp; Gift Shop</text>
+</g>
+<g class="node" data-id="TaxSync" data-label="Dynamic Tax Rates (VAT, Service Charge, City Tax)" data-shape="rectangle">
+  <rect x="1999.7429999999997" y="662.2" width="343.5369999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2171.5114999999996" y="680.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Dynamic Tax Rates (VAT, Service Charge, City Tax)</text>
+</g>
+<g class="node" data-id="PaySync" data-label="Accepted Tenders &amp; Assigned EDC Card Terminals" data-shape="rectangle">
+  <rect x="1322.618" y="662.2" width="342.79599999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1494.0159999999998" y="680.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Accepted Tenders &amp; Assigned EDC Card Terminals</text>
+</g>
+<g class="node" data-id="USALISync" data-label="USALI General Ledger Revenue Head Code" data-shape="rectangle">
+  <rect x="2371.2799999999997" y="662.2" width="299.077" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2520.8185" y="680.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">USALI General Ledger Revenue Head Code</text>
+</g>
+<g class="node" data-id="RulesSync" data-label="Operating Rules (Table Req, Room Charge, KOT, Barcode)" data-shape="rectangle">
+  <rect x="2698.3569999999995" y="662.2" width="379.10499999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2887.9094999999993" y="680.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Operating Rules (Table Req, Room Charge, KOT, Barcode)</text>
+</g>
+<g class="node" data-id="BanquetVenue" data-label="Venues, Seating Layouts &amp; Rental Tariffs" data-shape="rectangle">
+  <rect x="1693.4139999999998" y="662.2" width="278.3289999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1832.5784999999996" y="680.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Venues, Seating Layouts &amp; Rental Tariffs</text>
+</g>
+<g class="node" data-id="Sidebar" data-label="Sidebar.tsx" data-shape="rectangle">
+  <rect x="634.60925" y="479.00000000000006" width="110.122" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="689.67025" y="497.45000000000005" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Sidebar.tsx</text>
+</g>
+<g class="node" data-id="SideBq" data-label="BANQUET &amp; EVENTS (Venues, Catering, BEO)" data-shape="rectangle">
+  <rect x="56" y="632.2" width="312.41499999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="212.20749999999998" y="650.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">BANQUET &amp; EVENTS (Venues, Catering, BEO)</text>
+</g>
+<g class="node" data-id="SideSpa" data-label="SPA &amp; WELLNESS (Therapies, Booking)" data-shape="rectangle">
+  <rect x="396.41499999999996" y="632.2" width="279.8109999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="536.3204999999999" y="650.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">SPA &amp; WELLNESS (Therapies, Booking)</text>
+</g>
+<g class="node" data-id="SideRetail" data-label="GIFT SHOP &amp; RETAIL (Shop POS, Stock)" data-shape="rectangle">
+  <rect x="704.2259999999999" y="632.2" width="277.58799999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="843.0199999999999" y="650.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">GIFT SHOP &amp; RETAIL (Shop POS, Stock)</text>
+</g>
+<g class="node" data-id="SideFit" data-label="FITNESS &amp; POOL (Passes, Cabanas)" data-shape="rectangle">
+  <rect x="1009.8139999999999" y="632.2" width="259.804" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1139.716" y="650.6500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">FITNESS &amp; POOL (Passes, Cabanas)</text>
+</g>
+<g class="node" data-id="BanquetPOS" data-label="Banquet POS &amp; Function Billing" data-shape="rectangle">
+  <rect x="115.25575000000026" y="789.1000000000001" width="221.27199999999988" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="225.8917500000002" y="807.5500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Banquet POS &amp; Function Billing</text>
+</g>
+<g class="node" data-id="SpaPOS" data-label="Spa POS &amp; Therapist Checkout" data-shape="rectangle">
+  <rect x="364.52775000000014" y="789.1000000000001" width="222.75399999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="475.90475000000015" y="807.5500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Spa POS &amp; Therapist Checkout</text>
+</g>
+<g class="node" data-id="RetailPOS" data-label="Retail &amp; Gift Shop Barcode POS" data-shape="rectangle">
+  <rect x="615.2817500000001" y="789.1000000000001" width="220.53099999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="725.5472500000001" y="807.5500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Retail &amp; Gift Shop Barcode POS</text>
+</g>
+<g class="node" data-id="RestPOS" data-label="Restaurant &amp; In-Room Dining POS" data-shape="rectangle">
+  <rect x="863.81275" y="789.1000000000001" width="233.86899999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="980.74725" y="807.5500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Restaurant &amp; In-Room Dining POS</text>
+</g>
+<g class="node" data-id="RoomFolio" data-label="folio_charges (PostgreSQL Hotel Folio Engine)" data-shape="rectangle">
+  <rect x="2802.7368749999996" y="511.30000000000007" width="314.63799999999986" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2960.0558749999996" y="529.7500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">folio_charges (PostgreSQL Hotel Folio Engine)</text>
+</g>
+<g class="node" data-id="CorpLedger" data-label="Corporate Accounts Ledger" data-shape="rectangle">
+  <rect x="3145.3748749999995" y="511.30000000000007" width="207.934" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="3249.3418749999996" y="529.7500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Corporate Accounts Ledger</text>
+</g>
+<g class="node" data-id="CashCard" data-label="Cash / Card EDC / MFS" data-shape="rectangle">
+  <rect x="2597.9248749999997" y="511.30000000000007" width="176.81199999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="2686.3308749999997" y="529.7500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Cash / Card EDC / MFS</text>
+</g>
+</svg>

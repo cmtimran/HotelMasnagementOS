@@ -33,6 +33,7 @@ import {
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { confirmModal } from '../context/ConfirmModalContext';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -374,22 +375,28 @@ export default function UserStaffManagement() {
 
     // Delete User
     const handleDeleteUser = async (id: string, name: string) => {
-        if (confirm(`Are you sure you want to delete staff account "${name}"? This action is permanent.`)) {
-            try {
-                const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees/${id}`, {
-                    method: 'DELETE'
-                });
-                const rJson = await resp.json();
-                if (rJson.success) {
-                    await loadStaff();
-                    showToast(`Staff account "${name}" deleted.`);
-                    setSelectedUserIds(prev => prev.filter(uid => uid !== id));
-                } else {
-                    showToast(rJson.message || 'Failed to delete staff member.', 'error');
-                }
-            } catch {
-                showToast('Network error while deleting staff member.', 'error');
+        const confirmed = await confirmModal({
+            title: `Delete Staff Account "${name}"?`,
+            message: `Are you sure you want to delete staff account "${name}"? This action is permanent and revokes all PMS system access.`,
+            confirmText: 'Delete Account',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+            const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees/${id}`, {
+                method: 'DELETE'
+            });
+            const rJson = await resp.json();
+            if (rJson.success) {
+                await loadStaff();
+                showToast(`Staff account "${name}" deleted.`);
+                setSelectedUserIds(prev => prev.filter(uid => uid !== id));
+            } else {
+                showToast(rJson.message || 'Failed to delete staff member.', 'error');
             }
+        } catch {
+            showToast('Network error while deleting staff member.', 'error');
         }
     };
 
@@ -437,7 +444,13 @@ export default function UserStaffManagement() {
     // Bulk Delete
     const handleBulkDelete = async () => {
         if (selectedUserIds.length === 0) return;
-        if (!confirm(`Are you sure you want to delete ${selectedUserIds.length} selected staff members?`)) return;
+        const confirmed = await confirmModal({
+            title: `Delete ${selectedUserIds.length} Staff Accounts?`,
+            message: `Are you sure you want to permanently delete the ${selectedUserIds.length} selected staff members? This cannot be undone.`,
+            confirmText: 'Delete Selected',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
 
         setIsLoading(true);
         try {

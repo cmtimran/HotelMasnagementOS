@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PageHeader from './common/PageHeader';
 import { toast } from '../context/ToastContext';
+import { confirmModal } from '../context/ConfirmModalContext';
 import {
     TrendingUp,
     Database,
@@ -173,12 +174,19 @@ export const RevenueManagement: React.FC = () => {
         setIsHeadModalOpen(false);
     };
 
-    const handleDeleteHead = (id: number) => {
+    const handleDeleteHead = async (id: number) => {
         const target = revenueHeads.find(h => h.id === id);
-        if (window.confirm(`Are you sure you want to delete Revenue Head "${target?.name}"?`)) {
-            setRevenueHeads(prev => prev.filter(h => h.id !== id));
-            showToast('Revenue Head deleted.');
-        }
+        const name = target?.name || 'this revenue head';
+        const confirmed = await confirmModal({
+            title: `Delete Revenue Head?`,
+            message: `Are you sure you want to delete Revenue Head "${name}"?`,
+            confirmText: 'Delete Head',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        setRevenueHeads(prev => prev.filter(h => h.id !== id));
+        toast.success(`Revenue Head "${name}" deleted.`);
     };
 
     const handleToggleHeadActive = (id: number) => {
@@ -234,16 +242,24 @@ export const RevenueManagement: React.FC = () => {
         setIsGroupModalOpen(false);
     };
 
-    const handleDeleteGroup = (id: number) => {
+    const handleDeleteGroup = async (id: number) => {
+        const target = revenueGroups.find(g => g.id === id);
+        const name = target?.name || 'this revenue group';
         const headsInGroup = revenueHeads.filter(h => h.groupId === id);
         if (headsInGroup.length > 0) {
             toast.error(`Cannot delete group! It contains ${headsInGroup.length} active revenue heads. Reassign or delete those heads first.`);
             return;
         }
-        if (window.confirm('Are you sure you want to delete this revenue group?')) {
-            setRevenueGroups(prev => prev.filter(g => g.id !== id));
-            showToast('Revenue Group removed.');
-        }
+        const confirmed = await confirmModal({
+            title: `Delete Revenue Group?`,
+            message: `Are you sure you want to delete revenue group "${name}"?`,
+            confirmText: 'Delete Group',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        setRevenueGroups(prev => prev.filter(g => g.id !== id));
+        toast.success(`Revenue Group "${name}" removed.`);
     };
 
     // Filtered data

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Check, Printer, RotateCcw, PenTool, ShieldCheck } from 'lucide-react';
-import { getCurrencySymbol } from '../../utils/currencyUtils';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 
 interface DigitalRegCardModalProps {
     isOpen: boolean;
@@ -15,7 +15,7 @@ export const DigitalRegCardModal: React.FC<DigitalRegCardModalProps> = ({
     booking,
     onSuccess
 }) => {
-    const currency = getCurrencySymbol();
+    const { currencySymbol: currency } = useActiveCurrency();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSigned, setHasSigned] = useState(false);

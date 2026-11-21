@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import { requirePermission } from '../middleware/rbacGuard.js';
 
 const router = Router();
@@ -41,25 +41,26 @@ router.get('/', requirePermission('frontdesk.access'), async (req: Request, res:
                    disposed_at as "disposedAt", disposed_by as "disposedBy",
                    created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
             FROM lost_and_found_items
-            WHERE property_id = ?
+            WHERE property_id = $1
         `;
         const params: any[] = [propertyId];
 
         if (status !== 'all') {
-            query += ` AND status = ?`;
             params.push(status);
+            query += ` AND status = $${params.length}`;
         }
 
         if (search) {
-            query += ` AND (item_name ILIKE ? OR reference_no ILIKE ? OR room_number ILIKE ? OR guest_name ILIKE ? OR description ILIKE ?)`;
             const s = `%${search}%`;
-            params.push(s, s, s, s, s);
+            params.push(s);
+            const idx = params.length;
+            query += ` AND (item_name ILIKE $${idx} OR reference_no ILIKE $${idx} OR room_number ILIKE $${idx} OR guest_name ILIKE $${idx} OR description ILIKE $${idx})`;
         }
 
         query += ` ORDER BY found_date DESC, id DESC`;
 
-        const items = await db.prepare(query).all(...params);
-        res.json({ success: true, data: items });
+        const itemsRes = await pgPool.query(query, params);
+        res.json({ success: true, data: itemsRes.rows });
     } catch (e: any) {
         console.warn('Failed to fetch lost and found items:', e);
         res.status(500).json({ success: false, error: e?.message || 'Database query error' });
@@ -111,21 +112,21 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
                 found_by, finder_role, storage_location, storage_bin, is_valuable,
                 holding_period_days, guest_name, guest_phone, guest_email, reservation_id,
                 created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
             RETURNING id
         `;
 
-        const result = await db.prepare(insertQuery).get(
+        const result = await pgPool.query(insertQuery, [
             propertyId, refNo, itemName, category, description,
             foundDate, foundTime, locationType, roomNumber, areaDetails,
             foundBy, finderRole, storageLocation, storageBin, isValuable,
             holdingPeriodDays, guestName, guestPhone, guestEmail, reservationId,
             createdBy
-        );
+        ]);
 
         res.status(201).json({
             success: true,
-            data: { id: result.id, referenceNo: refNo },
+            data: { id: result.rows[0]?.id, referenceNo: refNo },
             message: `Lost & found item logged successfully with Ref: ${refNo}`
         });
     } catch (e: any) {
@@ -152,19 +153,19 @@ router.put('/:id/claim', requirePermission('frontdesk.access'), async (req: Requ
         const releasedBy = b.releasedBy || 'Front Desk Duty Manager';
         const releaseNotes = b.releaseNotes || 'Claimed by guest with ID verification';
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE lost_and_found_items
             SET status = 'claimed',
-                claimed_by = ?,
-                claimant_phone = ?,
-                claimant_id_type = ?,
-                claimant_id_number = ?,
-                released_by = ?,
+                claimed_by = $1,
+                claimant_phone = $2,
+                claimant_id_type = $3,
+                claimant_id_number = $4,
+                released_by = $5,
                 released_at = CURRENT_TIMESTAMP,
-                release_notes = ?,
+                release_notes = $6,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(claimedBy, claimantPhone, claimantIdType, claimantIdNumber, releasedBy, releaseNotes, id, propertyId);
+            WHERE id = $7 AND property_id = $8
+        `, [claimedBy, claimantPhone, claimantIdType, claimantIdNumber, releasedBy, releaseNotes, id, propertyId]);
 
         res.json({ success: true, message: `Item successfully marked as claimed & returned to ${claimedBy}` });
     } catch (e: any) {
@@ -184,20 +185,20 @@ router.put('/:id/ship', requirePermission('frontdesk.access'), async (req: Reque
         const releasedBy = b.releasedBy || 'Front Desk Manager';
         const notes = b.releaseNotes || `Dispatched via ${carrier} (Tracking: ${tracking})`;
 
-        const whereSql = propertyId ? 'WHERE id = ? AND property_id = ?' : 'WHERE id = ?';
+        const whereSql = propertyId ? 'WHERE id = $5 AND property_id = $6' : 'WHERE id = $5';
         const params = propertyId ? [tracking, carrier, releasedBy, notes, id, propertyId] : [tracking, carrier, releasedBy, notes, id];
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE lost_and_found_items
             SET status = 'shipped',
-                shipping_tracking_number = ?,
-                shipping_carrier = ?,
-                released_by = ?,
+                shipping_tracking_number = $1,
+                shipping_carrier = $2,
+                released_by = $3,
                 released_at = CURRENT_TIMESTAMP,
-                release_notes = ?,
+                release_notes = $4,
                 updated_at = CURRENT_TIMESTAMP
             ${whereSql}
-        `).run(...params);
+        `, params);
 
         res.json({ success: true, message: `Item dispatched via ${carrier}. Tracking: ${tracking}` });
     } catch (e: any) {
@@ -216,18 +217,18 @@ router.put('/:id/dispose', requirePermission('frontdesk.access'), async (req: Re
         const reason = b.disposalReason || 'Expired holding period without claim';
         const disposedBy = b.disposedBy || 'Housekeeping Executive';
 
-        const whereSql = propertyId ? 'WHERE id = ? AND property_id = ?' : 'WHERE id = ?';
+        const whereSql = propertyId ? 'WHERE id = $4 AND property_id = $5' : 'WHERE id = $4';
         const params = propertyId ? [targetStatus, reason, disposedBy, id, propertyId] : [targetStatus, reason, disposedBy, id];
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE lost_and_found_items
-            SET status = ?,
-                disposal_reason = ?,
+            SET status = $1,
+                disposal_reason = $2,
                 disposed_at = CURRENT_TIMESTAMP,
-                disposed_by = ?,
+                disposed_by = $3,
                 updated_at = CURRENT_TIMESTAMP
             ${whereSql}
-        `).run(...params);
+        `, params);
 
         res.json({ success: true, message: `Item marked as ${targetStatus}` });
     } catch (e: any) {

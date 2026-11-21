@@ -12,6 +12,8 @@ import {
     Calendar 
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
+import { useActiveCurrency } from '../../utils/currencyUtils';
+import { usePropertyLocalization } from '../../utils/localizationEngine';
 
 
 interface Account {
@@ -67,6 +69,9 @@ interface Folio {
 }
 
 export const AdvanceAccountingDashboard: React.FC = () => {
+    const { currencySymbol } = useActiveCurrency();
+    const { getFiscalYearRange } = usePropertyLocalization();
+    const fyInfo = getFiscalYearRange();
     const [activeTab, setActiveTab] = useState<'trial_balance' | 'journal' | 'coa' | 'folios'>('trial_balance');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -218,6 +223,13 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                             </h1>
                             <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none font-semibold">
                                 Double-Entry Enforced
+                            </span>
+                            <span 
+                                title={`Active Statutory Fiscal Year: ${fyInfo.startDate} to ${fyInfo.endDate}`}
+                                className="px-1.5 py-0.2 text-[8.5px] rounded bg-indigo-50 text-indigo-700 border border-indigo-200 leading-none font-semibold flex items-center gap-1"
+                            >
+                                <Calendar size={9} />
+                                <span>{fyInfo.fyCode} • {fyInfo.quarter}</span>
                             </span>
                         </div>
                         <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
@@ -513,7 +525,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-slate-400">Balance Due:</span>
                                     <span className={`text-sm font-mono ${folio.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                        ৳ {folio.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        {currencySymbol} {folio.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </span>
                                 </div>
                             </div>
@@ -676,12 +688,12 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                     <span className="font-semibold">
                                         {isNewEntryBalanced 
                                             ? 'Voucher is perfectly balanced' 
-                                            : `Out of balance by ৳ ${Math.abs(totalNewDebit - totalNewCredit).toFixed(2)}`}
+                                            : `Out of balance by ${currencySymbol} ${Math.abs(totalNewDebit - totalNewCredit).toFixed(2)}`}
                                     </span>
                                 </div>
                                 <div className="font-mono text-xs space-x-3">
-                                    <span>Dr: ৳ {totalNewDebit.toFixed(2)}</span>
-                                    <span>Cr: ৳ {totalNewCredit.toFixed(2)}</span>
+                                    <span>Dr: {currencySymbol} {totalNewDebit.toFixed(2)}</span>
+                                    <span>Cr: {currencySymbol} {totalNewCredit.toFixed(2)}</span>
                                 </div>
                             </div>
 

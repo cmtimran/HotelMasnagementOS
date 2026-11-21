@@ -67,52 +67,52 @@ export interface TaxCalculationResult {
 
 const STORAGE_KEY = 'hotel_taxes_vat_v1';
 
-// Default Fallback Masters (Matches TaxVatManagement seed)
+// Default Fallback Masters (0% Fallback - Clean Multi-Tenant Standard)
 export const DEFAULT_TAX_MASTERS: TaxMaster[] = [
     {
         id: 'tm-001',
-        code: 'VAT-15',
-        name: 'Standard VAT 15%',
+        code: 'VAT-0',
+        name: 'Standard VAT 0%',
         category: 'VAT',
-        rate: 15.0,
-        section: 'Section 15, VAT Act 2012',
+        rate: 0.0,
+        section: 'Statutory VAT (Configurable in Settings)',
         serviceCode: 'S001.10 - Hotel Accommodation',
         status: 'Active',
-        remarks: 'Statutory national value-added tax on hospitality services.',
+        remarks: 'Zero default tax until configured in Hotel Settings.',
     },
     {
         id: 'tm-002',
-        code: 'SC-10',
-        name: 'Hotel Service Charge 10%',
+        code: 'SC-0',
+        name: 'Hotel Service Charge 0%',
         category: 'SERVICE_CHARGE',
-        rate: 10.0,
-        section: 'Staff Welfare & Hotel Operations Pool',
+        rate: 0.0,
+        section: 'Staff Welfare Pool',
         serviceCode: 'SC-HOTEL',
         status: 'Active',
-        remarks: 'Distributed 80% to front-line hotel staff and 20% to operational breakage fund.',
+        remarks: 'Zero default service charge until configured in Hotel Settings.',
     },
     {
         id: 'tm-003',
-        code: 'CITY-2',
-        name: 'City Tourism Development Levy 2%',
+        code: 'CITY-0',
+        name: 'City Tourism Development Levy 0%',
         category: 'TAX',
-        rate: 2.0,
-        section: 'Municipal Tourism & City Maintenance Ordinance',
+        rate: 0.0,
+        section: 'Municipal Ordinance',
         serviceCode: 'TX-CITY',
         status: 'Active',
-        remarks: 'Local municipal surcharge for tourism development.',
+        remarks: 'Zero default city tax until configured in Hotel Settings.',
     }
 ];
 
 // Default Fallback Configurations
 export const DEFAULT_TAX_CONFIGURATIONS: TaxConfiguration[] = [
     {
-        id: 'tc-001',
-        code: 'HOSP-STD',
-        name: 'Standard Hospitality 5-Star Rule (10% SC + 15% VAT + 2% City)',
+        id: 'tc-000',
+        code: 'TAX-ZERO',
+        name: 'Standard Baseline (0% SC + 0% VAT + 0% City = 0%)',
         module: 'All Hotel Operations',
         status: 'Active',
-        remarks: 'Standard room and dining billing with compound VAT on running subtotal.',
+        remarks: 'Default tax-free configuration until property configures live rates in Tax & VAT settings.',
         lines: [
             {
                 taxMasterId: 'tm-002',
@@ -129,22 +129,6 @@ export const DEFAULT_TAX_CONFIGURATIONS: TaxConfiguration[] = [
             {
                 taxMasterId: 'tm-003',
                 executionOrder: 3,
-                calculationBasis: 'ORIGINAL_GROSS',
-                isInclusive: false,
-            },
-        ],
-    },
-    {
-        id: 'tc-002',
-        code: 'ROOM-VAT-ONLY',
-        name: 'Room Only Corporate Rate (15% VAT Single Tier)',
-        module: 'Rooms & Lodging',
-        status: 'Active',
-        remarks: 'Corporate room rate billing with no service charge and 15% flat VAT.',
-        lines: [
-            {
-                taxMasterId: 'tm-001',
-                executionOrder: 1,
                 calculationBasis: 'ORIGINAL_GROSS',
                 isInclusive: false,
             },
@@ -282,5 +266,66 @@ export function calculateReservationTaxes(
         otherTaxesAmount,
         totalTaxAmount,
         grandTotal,
+    };
+}
+
+/**
+ * Retrieve resolved statutory/configured tax rates for a specific module or configuration ID.
+ * Accurately extracts VAT %, Service Charge %, and City Tax % directly from Tax & VAT Settings.
+ */
+export function getTaxRatesForModule(targetConfigId?: string): {
+    vatRate: number;
+    serviceChargeRate: number;
+    cityTaxRate: number;
+    configId: string;
+    configName: string;
+    configCode: string;
+} {
+    const masters = getTaxMasters();
+    const configs = getTaxConfigurations();
+
+    let config = targetConfigId ? configs.find(c => c.id === targetConfigId && c.status === 'Active') : null;
+    if (!config) {
+        config = configs.find(c => c.status === 'Active' && (c.module?.toLowerCase().includes('dining') || c.module?.toLowerCase().includes('restaurant') || c.module?.toLowerCase().includes('f&b') || c.module?.toLowerCase().includes('pos')))
+            || configs.find(c => c.status === 'Active' && c.module?.toLowerCase().includes('all'))
+            || configs.find(c => c.status === 'Active')
+            || configs[0]
+            || DEFAULT_TAX_CONFIGURATIONS[0];
+    }
+
+    let vatRate = 0;
+    let serviceChargeRate = 0;
+    let cityTaxRate = 0;
+
+    if (config && config.lines && config.lines.length > 0) {
+        for (const line of config.lines) {
+            const master = masters.find(m => m.id === line.taxMasterId);
+            if (master && master.status === 'Active') {
+                const rate = Number(master.rate || 0);
+                if (master.category === 'VAT') {
+                    vatRate += rate;
+                } else if (master.category === 'SERVICE_CHARGE') {
+                    serviceChargeRate += rate;
+                } else if (master.category === 'TAX') {
+                    cityTaxRate += rate;
+                }
+            }
+        }
+    } else {
+        const vatMaster = masters.find(m => m.category === 'VAT' && m.status === 'Active');
+        if (vatMaster) vatRate = Number(vatMaster.rate || 0);
+        const scMaster = masters.find(m => m.category === 'SERVICE_CHARGE' && m.status === 'Active');
+        if (scMaster) serviceChargeRate = Number(scMaster.rate || 0);
+        const cityMaster = masters.find(m => m.category === 'TAX' && m.status === 'Active');
+        if (cityMaster) cityTaxRate = Number(cityMaster.rate || 0);
+    }
+
+    return {
+        vatRate: Math.round(vatRate * 100) / 100,
+        serviceChargeRate: Math.round(serviceChargeRate * 100) / 100,
+        cityTaxRate: Math.round(cityTaxRate * 100) / 100,
+        configId: config?.id || 'DEFAULT',
+        configName: config?.name || 'Default Tax Policy',
+        configCode: config?.code || 'DEFAULT'
     };
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { useActiveCurrency } from '../../../utils/currencyUtils';
 import type { FolioData, RevenueHead } from '../folioTypes';
 
 interface AddChargeModalProps {
@@ -19,7 +20,7 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
     activeFolioId,
     onSuccess
 }) => {
-    const currency = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol: currency } = useActiveCurrency();
     const [selectedFolioId, setSelectedFolioId] = useState<string | number>(activeFolioId);
     const [applyToGroup, setApplyToGroup] = useState(false);
     const [revenueHeads, setRevenueHeads] = useState<RevenueHead[]>([]);
@@ -87,9 +88,22 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
         setErrorMsg('');
 
         try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+            const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
+            let activeUserName = 'Front Desk';
+            if (currentUserStr) {
+                try {
+                    const parsedUser = JSON.parse(currentUserStr);
+                    if (parsedUser.name) activeUserName = parsedUser.name;
+                } catch {}
+            }
+
             const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${selectedFolioId}/charges`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({
                     revenueHead: selectedHead,
                     amount: numAmount,
@@ -97,7 +111,7 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
                     taxApplicable,
                     description,
                     applyToGroup,
-                    userName: 'Front Desk'
+                    userName: activeUserName
                 })
             });
 
@@ -117,16 +131,16 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/20 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
             {/* Slide-out Drawer Panel (Right Side) */}
-            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
                 {/* Header matching Screenshot 681ab288.png */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <h3 className="text-xs font-bold tracking-wide">Add Charge</h3>
@@ -289,6 +303,7 @@ export const AddChargeModal: React.FC<AddChargeModalProps> = ({
                     </div>
                 </form>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

@@ -501,7 +501,7 @@ const ConnectingRoomManagement: React.FC<ConnectingRoomManagementProps> = ({ pro
                 </div>
 
                 {/* Suites Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {filteredConnectingRooms.length === 0 ? (
                         <div className="col-span-full card-container p-8 text-center text-slate-400 text-xs">
                             No connecting suites found matching your search.

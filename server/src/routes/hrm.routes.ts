@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
+import { requireRole } from '../middleware/rbacGuard.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/departments', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const departments = await db.prepare(`
+        const result = await pgPool.query(`
             SELECT 
                 d.*,
                 p.name as property_name,
@@ -29,11 +30,11 @@ router.get('/departments', async (req: Request, res: Response) => {
                 (SELECT COUNT(*) FROM designations des WHERE des.department_id = d.id) as designation_count
             FROM departments d
             JOIN properties p ON p.id = d.property_id
-            WHERE d.property_id = ?
+            WHERE d.property_id = $1
             ORDER BY d.id ASC
-        `).all(propertyId);
+        `, [propertyId]);
 
-        res.json({ success: true, data: departments });
+        res.json({ success: true, data: result.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch departments' });
     }
@@ -50,12 +51,13 @@ router.post('/departments', async (req: Request, res: Response) => {
         if (!code || !name) {
             return res.status(400).json({ success: false, error: 'code and name are required' });
         }
-        const result = await db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO departments (property_id, code, name, cost_center_code)
-            VALUES (?, ?, ?, ?)
-        `).run(propertyId, code.toUpperCase(), name, costCenterCode || `CC-${code.toUpperCase()}`);
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+        `, [propertyId, code.toUpperCase(), name, costCenterCode || `CC-${code.toUpperCase()}`]);
 
-        res.status(201).json({ success: true, id: Number(result.lastInsertRowid), message: 'Department created successfully' });
+        res.status(201).json({ success: true, id: Number(result.rows[0]?.id), message: 'Department created successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to create department' });
     }
@@ -66,13 +68,13 @@ router.put('/departments/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const { code, name, costCenterCode } = req.body;
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE departments
-            SET code = COALESCE(?, code),
-                name = COALESCE(?, name),
-                cost_center_code = COALESCE(?, cost_center_code)
-            WHERE id = ?
-        `).run(code ? code.toUpperCase() : null, name || null, costCenterCode || null, id);
+            SET code = COALESCE($1, code),
+                name = COALESCE($2, name),
+                cost_center_code = COALESCE($3, cost_center_code)
+            WHERE id = $4
+        `, [code ? code.toUpperCase() : null, name || null, costCenterCode || null, id]);
 
         res.json({ success: true, message: 'Department updated successfully' });
     } catch (e: any) {
@@ -84,7 +86,7 @@ router.put('/departments/:id', async (req: Request, res: Response) => {
 router.delete('/departments/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM departments WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM departments WHERE id = $1', [id]);
         res.json({ success: true, message: 'Department deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete department' });
@@ -94,7 +96,7 @@ router.delete('/departments/:id', async (req: Request, res: Response) => {
 // GET /api/hrm/designations - List all designations
 router.get('/designations', async (req: Request, res: Response) => {
     try {
-        const designations = await db.prepare(`
+        const result = await pgPool.query(`
             SELECT 
                 des.*,
                 d.name as department_name,
@@ -102,9 +104,9 @@ router.get('/designations', async (req: Request, res: Response) => {
             FROM designations des
             JOIN departments d ON d.id = des.department_id
             ORDER BY d.id ASC, des.id ASC
-        `).all();
+        `);
 
-        res.json({ success: true, data: designations });
+        res.json({ success: true, data: result.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch designations' });
     }
@@ -135,23 +137,23 @@ router.get('/employees', async (req: Request, res: Response) => {
             JOIN departments d ON d.id = e.department_id
             JOIN designations des ON des.id = e.designation_id
             JOIN properties p ON p.id = e.property_id
-            WHERE e.property_id = ?
+            WHERE e.property_id = $1
         `;
         const params: any[] = [propertyId];
 
         if (status) {
-            query += ' AND e.status = ?';
+            query += ' AND e.status = $2';
             params.push(status);
         }
 
         query += ' ORDER BY e.id ASC';
 
-        const employees = await db.prepare(query).all(...params);
+        const result = await pgPool.query(query, params);
 
         res.json({
             success: true,
-            data: employees,
-            count: employees.length
+            data: result.rows,
+            count: result.rows.length
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch employees' });
@@ -183,14 +185,13 @@ router.post('/employees', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Missing required employee fields' });
         }
 
-        const insertStmt = db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO employees (
                 property_id, department_id, designation_id, employee_code,
                 first_name, last_name, email, phone, nid, hire_date, basic_salary, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        const result = await insertStmt.run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING id
+        `, [
             propertyId,
             departmentId,
             designationId,
@@ -203,12 +204,12 @@ router.post('/employees', async (req: Request, res: Response) => {
             hireDate || new Date().toISOString().slice(0, 10),
             basicSalary,
             status
-        );
+        ]);
 
         res.status(201).json({
             success: true,
             message: 'Employee registered successfully',
-            employeeId: Number(result.lastInsertRowid)
+            employeeId: Number(result.rows[0]?.id)
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to create employee' });
@@ -231,20 +232,20 @@ router.put('/employees/:id', async (req: Request, res: Response) => {
             status
         } = req.body;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE employees
-            SET department_id = COALESCE(?, department_id),
-                designation_id = COALESCE(?, designation_id),
-                employee_code = COALESCE(?, employee_code),
-                first_name = COALESCE(?, first_name),
-                last_name = COALESCE(?, last_name),
-                email = COALESCE(?, email),
-                phone = COALESCE(?, phone),
-                basic_salary = COALESCE(?, basic_salary),
-                status = COALESCE(?, status),
+            SET department_id = COALESCE($1, department_id),
+                designation_id = COALESCE($2, designation_id),
+                employee_code = COALESCE($3, employee_code),
+                first_name = COALESCE($4, first_name),
+                last_name = COALESCE($5, last_name),
+                email = COALESCE($6, email),
+                phone = COALESCE($7, phone),
+                basic_salary = COALESCE($8, basic_salary),
+                status = COALESCE($9, status),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $10
+        `, [
             departmentId || null,
             designationId || null,
             employeeCode || null,
@@ -255,7 +256,7 @@ router.put('/employees/:id', async (req: Request, res: Response) => {
             basicSalary !== undefined ? basicSalary : null,
             status || null,
             id
-        );
+        ]);
 
         res.json({ success: true, message: 'Employee updated successfully' });
     } catch (e: any) {
@@ -263,11 +264,11 @@ router.put('/employees/:id', async (req: Request, res: Response) => {
     }
 });
 
-// DELETE /api/hrm/employees/:id - Delete employee
-router.delete('/employees/:id', async (req: Request, res: Response) => {
+// DELETE /api/hrm/employees/:id - Delete employee (Privileged HR / Management Only)
+router.delete('/employees/:id', requireRole(['super_admin', 'general_manager']), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM employees WHERE id = $1', [id]);
         res.json({ success: true, message: 'Employee deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete employee' });
@@ -285,16 +286,16 @@ router.get('/shifts', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const shifts = await db.prepare(`
+        const result = await pgPool.query(`
             SELECT 
                 s.*,
                 (SELECT COUNT(*) FROM employee_shift_rosters esr WHERE esr.shift_id = s.id AND esr.roster_date = CURRENT_DATE) as assigned_today
             FROM shifts s
-            WHERE s.property_id = ?
+            WHERE s.property_id = $1
             ORDER BY s.start_time ASC
-        `).all(propertyId);
+        `, [propertyId]);
 
-        res.json({ success: true, data: shifts });
+        res.json({ success: true, data: result.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch shifts' });
     }
@@ -311,12 +312,13 @@ router.post('/shifts', async (req: Request, res: Response) => {
         if (!name || !startTime || !endTime) {
             return res.status(400).json({ success: false, error: 'name, startTime, and endTime are required' });
         }
-        const result = await db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO shifts (property_id, name, start_time, end_time, grace_period_minutes)
-            VALUES (?, ?, ?, ?, ?)
-        `).run(propertyId, name, startTime, endTime, gracePeriodMinutes);
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        `, [propertyId, name, startTime, endTime, gracePeriodMinutes]);
 
-        res.status(201).json({ success: true, id: Number(result.lastInsertRowid), message: 'Shift created successfully' });
+        res.status(201).json({ success: true, id: Number(result.rows[0]?.id), message: 'Shift created successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to create shift' });
     }
@@ -327,14 +329,14 @@ router.put('/shifts/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const { name, startTime, endTime, gracePeriodMinutes } = req.body;
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE shifts
-            SET name = COALESCE(?, name),
-                start_time = COALESCE(?, start_time),
-                end_time = COALESCE(?, end_time),
-                grace_period_minutes = COALESCE(?, grace_period_minutes)
-            WHERE id = ?
-        `).run(name || null, startTime || null, endTime || null, gracePeriodMinutes !== undefined ? gracePeriodMinutes : null, id);
+            SET name = COALESCE($1, name),
+                start_time = COALESCE($2, start_time),
+                end_time = COALESCE($3, end_time),
+                grace_period_minutes = COALESCE($4, grace_period_minutes)
+            WHERE id = $5
+        `, [name || null, startTime || null, endTime || null, gracePeriodMinutes !== undefined ? gracePeriodMinutes : null, id]);
 
         res.json({ success: true, message: 'Shift updated successfully' });
     } catch (e: any) {
@@ -346,7 +348,7 @@ router.put('/shifts/:id', async (req: Request, res: Response) => {
 router.delete('/shifts/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        await db.prepare('DELETE FROM shifts WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM shifts WHERE id = $1', [id]);
         res.json({ success: true, message: 'Shift deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete shift' });
@@ -366,7 +368,7 @@ router.get('/attendance', async (req: Request, res: Response) => {
         }
         const date = req.query.date as string || new Date().toISOString().slice(0, 10);
 
-        const attendance = await db.prepare(`
+        const result = await pgPool.query(`
             SELECT 
                 a.*,
                 e.employee_code,
@@ -381,11 +383,11 @@ router.get('/attendance', async (req: Request, res: Response) => {
             JOIN departments d ON d.id = e.department_id
             JOIN designations des ON des.id = e.designation_id
             JOIN shifts s ON s.id = a.shift_id
-            WHERE e.property_id = ? AND (a.attendance_date)::date = (?)::date
+            WHERE e.property_id = $1 AND (a.attendance_date)::date = ($2)::date
             ORDER BY a.clock_in ASC
-        `).all(propertyId, date);
+        `, [propertyId, date]);
 
-        res.json({ success: true, data: attendance, date });
+        res.json({ success: true, data: result.rows, date });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch attendance' });
     }
@@ -403,10 +405,11 @@ router.post('/attendance/clock', async (req: Request, res: Response) => {
         const now = new Date();
         const timeStr = `${date} ${now.toTimeString().slice(0, 8)}`;
 
-        const existing = await db.prepare(`
+        const existingRes = await pgPool.query(`
             SELECT * FROM attendance_records 
-            WHERE employee_id = ? AND (attendance_date)::date = (?)::date
-        `).get(employeeId, date) as any;
+            WHERE employee_id = $1 AND (attendance_date)::date = ($2)::date
+        `, [employeeId, date]);
+        const existing = existingRes.rows[0];
 
         if (action === 'CLOCK_IN') {
             if (existing && existing.clock_in) {
@@ -414,16 +417,16 @@ router.post('/attendance/clock', async (req: Request, res: Response) => {
             }
 
             if (existing) {
-                await db.prepare(`
+                await pgPool.query(`
                     UPDATE attendance_records
-                    SET clock_in = ?, status = 'PRESENT', shift_id = ?
-                    WHERE id = ?
-                `).run(timeStr, shiftId, existing.id);
+                    SET clock_in = $1, status = 'PRESENT', shift_id = $2
+                    WHERE id = $3
+                `, [timeStr, shiftId, existing.id]);
             } else {
-                await db.prepare(`
+                await pgPool.query(`
                     INSERT INTO attendance_records (employee_id, shift_id, attendance_date, clock_in, status)
-                    VALUES (?, ?, ?, ?, 'PRESENT')
-                `).run(employeeId, shiftId, date, timeStr);
+                    VALUES ($1, $2, $3, $4, 'PRESENT')
+                `, [employeeId, shiftId, date, timeStr]);
             }
 
             return res.json({ success: true, message: `Clock-in successful at ${timeStr}` });
@@ -437,11 +440,11 @@ router.post('/attendance/clock', async (req: Request, res: Response) => {
             const outTime = new Date(timeStr).getTime();
             const hours = Number(((outTime - inTime) / (1000 * 60 * 60)).toFixed(2));
 
-            await db.prepare(`
+            await pgPool.query(`
                 UPDATE attendance_records
-                SET clock_out = ?, work_hours = ?
-                WHERE id = ?
-            `).run(timeStr, hours > 0 ? hours : 8.0, existing.id);
+                SET clock_out = $1, work_hours = $2
+                WHERE id = $3
+            `, [timeStr, hours > 0 ? hours : 8.0, existing.id]);
 
             return res.json({ success: true, message: `Clock-out recorded. Hours logged: ${hours > 0 ? hours : 8.0}h` });
         }
@@ -463,16 +466,16 @@ router.get('/payroll', async (req: Request, res: Response) => {
         if (!propertyId) {
             return res.json({ success: true, data: [] });
         }
-        const runs = await db.prepare(`
+        const runs = await pgPool.query(`
             SELECT 
                 pr.*,
                 (SELECT COUNT(*) FROM payroll_items pi WHERE pi.payroll_run_id = pr.id) as total_employees_paid
             FROM payroll_runs pr
-            WHERE pr.property_id = ?
+            WHERE pr.property_id = $1
             ORDER BY pr.period_year DESC, pr.period_month DESC
-        `).all(propertyId);
+        `, [propertyId]);
 
-        res.json({ success: true, data: runs });
+        res.json({ success: true, data: runs.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch payroll runs' });
     }
@@ -482,7 +485,7 @@ router.get('/payroll', async (req: Request, res: Response) => {
 router.get('/payroll/:id/items', async (req: Request, res: Response) => {
     try {
         const runId = Number(req.params.id);
-        const items = await db.prepare(`
+        const items = await pgPool.query(`
             SELECT 
                 pi.*,
                 e.employee_code,
@@ -493,18 +496,18 @@ router.get('/payroll/:id/items', async (req: Request, res: Response) => {
             JOIN employees e ON e.id = pi.employee_id
             JOIN departments d ON d.id = e.department_id
             JOIN designations des ON des.id = e.designation_id
-            WHERE pi.payroll_run_id = ?
+            WHERE pi.payroll_run_id = $1
             ORDER BY e.employee_code ASC
-        `).all(runId);
+        `, [runId]);
 
-        res.json({ success: true, data: items });
+        res.json({ success: true, data: items.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch payroll items' });
     }
 });
 
-// POST /api/hrm/payroll/process - Run Monthly Payroll & Post to General Ledger
-router.post('/payroll/process', async (req: Request, res: Response) => {
+// POST /api/hrm/payroll/process - Run Monthly Payroll & Post to General Ledger (Accountant / GM / SuperAdmin Only)
+router.post('/payroll/process', requireRole(['super_admin', 'general_manager', 'accountant']), async (req: Request, res: Response) => {
     try {
         const propertyId = getReqPropertyId(req);
         if (!propertyId) {
@@ -517,20 +520,22 @@ router.post('/payroll/process', async (req: Request, res: Response) => {
         }
 
         // Check if payroll already run for this month/year
-        const existing = await db.prepare(`
+        const existingRes = await pgPool.query(`
             SELECT id FROM payroll_runs 
-            WHERE property_id = ? AND period_month = ? AND period_year = ?
-        `).get(propertyId, month, year) as any;
+            WHERE property_id = $1 AND period_month = $2 AND period_year = $3
+        `, [propertyId, month, year]);
+        const existing = existingRes.rows[0];
 
         if (existing) {
             return res.status(400).json({ success: false, error: `Payroll for ${month}/${year} has already been generated (Run #${existing.id})` });
         }
 
         // Fetch all active employees
-        const employees = await db.prepare(`
+        const empRes = await pgPool.query(`
             SELECT id, basic_salary FROM employees
-            WHERE property_id = ? AND status = 'ACTIVE'
-        `).all(propertyId) as any[];
+            WHERE property_id = $1 AND status = 'ACTIVE'
+        `, [propertyId]);
+        const employees = empRes.rows;
 
         if (employees.length === 0) {
             return res.status(400).json({ success: false, error: 'No active employees found to process payroll' });
@@ -542,7 +547,7 @@ router.post('/payroll/process', async (req: Request, res: Response) => {
 
         const itemsToInsert: any[] = [];
 
-        employees.forEach(emp => {
+        employees.forEach((emp: any) => {
             const basic = Number(emp.basic_salary);
             const allowance = Math.round(basic * 0.10); // 10% standard housing/food allowance
             const overtime = 0;
@@ -568,22 +573,20 @@ router.post('/payroll/process', async (req: Request, res: Response) => {
         });
 
         // 1. Insert Payroll Run
-        const runStmt = db.prepare(`
+        const runResult = await pgPool.query(`
             INSERT INTO payroll_runs (property_id, period_month, period_year, total_gross, total_deductions, total_net, is_posted_to_gl)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
-        `);
-        const runResult = await runStmt.run(propertyId, month, year, totalGross, totalDeductions, totalNet);
-        const payrollRunId = Number(runResult.lastInsertRowid);
+            VALUES ($1, $2, $3, $4, $5, $6, 1)
+            RETURNING id
+        `, [propertyId, month, year, totalGross, totalDeductions, totalNet]);
+        const payrollRunId = Number(runResult.rows[0]?.id);
 
         // 2. Insert Payroll Items
-        const itemStmt = db.prepare(`
-            INSERT INTO payroll_items (
-                payroll_run_id, employee_id, basic_salary, allowances, overtime_pay, deductions, tax_deductions, net_salary, payment_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PAID')
-        `);
-
         for (const item of itemsToInsert) {
-            await itemStmt.run(
+            await pgPool.query(`
+                INSERT INTO payroll_items (
+                    payroll_run_id, employee_id, basic_salary, allowances, overtime_pay, deductions, tax_deductions, net_salary, payment_status
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PAID')
+            `, [
                 payrollRunId,
                 item.employeeId,
                 item.basic,
@@ -592,43 +595,50 @@ router.post('/payroll/process', async (req: Request, res: Response) => {
                 item.deductions,
                 item.tax,
                 item.net
-            );
+            ]);
         }
 
         // 3. Post Balanced Double-Entry Journal to General Ledger
-        const salaryAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '5010'").get() as any;
-        const bankAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '1020'").get() as any;
-        const taxAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '2020'").get() as any;
+        const salRes = await pgPool.query("SELECT id FROM chart_of_accounts WHERE account_code = '5010'");
+        const salaryAccount = salRes.rows[0];
+        const bankRes = await pgPool.query("SELECT id FROM chart_of_accounts WHERE account_code = '1020'");
+        const bankAccount = bankRes.rows[0];
+        const taxRes = await pgPool.query("SELECT id FROM chart_of_accounts WHERE account_code = '2020'");
+        const taxAccount = taxRes.rows[0];
 
         if (salaryAccount && bankAccount) {
             const entryNumber = `JV-PR-${year}${String(month).padStart(2, '0')}-${payrollRunId}`;
-            const jvStmt = db.prepare(`
+            const jvResult = await pgPool.query(`
                 INSERT INTO journal_entries (
                     organization_id, property_id, entry_number, entry_date, description, reference_type, reference_id, is_posted
-                ) VALUES (1, ?, ?, CURRENT_DATE, ?, 'PAYROLL', ?, 1)
-            `);
-            const jvResult = await jvStmt.run(
+                ) VALUES (1, $1, $2, CURRENT_DATE, $3, 'PAYROLL', $4, 1)
+                RETURNING id
+            `, [
                 propertyId,
                 entryNumber,
                 `Monthly Payroll Settlement for ${month}/${year} (${itemsToInsert.length} Staff)`,
                 payrollRunId
-            );
-            const jvId = Number(jvResult.lastInsertRowid);
-
-            const lineStmt = db.prepare(`
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
-                VALUES (?, ?, ?, ?, ?)
-            `);
+            ]);
+            const jvId = Number(jvResult.rows[0]?.id);
 
             // Debit Salary Expense
-            await lineStmt.run(jvId, salaryAccount.id, totalGross, 0.00, `Staff Salary Expense ${month}/${year}`);
+            await pgPool.query(`
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [jvId, salaryAccount.id, totalGross, 0.00, `Staff Salary Expense ${month}/${year}`]);
 
             // Credit Bank Account
-            await lineStmt.run(jvId, bankAccount.id, 0.00, totalNet, `Net Salary Disbursement via City Bank`);
+            await pgPool.query(`
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [jvId, bankAccount.id, 0.00, totalNet, `Net Salary Disbursement via City Bank`]);
 
             // Credit Tax/Deductions Payable if any
             if (totalDeductions > 0 && taxAccount) {
-                await lineStmt.run(jvId, taxAccount.id, 0.00, totalDeductions, `Tax & PF Deductions Withheld`);
+                await pgPool.query(`
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo)
+                    VALUES ($1, $2, $3, $4, $5)
+                `, [jvId, taxAccount.id, 0.00, totalDeductions, `Tax & PF Deductions Withheld`]);
             }
         }
 

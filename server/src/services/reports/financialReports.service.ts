@@ -1,4 +1,4 @@
-import { db } from '../../database/db.js';
+import { pgPool } from '../../database/postgres.js';
 import type { ReportFilterQuery } from '../../types/index.js';
 
 const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
@@ -28,27 +28,27 @@ export const financialReportsService = {
     }
 
     // 1. Total Rooms
-    const totalRoomsRow = await db.prepare(`SELECT count(*) as count FROM rooms WHERE property_id = ? AND status = 'ACTIVE'`).get(propId) as any;
-    const totalRooms = Number(totalRoomsRow?.count || 0);
+    const totalRoomsRes = await pgPool.query(`SELECT count(*) as count FROM rooms WHERE property_id = $1 AND status = 'ACTIVE'`, [propId]);
+    const totalRooms = Number(totalRoomsRes.rows[0]?.count || 0);
 
     // 2. Occupied Rooms
-    const occupiedRow = await db.prepare(`
+    const occupiedRes = await pgPool.query(`
       SELECT count(DISTINCT room_id) as count 
       FROM reservation_rooms rr 
       JOIN reservations r ON r.id = rr.reservation_id 
-      WHERE r.property_id = ? AND r.status = 'IN_HOUSE'
-    `).get(propId) as any;
-    const occupied = Number(occupiedRow?.count || 0);
+      WHERE r.property_id = $1 AND r.status = 'IN_HOUSE'
+    `, [propId]);
+    const occupied = Number(occupiedRes.rows[0]?.count || 0);
 
     const occupancyRate = totalRooms > 0 ? ((occupied / totalRooms) * 100).toFixed(2) : '0.00';
 
     // 3. Room Revenue
-    const revRow = await db.prepare(`
+    const revRes = await pgPool.query(`
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM reservations 
-      WHERE property_id = ? AND status IN ('CONFIRMED', 'IN_HOUSE', 'COMPLETED')
-    `).get(propId) as any;
-    const totalRoomRev = Number(revRow?.total || 0);
+      WHERE property_id = $1 AND status IN ('CONFIRMED', 'IN_HOUSE', 'COMPLETED')
+    `, [propId]);
+    const totalRoomRev = Number(revRes.rows[0]?.total || 0);
 
     // 4. Average Daily Rate (ADR)
     const adr = occupied > 0 ? (totalRoomRev / occupied).toFixed(2) : '0.00';
@@ -57,12 +57,12 @@ export const financialReportsService = {
     const revPar = totalRooms > 0 ? (totalRoomRev / totalRooms).toFixed(2) : '0.00';
 
     // 6. F&B Revenue
-    const fbRow = await db.prepare(`
+    const fbRes = await pgPool.query(`
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM folio_charges 
       WHERE (charge_code LIKE '%FB%' OR charge_code LIKE '%REST%' OR charge_code LIKE '%MEAL%')
-    `).get() as any;
-    const fbRev = Number(fbRow?.total || 0);
+    `);
+    const fbRev = Number(fbRes.rows[0]?.total || 0);
 
     const totalGross = totalRoomRev + fbRev;
 
@@ -83,7 +83,7 @@ export const financialReportsService = {
    */
   getTrialBalance: async (_propertyId: string, _query: ReportFilterQuery) => {
     try {
-      const rows = await db.prepare(`
+      const rowsRes = await pgPool.query(`
         SELECT 
           coa.account_code as "accountCode",
           coa.account_name as "accountName",
@@ -96,7 +96,8 @@ export const financialReportsService = {
         GROUP BY coa.id, coa.account_code, coa.account_name, coa.account_type
         HAVING (COALESCE(SUM(jl.debit), 0) > 0 OR COALESCE(SUM(jl.credit), 0) > 0)
         ORDER BY coa.account_code ASC
-      `).all() as any[];
+      `);
+      const rows = rowsRes.rows as any[];
 
       if (rows && rows.length > 0) {
         return rows.map(r => ({
@@ -121,7 +122,7 @@ export const financialReportsService = {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return [];
 
-    const rows = await db.prepare(`
+    const rowsRes = await pgPool.query(`
       SELECT 
         r.reservation_number as "resNo",
         g.first_name || ' ' || g.last_name as "guestName",
@@ -133,10 +134,11 @@ export const financialReportsService = {
       JOIN folios f ON f.id = p.folio_id
       JOIN reservations r ON r.id = f.reservation_id
       JOIN guests g ON g.id = r.booker_guest_id
-      WHERE p.property_id = ?
+      WHERE p.property_id = $1
       ORDER BY p.id DESC
       LIMIT 20
-    `).all(propId) as any[];
+    `, [propId]);
+    const rows = rowsRes.rows as any[];
 
     return rows || [];
   },

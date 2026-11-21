@@ -11,7 +11,7 @@
 
 export interface ParsedIdentityDocument {
     rawLines: string[];
-    format: 'TD3' | 'TD1' | 'TD2' | 'MANUAL' | 'OCR';
+    format: 'TD3' | 'TD1' | 'TD2' | 'MANUAL' | 'OCR' | 'BARCODE' | 'PDF417' | 'QR';
     documentType: 'Passport' | 'National ID' | 'Driving License' | 'Visa' | 'Other' | string;
     documentNumber: string;
     issuingCountryCode: string;
@@ -27,6 +27,11 @@ export interface ParsedIdentityDocument {
     expiryDate: string; // YYYY-MM-DD
     isExpired: boolean;
     personalNumber?: string;
+    fatherName?: string;
+    motherName?: string;
+    address?: string;
+    detectionMethod?: 'MRZ_ICAO' | 'PDF417_BARCODE' | 'QR_CODE' | 'NEURAL_OCR' | 'AI_VISION';
+    confidenceScore?: number; // 0 - 100%
     isChecksumValid: boolean;
     checksumDetails?: {
         docNumberValid: boolean;
@@ -35,6 +40,8 @@ export interface ParsedIdentityDocument {
         compositeValid: boolean;
     };
     extractedFields?: Record<string, string>;
+    isValidDocument?: boolean;
+    rejectionReason?: string;
 }
 
 // ISO 3166-1 alpha-3 country code dictionary
@@ -228,6 +235,7 @@ export const parseTD3 = (line1: string, line2: string): ParsedIdentityDocument =
         isExpired,
         personalNumber: personalNumber || undefined,
         isChecksumValid: docNumberValid && dobValid && expiryValid,
+        isValidDocument: true,
         checksumDetails: {
             docNumberValid,
             dobValid,
@@ -240,32 +248,110 @@ export const parseTD3 = (line1: string, line2: string): ParsedIdentityDocument =
 /**
  * Parses TD1 Format (Smart ID Cards: 3 lines × 30 characters)
  */
+/**
+ * Parses TD1 Format (Smart ID Cards: 3 lines × 30 characters)
+ * Resilient to real-world OCR noise (<K, «, c, trailing filler artifacts)
+ */
 export const parseTD1 = (line1: string, line2: string, line3: string): ParsedIdentityDocument => {
-    const l1 = line1.padEnd(30, '<').substring(0, 30);
-    const l2 = line2.padEnd(30, '<').substring(0, 30);
-    const l3 = line3.padEnd(30, '<').substring(0, 30);
+    const rawL1 = (line1 || '').trim().replace(/\s+/g, '');
+    const rawL2 = (line2 || '').trim().replace(/\s+/g, '');
+    const rawL3 = (line3 || '').trim().replace(/\s+/g, '');
 
-    const issuingCountry = l1.substring(2, 5).replace(/</g, '');
-    const docNumber = l1.substring(5, 14).replace(/</g, '');
+    const l1 = rawL1.padEnd(30, '<').substring(0, 30);
+    const l2 = rawL2.padEnd(30, '<').substring(0, 30);
+    const l3 = rawL3.padEnd(30, '<').substring(0, 30);
+
+    // 1. Line 1: Issuing Country & Document Number
+    let issuingCountry = 'BGD';
+    const cMatch = rawL1.match(/^[IA1l\|][<K«c\s]*([A-Z0-9]{3})/i);
+    if (cMatch) {
+        issuingCountry = cMatch[1].toUpperCase();
+        if (issuingCountry === 'B6D' || issuingCountry === 'BOD' || issuingCountry === 'KBG') {
+            issuingCountry = 'BGD';
+        }
+    } else {
+        issuingCountry = l1.substring(2, 5).replace(/</g, '').toUpperCase();
+        if (issuingCountry === 'B6D' || issuingCountry === 'BOD' || issuingCountry === 'KBG') issuingCountry = 'BGD';
+    }
+
+    let docNumber = '';
     const docCheckDigit = l1[14];
+    const numMatch = rawL1.match(/([0-9]{9})/);
+    if (numMatch) {
+        docNumber = numMatch[1];
+        // Bangladesh Smart NID encodes the 10th digit right after delimiter/check digit
+        const rest = rawL1.substring(rawL1.indexOf(docNumber) + 9);
+        const tenthDigit = rest.match(/[<K«c\s0-9]*?([0-9])/);
+        if (tenthDigit && (issuingCountry === 'BGD' || docNumber.length === 9)) {
+            docNumber = `${docNumber}${tenthDigit[1]}`;
+        }
+    } else {
+        docNumber = l1.substring(5, 14).replace(/</g, '');
+        if (issuingCountry === 'BGD' && docNumber.length === 9) {
+            const tenthDigit = l1.substring(14).match(/[<0-9]?([0-9])/);
+            if (tenthDigit && tenthDigit[1]) {
+                docNumber = `${docNumber}${tenthDigit[1]}`;
+            }
+        }
+    }
 
-    // Line 2
-    const dobRaw = l2.substring(0, 6);
-    const dobCheckDigit = l2[6];
-    const sexChar = l2[7];
-    const expiryRaw = l2.substring(8, 14);
-    const expiryCheckDigit = l2[14];
-    const nationality = l2.substring(15, 18).replace(/</g, '');
+    // 2. Line 2: DOB, Sex, Expiry, Nationality
+    let dobRaw = '';
+    let sexChar = 'F';
+    let expiryRaw = '';
+    let nationality = issuingCountry;
 
-    // Line 3: Surname<<Given<Names
-    const nameSplit = l3.split('<<');
-    const surname = (nameSplit[0] || '').replace(/</g, ' ').trim();
-    const givenNames = (nameSplit[1] || '').replace(/</g, ' ').trim();
-    const fullName = `${givenNames} ${surname}`.trim() || surname || 'Guest';
+    const l2Match = rawL2.match(/([0-9]{6})[0-9]?([MF])([0-9]{6})?[0-9]?([A-Z]{3})?/i);
+    if (l2Match) {
+        dobRaw = l2Match[1];
+        sexChar = l2Match[2].toUpperCase();
+        expiryRaw = l2Match[3] || '';
+        if (l2Match[4]) {
+            nationality = l2Match[4].toUpperCase();
+            if (nationality === 'B6D' || nationality === 'BOD' || nationality === 'KBG') nationality = 'BGD';
+        }
+    } else {
+        dobRaw = l2.substring(0, 6);
+        sexChar = l2[7] || 'M';
+        expiryRaw = l2.substring(8, 14);
+        nationality = l2.substring(15, 18).replace(/</g, '');
+        if (nationality === 'B6D' || nationality === 'BOD' || nationality === 'KBG') nationality = 'BGD';
+    }
+
+    // 3. Line 3: Surname<<Given<Names (handles OCR noise like <K<K or trailing filler garbage)
+    let surname = '';
+    let givenNames = '';
+    let fullName = '';
+
+    const splitMatch = rawL3.match(/^([A-Za-z]{2,25})[<K«c\(]{2,}(.+)$/);
+    if (splitMatch) {
+        surname = splitMatch[1].trim();
+        if (surname === 'BGD' || surname === issuingCountry) surname = '';
+        const rest = splitMatch[2];
+        const words: string[] = [];
+        const segments = rest.split(/[<«\(]+/);
+        for (const seg of segments) {
+            const clean = seg.replace(/[^A-Za-z]/g, '').trim();
+            if (!clean) continue;
+            if (/^[KLZ]+$/i.test(clean) && (clean.length === 1 || clean.length > 3)) continue;
+            if (/^(LLLL|KKKK|ZZZZ)/i.test(clean)) break;
+            if (clean.length === 1 && clean !== 'A') continue;
+            words.push(clean);
+        }
+        givenNames = words.join(' ').trim();
+        fullName = [givenNames, surname].filter(Boolean).join(' ').trim();
+    } else {
+        const nameSplit = l3.split(/<{2,}/);
+        surname = (nameSplit[0] || '').replace(/[^A-Za-z]/g, ' ').trim();
+        if (surname === 'BGD' || surname === issuingCountry) surname = '';
+        const rawGiven = (nameSplit[1] || '').replace(/<+$/, '').replace(/[^A-Za-z]/g, ' ').trim();
+        givenNames = rawGiven;
+        fullName = [givenNames, surname].filter(Boolean).join(' ').trim() || surname || 'Guest';
+    }
 
     const docNumberValid = verifyCheckDigit(l1.substring(5, 14), docCheckDigit);
-    const dobValid = verifyCheckDigit(dobRaw, dobCheckDigit);
-    const expiryValid = verifyCheckDigit(expiryRaw, expiryCheckDigit);
+    const dobValid = verifyCheckDigit(dobRaw, l2[6]);
+    const expiryValid = verifyCheckDigit(expiryRaw, l2[14]);
 
     const dateOfBirth = parseIcaoDate(dobRaw, false);
     const expiryDate = parseIcaoDate(expiryRaw, true);
@@ -276,10 +362,12 @@ export const parseTD1 = (line1: string, line2: string, line3: string): ParsedIde
     if (sexChar === 'M') gender = 'Male';
     else if (sexChar === 'F') gender = 'Female';
 
+    const isSmartCard = docNumber.length === 10 || issuingCountry === 'BGD';
+
     return {
-        rawLines: [l1, l2, l3],
+        rawLines: [rawL1, rawL2, rawL3],
         format: 'TD1',
-        documentType: 'National ID',
+        documentType: isSmartCard ? 'Smart National ID' : 'National ID',
         documentNumber: docNumber,
         issuingCountryCode: issuingCountry,
         issuingCountryName: resolveCountryName(issuingCountry),
@@ -287,13 +375,14 @@ export const parseTD1 = (line1: string, line2: string, line3: string): ParsedIde
         nationalityName: resolveCountryName(nationality),
         surname,
         givenNames,
-        fullName,
+        fullName: fullName || 'Guest',
         dateOfBirth,
         age,
         gender,
         expiryDate,
         isExpired,
         isChecksumValid: docNumberValid && dobValid && expiryValid,
+        isValidDocument: true,
         checksumDetails: {
             docNumberValid,
             dobValid,
@@ -310,11 +399,11 @@ export const parseTD1 = (line1: string, line2: string, line3: string): ParsedIde
 export const parseMrzText = (rawText: string): ParsedIdentityDocument | null => {
     if (!rawText) return null;
 
-    // Clean whitespace and filter lines containing typical MRZ characters (A-Z, 0-9, <)
+    // Clean whitespace and filter lines containing typical MRZ characters (A-Z, 0-9, <, noise chars)
     const lines = rawText
         .split('\n')
-        .map(l => l.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9<]/g, ''))
-        .filter(l => l.length >= 26);
+        .map(l => l.toUpperCase().replace(/\s+/g, '').replace(/[«c\(]/g, '<').replace(/[^A-Z0-9<]/g, ''))
+        .filter(l => l.length >= 24 && l.length <= 48);
 
     // 1. Check for TD3 (Passports: 2 consecutive lines of 44 chars)
     for (let i = 0; i < lines.length - 1; i++) {
@@ -330,7 +419,9 @@ export const parseMrzText = (rawText: string): ParsedIdentityDocument | null => 
         const l1 = lines[i];
         const l2 = lines[i + 1];
         const l3 = lines[i + 2];
-        if (l1.length >= 28 && l2.length >= 28 && l3.length >= 28 && (l1.startsWith('I') || l1.startsWith('A'))) {
+        if (l1.length >= 24 && l2.length >= 24 && l3.length >= 24 &&
+            (l1.startsWith('I') || l1.startsWith('A') || l1.includes('BGD')) &&
+            (/^[0-9]{6}/.test(l2) || l2.includes('M') || l2.includes('F'))) {
             return parseTD1(l1, l2, l3);
         }
     }

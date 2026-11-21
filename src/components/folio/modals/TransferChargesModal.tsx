@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, ArrowRight, ArrowRightLeft } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { useActiveCurrency } from '../../../utils/currencyUtils';
 import type { FolioData } from '../folioTypes';
 
 interface TransferChargesModalProps {
@@ -19,7 +20,7 @@ export const TransferChargesModal: React.FC<TransferChargesModalProps> = ({
     allFolios,
     onSuccess
 }) => {
-    const currency = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol: currency } = useActiveCurrency();
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'inhouse' | 'reservation' | 'checkedout'>('all');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,16 +116,16 @@ export const TransferChargesModal: React.FC<TransferChargesModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/25 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
             {/* Slide-out Drawer Panel (Right Side) */}
-            <div className="fixed inset-y-0 right-0 w-[540px] sm:w-[680px] max-w-full bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
+            <div className="fixed inset-y-0 right-0 w-[540px] sm:w-[680px] max-w-full bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
                 {/* Header */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <div className="flex items-center gap-2">
@@ -282,6 +283,7 @@ export const TransferChargesModal: React.FC<TransferChargesModalProps> = ({
                     </button>
                 </div>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

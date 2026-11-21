@@ -402,7 +402,7 @@ const MaintenanceKanban = () => {
             </div>
 
             {/* =========================================================================
-                SECTION 1: OUT OF ORDER & ROOM BLOCKS (eZee PMS Front Office >> Out of Order)
+                SECTION 1: OUT OF ORDER & ROOM BLOCKS (Front Office >> Out of Order)
                ========================================================================= */}
             {activeSection === 'blocks' && (
                 <div className="space-y-4">

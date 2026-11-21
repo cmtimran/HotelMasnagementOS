@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import { subscribeToPMSEvents } from '../../utils/roomInventoryEngine';
+import { classifyReservation, generateFolioNumber } from '../../utils/reservationNumbering';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import type { FolioData, FolioSubTab } from './folioTypes';
 import { HorizonSummaryBanner } from './HorizonSummaryBanner';
@@ -23,6 +24,8 @@ import { TransferChargesModal } from './modals/TransferChargesModal';
 import { SplitFolioModal } from './modals/SplitFolioModal';
 import { TaxExemptionModal } from './modals/TaxExemptionModal';
 import { VoidModal } from './modals/VoidModal';
+import { FolioInvoiceModal } from './modals/FolioInvoiceModal';
+import { EmailFolioModal } from './modals/EmailFolioModal';
 
 interface DrawerFolioOperationsProps {
     booking: AmendBookingData | null;
@@ -40,10 +43,10 @@ interface DrawerFolioOperationsProps {
 export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     booking,
     resolvedGroupRooms = [],
-    onOpenAddPayment,
+    onOpenAddPayment: _onOpenAddPayment,
     onOpenAmendStay: _onOpenAmendStay,
     onOpenRoomMove: _onOpenRoomMove,
-    onOpenRoomSplit,
+    onOpenRoomSplit: _onOpenRoomSplit,
     onOpenCheckOut: _onOpenCheckOut,
     isTaxExemptionOpen: externalTaxExemptionOpen,
     onToggleTaxExemption
@@ -84,6 +87,11 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
         amt: 0
     });
 
+    // Invoice & Email Modals State
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+    const [invoiceViewMode, setInvoiceViewMode] = useState<'invoice' | 'voucher'>('invoice');
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+
     // Dynamic Data Fetcher (Queries PostgreSQL via /api/accounting/folios)
     const fetchFolioData = useCallback(async () => {
         if (!booking) return;
@@ -119,8 +127,94 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         room_type: f.room_type || booking.roomType || 'Standard Suite'
                     };
                 });
-                // Check if there are group rooms in resolvedGroupRooms missing from the server folios
-                if (resolvedGroupRooms && resolvedGroupRooms.length > 1) {
+
+                const stayClassification = classifyReservation((booking as any) || {});
+                const isSplitStayBooking = stayClassification === 'SPLIT_STAY';
+
+                if (isSplitStayBooking) {
+                    // Split Stay Architecture: Single Guest moving sequentially across rooms
+                    // Consolidate into the Master Folio rather than creating separate phantom room folios!
+                    const sortedLegs = [...resolvedGroupRooms].sort((a: any, b: any) => {
+                        const tA = new Date(a.checkInDate || a.checkIn || booking.arrivalDate).getTime();
+                        const tB = new Date(b.checkInDate || b.checkIn || booking.arrivalDate).getTime();
+                        return tA - tB;
+                    });
+                    const sequentialRoomRoute = sortedLegs.map((r: any) => r.roomNumber).filter(Boolean).join(' → ');
+
+                    enriched.forEach((f: any) => {
+                        f.room_number = sequentialRoomRoute || f.room_number;
+                        f.is_split_stay = true;
+                        f.split_legs = sortedLegs;
+
+                        // Ensure all sequential legs have their room accommodation charges inside this Master Folio!
+                        const existingChargesDesc = (f.charges || []).map((c: any) => String(c.description || '').toLowerCase());
+                        const additionalCharges: any[] = [];
+                        let additionalTotal = 0;
+                        let runningNightNumber = (f.charges || []).filter((c: any) => c.charge_code === 'ROOM_CHG').length + 1;
+
+                        sortedLegs.forEach((leg: any, legIdx: number) => {
+                            const legRoom = String(leg.roomNumber || '').trim();
+                            const legIn = leg.checkInDate || leg.checkIn || booking.arrivalDate;
+                            const legOut = leg.checkOutDate || leg.checkOut || booking.departureDate;
+                            const legNights = Math.max(1, leg.nights || (
+                                legIn && legOut 
+                                    ? Math.max(1, Math.round((new Date(legOut).getTime() - new Date(legIn).getTime()) / 86400000))
+                                    : 1
+                            ));
+                            const legRate = Number(leg.avgDailyRate || leg.room_rate || booking.avgDailyRate || (booking.totalAmount ? Math.round(booking.totalAmount / (booking.nights || 1)) : 3000));
+
+                            // Check if charges for this specific room leg already exist
+                            const legAlreadyPosted = existingChargesDesc.some((desc: string) => desc.includes(`room ${legRoom.toLowerCase()}`));
+
+                            if (!legAlreadyPosted) {
+                                for (let d = 0; d < legNights; d++) {
+                                    const nightDate = new Date(legIn);
+                                    nightDate.setDate(nightDate.getDate() + d);
+                                    const chargeDateStr = nightDate.toISOString().split('T')[0];
+                                    const baseAmt = legRate;
+                                    const svcCharge = Math.round(baseAmt * 0.10 * 100) / 100;
+                                    const vatAmt = Math.round(baseAmt * 0.15 * 100) / 100;
+                                    const cityTaxAmt = Math.round(baseAmt * 0.01 * 100) / 100;
+                                    const totalTax = svcCharge + vatAmt + cityTaxAmt;
+                                    const grandAmt = baseAmt + totalTax;
+                                    additionalTotal += grandAmt;
+
+                                    additionalCharges.push({
+                                        id: `split-leg-${legIdx}-${d + 1}`,
+                                        charge_code: 'ROOM_CHG',
+                                        revenue_head: 'Room Charges',
+                                        ref_no: String(runningNightNumber),
+                                        description: `Room Charge - Room ${legRoom} (Leg ${legIdx + 1}/${sortedLegs.length} · Night ${d + 1} of ${legNights})`,
+                                        amount: baseAmt,
+                                        discount_amount: 0,
+                                        service_charge: svcCharge,
+                                        vat: vatAmt,
+                                        city_tax: cityTaxAmt,
+                                        total_tax: totalTax,
+                                        total_amount: grandAmt,
+                                        charge_date: chargeDateStr,
+                                        is_tax_applicable: true,
+                                        user_name: 'System Auditor',
+                                        is_voided: false,
+                                        status: 'Posted',
+                                        legRoomNumber: legRoom
+                                    });
+                                    runningNightNumber++;
+                                }
+                            }
+                        });
+
+                        if (additionalCharges.length > 0) {
+                            f.charges = [...(f.charges || []), ...additionalCharges];
+                            f.balance = Number(f.balance || 0) + additionalTotal;
+                            if (f.summary) {
+                                f.summary.totalCharges = Number(f.summary.totalCharges || 0) + additionalTotal;
+                                f.summary.dueAmount = Number(f.summary.dueAmount || 0) + additionalTotal;
+                            }
+                        }
+                    });
+                } else if (resolvedGroupRooms && resolvedGroupRooms.length > 1) {
+                    // Check if there are group rooms in resolvedGroupRooms missing from the server folios (Multi-room group)
                     const existingRoomNos = new Set(enriched.map((f: any) => String(f.room_number || '').trim()));
                     resolvedGroupRooms.forEach((gr: any, idx: number) => {
                         const grRoomNum = String(gr.roomNumber || '').trim();
@@ -230,7 +324,144 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         ? Math.max(1, Math.round((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86400000))
                         : 1
                 ));
-                const paidAmt = Number(booking.paidAmount || 0);
+                const advancePaymentsList = Array.isArray((booking as any).paymentRows) && (booking as any).paymentRows.length > 0
+                    ? (booking as any).paymentRows
+                    : (Array.isArray((booking as any).advancePayments) && (booking as any).advancePayments.length > 0
+                        ? (booking as any).advancePayments
+                        : []);
+                const paidAmt = advancePaymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0) || Number(booking.paidAmount || 0);
+
+                const builtPayments = advancePaymentsList.length > 0 ? advancePaymentsList.map((p: any, pIdx: number) => ({
+                    id: pIdx + 1,
+                    payment_number: `PAY-${String(pIdx + 1).padStart(2, '0')}`,
+                    payment_method: p.method || 'Advance Deposit',
+                    amount: Number(p.amount) || 0,
+                    reference_code: p.reference ? `ADV_DEP: ${p.reference}` : 'FRONT_DESK_DEPOSIT',
+                    transaction_date: checkInDate,
+                    status: 'Settled'
+                })) : (paidAmt > 0 ? [{
+                    id: 1,
+                    payment_number: 'PAY-01',
+                    payment_method: 'Advance Deposit',
+                    amount: paidAmt,
+                    reference_code: 'FRONT_DESK_DEPOSIT',
+                    transaction_date: checkInDate,
+                    status: 'Settled'
+                }] : []);
+
+                const stayClassification = classifyReservation((booking as any) || {});
+                const isSplitStayBooking = stayClassification === 'SPLIT_STAY';
+
+                if (isSplitStayBooking) {
+                    // Split Stay Architecture: Generate single unified Master Folio across all sequential room legs
+                    const sortedLegs = [...resolvedGroupRooms].sort((a: any, b: any) => {
+                        const tA = new Date(a.checkInDate || a.checkIn || checkInDate).getTime();
+                        const tB = new Date(b.checkInDate || b.checkIn || checkInDate).getTime();
+                        return tA - tB;
+                    });
+                    const sequentialRoomRoute = sortedLegs.map((r: any) => r.roomNumber).filter(Boolean).join(' → ');
+
+                    const dynamicCharges: any[] = [];
+                    let runningChargesTotal = 0;
+                    let nightCounter = 1;
+
+                    sortedLegs.forEach((leg: any, legIdx: number) => {
+                        const legRoom = String(leg.roomNumber || '').trim();
+                        const legIn = leg.checkInDate || leg.checkIn || checkInDate;
+                        const legOut = leg.checkOutDate || leg.checkOut || checkOutDate;
+                        const legNights = Math.max(1, leg.nights || (
+                            legIn && legOut 
+                                ? Math.max(1, Math.round((new Date(legOut).getTime() - new Date(legIn).getTime()) / 86400000))
+                                : 1
+                        ));
+                        const legRate = Number(leg.avgDailyRate || leg.room_rate || booking.avgDailyRate || 3000);
+
+                        for (let d = 0; d < legNights; d++) {
+                            const nightDate = new Date(legIn);
+                            nightDate.setDate(nightDate.getDate() + d);
+                            const chargeDateStr = nightDate.toISOString().split('T')[0];
+                            const baseAmt = legRate;
+                            const svcCharge = Math.round(baseAmt * 0.10 * 100) / 100;
+                            const vatAmt = Math.round(baseAmt * 0.15 * 100) / 100;
+                            const cityTaxAmt = Math.round(baseAmt * 0.01 * 100) / 100;
+                            const totalTax = svcCharge + vatAmt + cityTaxAmt;
+                            const grandAmt = baseAmt + totalTax;
+                            runningChargesTotal += grandAmt;
+
+                            dynamicCharges.push({
+                                id: `split-${legIdx}-${d + 1}`,
+                                charge_code: 'ROOM_CHG',
+                                revenue_head: 'Room Charges',
+                                ref_no: String(nightCounter),
+                                description: `Room Charge - Room ${legRoom} (Leg ${legIdx + 1}/${sortedLegs.length} · Night ${d + 1} of ${legNights})`,
+                                amount: baseAmt,
+                                discount_amount: 0,
+                                service_charge: svcCharge,
+                                vat: vatAmt,
+                                city_tax: cityTaxAmt,
+                                total_tax: totalTax,
+                                total_amount: grandAmt,
+                                charge_date: chargeDateStr,
+                                is_tax_applicable: true,
+                                user_name: 'System Auditor',
+                                is_voided: false,
+                                status: 'Posted',
+                                legRoomNumber: legRoom
+                            });
+                            nightCounter++;
+                        }
+                    });
+
+                    const netDue = Math.max(0, runningChargesTotal - paidAmt);
+                    const splitMasterFolio: FolioData = {
+                        id: booking.id || 'FOL-SPLIT-MASTER',
+                        reservation_id: booking.id || '1',
+                        folio_number: booking.folioNumber || `FOL-${booking.reservationNumber}`,
+                        status: booking.status || 'OPEN',
+                        balance: netDue,
+                        reservation_number: booking.reservationNumber,
+                        guest_name: cleanGuestName,
+                        guest_phone: booking.phone || '',
+                        guest_email: booking.email || '',
+                        room_number: sequentialRoomRoute,
+                        room_type: booking.roomType || 'Standard Suite',
+                        check_in: checkInDate,
+                        check_out: checkOutDate,
+                        bill_to: cleanGuestName,
+                        market_code: booking.ratePlan || 'Best Available Rate (BAR)',
+                        business_source: booking.source || 'Direct',
+                        rooms: sortedLegs.map((l: any, idx: number) => ({
+                            id: idx + 1,
+                            room_number: l.roomNumber,
+                            room_type: l.roomType || booking.roomType || 'Standard',
+                            check_in_date: l.checkInDate || checkInDate,
+                            check_out_date: l.checkOutDate || checkOutDate,
+                            room_rate: Number(l.avgDailyRate || 3000),
+                            adults: l.adults ?? booking.adults ?? 1,
+                            children: l.children ?? booking.children ?? 0,
+                            nights: l.nights || 1
+                        })),
+                        charges: dynamicCharges,
+                        payments: builtPayments,
+                        summary: {
+                            totalCharges: runningChargesTotal,
+                            totalPaid: paidAmt,
+                            totalDiscount: 0,
+                            serviceCharge: runningChargesTotal * 0.10,
+                            vat: runningChargesTotal * 0.15,
+                            cityTax: runningChargesTotal * 0.01,
+                            totalTax: runningChargesTotal * 0.26,
+                            dueAmount: netDue
+                        }
+                    };
+
+                    (splitMasterFolio as any).is_split_stay = true;
+                    (splitMasterFolio as any).split_legs = sortedLegs;
+
+                    setFolios([splitMasterFolio]);
+                    setActiveFolioId(splitMasterFolio.id);
+                    return;
+                }
 
                 const roomsToBuild = (resolvedGroupRooms && resolvedGroupRooms.length > 0)
                     ? resolvedGroupRooms
@@ -289,9 +520,11 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         });
                     }
 
-                    const folioNo = isOwner
-                        ? (rm.folioNumber || `49 - ${cleanGuestName}`)
-                        : (rm.folioNumber || `${50 + idx} - ${cleanGuestName}`);
+                    const folioNo = rm.folioNumber || (
+                        isOwner
+                            ? (booking.folioNumber || generateFolioNumber(booking.reservationNumber, 0, stayClassification, true))
+                            : generateFolioNumber(booking.reservationNumber, idx, stayClassification, false)
+                    );
 
                     return {
                         id: isOwner ? (booking.id || 'FOL-DEFAULT') : `fol-group-${idx + 1}`,
@@ -299,7 +532,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         folio_number: folioNo,
                         status: rm.status || booking.status || 'OPEN',
                         balance: Math.max(0, runningChargesTotal - rmPaid),
-                        reservation_number: rm.subBookingNumber || rm.reservationNumber || (booking.reservationNumber ? `${booking.reservationNumber}-${idx + 1}` : 'RES-1173-2026'),
+                        reservation_number: rm.subBookingNumber || rm.reservationNumber || (booking.reservationNumber ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : 'RES-1173-2026'),
                         guest_name: cleanGuestName,
                         guest_phone: booking.phone || '',
                         guest_email: booking.email || '',
@@ -324,16 +557,16 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                             }
                         ],
                         charges: dynamicCharges,
-                        payments: rmPaid > 0 ? [
+                        payments: (isOwner && builtPayments.length > 0) ? builtPayments : (rmPaid > 0 ? [
                             {
                                 id: 1,
                                 payment_number: 'PAY-001',
-                                payment_method: 'Cash',
+                                payment_method: 'Advance Deposit',
                                 amount: rmPaid,
                                 transaction_date: checkInDate,
                                 status: 'Settled'
                             }
-                        ] : [],
+                        ] : []),
                         summary: {
                             totalCharges: runningChargesTotal,
                             totalPaid: rmPaid,
@@ -380,32 +613,64 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
     }, [folios, activeFolioId]);
 
     const handlePrintFolio = () => {
-        window.print();
+        setInvoiceViewMode('invoice');
+        setIsInvoiceModalOpen(true);
+    };
+
+    const handlePrintExtraCharges = () => {
+        setInvoiceViewMode('voucher');
+        setIsInvoiceModalOpen(true);
     };
 
     const handleEmailFolio = () => {
-        alert(`Folio Invoice successfully emailed to ${activeFolio?.guest_email || 'guest contact'}!`);
+        setIsEmailModalOpen(true);
     };
 
     const handleExportExcel = () => {
         if (!activeFolio) return;
+        const totalCharges = activeFolio.charges.reduce((s, c) => s + (Number(c.total_amount) || Number(c.amount) || 0), 0);
+        const totalPaid = activeFolio.payments ? activeFolio.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0) : 0;
+        const balanceDue = Math.max(0, totalCharges - totalPaid);
+
         const csvRows = [
-            ['Date', 'Ref No', 'Revenue Head', 'Description', 'User', 'Status', 'Amount'],
+            ['GRAND PALACE HOTEL & RESORT - OFFICIAL GUEST FOLIO LEDGER'],
+            ['Folio Number', activeFolio.folio_number, 'Reservation Number', activeFolio.reservation_number || ''],
+            ['Guest Name', activeFolio.guest_name, 'Room Number', activeFolio.room_number || ''],
+            ['Check-In', activeFolio.check_in || '', 'Check-Out', activeFolio.check_out || ''],
+            ['Export Date', new Date().toISOString().split('T')[0]],
+            [],
+            ['CHARGES & POSTINGS'],
+            ['Date', 'Ref No', 'Revenue Head', 'Description', 'User', 'Status', 'Debit Amount'],
             ...activeFolio.charges.map(c => [
-                c.charge_date,
-                c.ref_no,
-                c.revenue_head,
-                c.description,
-                c.user_name,
-                c.status,
-                c.total_amount
-            ])
+                c.charge_date || '',
+                c.ref_no || '',
+                c.revenue_head || '',
+                c.description || '',
+                c.user_name || 'Front Desk',
+                c.status || 'Posted',
+                (Number(c.total_amount) || Number(c.amount) || 0).toFixed(2)
+            ]),
+            [],
+            ['PAYMENTS & SETTLEMENTS'],
+            ['Date', 'Payment Number', 'Payment Method', 'Amount Paid', 'Reference'],
+            ...(activeFolio.payments || []).map(p => [
+                p.transaction_date || '',
+                p.payment_number || '',
+                p.payment_method || 'Cash / Gateway',
+                (Number(p.amount) || 0).toFixed(2),
+                p.reference_code || 'SETTLED'
+            ]),
+            [],
+            ['FINANCIAL SUMMARY'],
+            ['Total Gross Charges', totalCharges.toFixed(2)],
+            ['Total Paid / Credits', totalPaid.toFixed(2)],
+            ['Net Balance Due', balanceDue.toFixed(2)]
         ];
-        const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(',')).join('\n');
+        const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.map(item => `"${String(item).replace(/"/g, '""')}"`).join(',')).join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `Folio_${activeFolio.folio_number}.csv`);
+        link.setAttribute('download', `Folio_${activeFolio.folio_number.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -445,6 +710,7 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 isLoading={isLoading}
                 onSelectTab={setActiveTab}
                 onPrintFolio={handlePrintFolio}
+                onPrintExtraChargesVoucher={handlePrintExtraCharges}
                 onEmailFolio={handleEmailFolio}
                 onExportExcel={handleExportExcel}
             />
@@ -460,15 +726,12 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                         onSelectFolio={setActiveFolioId}
                         onOpenNewFolio={() => setIsNewFolioOpen(true)}
                         onOpenRouteFolio={() => setIsRouteFolioOpen(true)}
-                        onOpenAddPayment={() => {
-                            setIsAddPaymentOpen(true);
-                            if (onOpenAddPayment) onOpenAddPayment();
-                        }}
+                        onOpenAddPayment={() => setIsAddPaymentOpen(true)}
                         onOpenAddCharge={() => setIsAddChargeOpen(true)}
                         onOpenAddDiscount={() => setIsApplyDiscountOpen(true)}
                         onOpenAdjustments={() => setIsAdjustmentsOpen(true)}
                         onOpenTransfer={() => setIsTransferOpen(true)}
-                        onOpenSplitFolio={onOpenRoomSplit || (() => setIsSplitFolioOpen(true))}
+                        onOpenSplitFolio={() => setIsSplitFolioOpen(true)}
                         onOpenTaxExemption={() => handleSetTaxExemptionOpen(true)}
                         onRefresh={fetchFolioData}
                         onOpenVoid={(type, id, desc, amt) => {
@@ -614,6 +877,28 @@ export const DrawerFolioOperations: React.FC<DrawerFolioOperationsProps> = ({
                 targetDescription={voidModalState.desc}
                 targetAmount={voidModalState.amt}
                 onSuccess={fetchFolioData}
+            />
+
+            {/* Enterprise Folio Invoice & Voucher Modal */}
+            <FolioInvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => setIsInvoiceModalOpen(false)}
+                folio={activeFolio}
+                booking={booking}
+                viewMode={invoiceViewMode}
+                onOpenEmailModal={() => setIsEmailModalOpen(true)}
+            />
+
+            {/* Email Folio Modal */}
+            <EmailFolioModal
+                isOpen={isEmailModalOpen}
+                onClose={() => setIsEmailModalOpen(false)}
+                folio={activeFolio}
+                booking={booking}
+                onSuccess={(msg) => {
+                    setSuccessBannerMsg(msg);
+                    setTimeout(() => setSuccessBannerMsg(''), 4500);
+                }}
             />
         </div>
     );

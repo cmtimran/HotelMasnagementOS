@@ -453,7 +453,11 @@ export class TenantConnectionManager {
         // =========================================================================
         // ENTERPRISE VIP TIER: Dedicated Physical Database-per-Tenant
         // =========================================================================
-        const dbName = `tenant_${rawSlug.replace(/-/g, '_')}`;
+        const sanitizedSlug = rawSlug.toLowerCase().replace(/[^a-z0-9_]/g, '');
+        if (!sanitizedSlug || sanitizedSlug.length < 3 || sanitizedSlug.length > 30) {
+            throw new Error('Invalid tenant slug. Must contain only 3-30 lowercase alphanumeric characters or underscores.');
+        }
+        const dbName = `tenant_${sanitizedSlug}`;
         console.log(`🏗️ [Tenant Provisioning] Onboarding Enterprise Dedicated physical database: ${dbName}...`);
         await pgPool.query(`CREATE DATABASE "${dbName}";`);
 
@@ -865,7 +869,10 @@ export class TenantConnectionManager {
                 WHERE datname = $1 AND pid <> pg_backend_pid();
             `, [db_name]);
 
-            await pgPool.query(`DROP DATABASE IF EXISTS "${db_name}";`);
+            const safeDbName = String(db_name).replace(/[^a-z0-9_]/g, '');
+            if (safeDbName) {
+                await pgPool.query(`DROP DATABASE IF EXISTS "${safeDbName}";`);
+            }
         } else if (property_id) {
             // If SHARED, mark property as archived
             console.log(`🧹 [Tenant Cleanup] De-registering shared property ID ${property_id}...`);

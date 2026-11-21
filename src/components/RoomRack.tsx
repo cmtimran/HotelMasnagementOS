@@ -8,7 +8,7 @@ import {
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { getNextDayISO } from './common/StayPeriodPicker';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import { 
     getCanonicalRooms, 
     getAllStoredReservations, 
@@ -20,6 +20,7 @@ import {
     getOperatingSystemDate,
     subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
+import { getActiveDiscrepancyForRoom, fetchDiscrepanciesFromDB } from '../utils/housekeepingDiscrepancyEngine';
 
 export interface RoomRackItem {
     id: number;
@@ -27,6 +28,7 @@ export interface RoomRackItem {
     floor: number;
     roomType: string;
     status: 'clean' | 'dirty' | 'inspected' | 'occupied' | 'ooo' | 'reserved' | string;
+    discrepancy?: string;
     guestName?: string;
     phone?: string;
     checkIn?: string;
@@ -133,6 +135,7 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
 
         const isConn = Boolean(r.isConnecting || r.connectedTo);
         const connTo = r.connectedTo || undefined;
+        const activeDisc = getActiveDiscrepancyForRoom(r.number);
 
         return {
             id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || 1,
@@ -146,6 +149,7 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             smokingStatus: r.smokingStatus || (isBalcony ? 'Balcony Smoking Only' : (isSmoking ? 'Smoking' : 'Non-Smoking')),
             smokingAllowed: Boolean(isSmoking || isBalcony),
             status,
+            discrepancy: activeDisc ? activeDisc.discrepancyType : undefined,
             guestName: activeRes ? activeRes.guestName : undefined,
             phone: activeRes ? activeRes.phone : undefined,
             checkIn: activeRes ? (activeRes.checkIn || activeRes.arrivalDate) : undefined,
@@ -167,7 +171,7 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
 };
 
 export const RoomRack: React.FC = () => {
-    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol } = useActiveCurrency();
     const { setActivePage } = useNavigation();
 
     // Operating System Date & Rack Date
@@ -191,7 +195,11 @@ export const RoomRack: React.FC = () => {
     }, [rackDate]);
 
     useEffect(() => {
-        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+        Promise.all([
+            syncRoomTypesAndRoomsFromDB(), 
+            syncReservationsFromDB(),
+            fetchDiscrepanciesFromDB()
+        ]).then(() => {
             setRooms(deriveRoomsFromInventory(rackDate));
         });
 
@@ -766,6 +774,11 @@ export const RoomRack: React.FC = () => {
                                                             <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
                                                                 {room.roomNumber}
                                                             </h3>
+                                                            {room.discrepancy && (
+                                                                <span className="px-1.5 py-0.5 rounded bg-rose-100 border border-rose-300 text-rose-700 text-[9px] font-black tracking-wider animate-pulse" title={`Physical Discrepancy: ${room.discrepancy}`}>
+                                                                    ⚠️ {room.discrepancy.split(' ')[0]}
+                                                                </span>
+                                                            )}
                                                             {/* Smoking Policy Icon Only */}
                                                             {room.smokingStatus === 'Smoking' ? (
                                                                 <span
@@ -1288,9 +1301,10 @@ export const RoomRack: React.FC = () => {
                                     <>
                                         <button
                                             type="button"
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (selectedRoom.reservationId) {
-                                                    updateReservationStatusInDB(selectedRoom.reservationId, 'in-house');
+                                                    const ok = await updateReservationStatusInDB(selectedRoom.reservationId, 'in-house');
+                                                    if (!ok) return;
                                                 }
                                                 handleUpdateRoomStatus(selectedRoom.id, 'occupied');
                                                 setSelectedRoom(null);

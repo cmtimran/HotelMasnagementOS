@@ -9,7 +9,6 @@ import {
     User as UserIcon,
     MapPin,
     Briefcase,
-    Delete,
     MoreVertical,
     Car,
     Plane,
@@ -26,6 +25,12 @@ import {
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './MultiRoomSelectorModal';
 import { PassportIdScannerModal } from './PassportIdScannerModal';
+import {
+    FinancialStatusStrip,
+    PaymentTenderConsole,
+    DiscountConsole,
+    SettlementBreakdownCard
+} from '../reservations/shared';
 import { useProperty } from '../../context/PropertyContext';
 import { getCurrencySymbol } from '../../utils/currencyUtils';
 import type {
@@ -52,8 +57,7 @@ import {
     calculateTariffForRatePlan,
     generateMasterReservationNumber,
     generateGroupCode,
-    generateSubBookingNumber,
-    generateRegistrationNumber,
+        generateRegistrationNumber,
     generateFolioNumber,
     getRoomSmokingPolicy,
     getOperatingSystemDate,
@@ -69,6 +73,7 @@ import {
     validatePreBookingFlight
 } from '../../hooks/useReservationBookingEngine';
 import { toast } from '../../context/ToastContext';
+import { confirmModal } from '../../context/ConfirmModalContext';
 import {
     calculateReservationTaxes,
     getActiveTaxConfiguration,
@@ -110,8 +115,9 @@ interface RoomRow {
 
 interface PaymentRow {
     id: number;
-    method: 'Cash' | 'Card' | 'bKash' | 'Bank Transfer';
+    method: 'Cash' | 'Card' | 'bKash' | 'Nagad' | 'Bank Transfer' | 'Direct Billing' | string;
     amount: number;
+    reference?: string;
 }
 
 export const AddReservationModal: React.FC<AddReservationModalProps> = ({
@@ -174,6 +180,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         calculateRoomRate,
         getPackageById,
         validateAllRoomRestrictions,
+        getStayHolidaySummary,
         getOfferValue,
         resolveOfferSelection,
         validatePackageRestrictions
@@ -301,10 +308,10 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     }
                 ]);
             }
-            if (editingReservation.paidAmount !== undefined && !editingReservation.isNewBookingTemplate) {
-                setPaymentRows([{ id: 1, method: 'Cash', amount: editingReservation.paidAmount }]);
-            } else if (editingReservation.isNewBookingTemplate) {
-                setPaymentRows([{ id: 1, method: 'Cash', amount: 0 }]);
+            if (editingReservation.paidAmount !== undefined && !editingReservation.isNewBookingTemplate && Number(editingReservation.paidAmount) > 0) {
+                setPaymentRows([{ id: 1, method: ((editingReservation as any).paymentMethod as any) || 'Cash', amount: Number(editingReservation.paidAmount) }]);
+            } else {
+                setPaymentRows([]);
             }
         } else {
             // Fresh Reservation from StayView or Header
@@ -340,6 +347,15 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             const defaultType = canonical?.roomTypeName || 'Deluxe Double';
             const defaultRate = canonical?.baseRate || 3000;
             const defaultPlan = availableRatePlans[0]?.name || '';
+            const defaultCalculatedRate = calculateRoomRate({
+                roomType: defaultType,
+                ratePlan: defaultPlan,
+                adults: 2,
+                children: 1,
+                baseRate: defaultRate,
+                nights: calculatedNights,
+                checkInDate: start
+            });
 
             setRoomsList([
                 {
@@ -351,16 +367,22 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     assignedRooms: [cleanRoom],
                     adults: 2,
                     children: 1,
-                    rate: defaultRate,
+                    rate: defaultCalculatedRate,
                     isAssign: true,
                     checkInDate: start,
                     checkOutDate: end,
                     nights: calculatedNights
                 }
             ]);
-            setPaymentRows([{ id: 1, method: 'Cash', amount: defaultRate * calculatedNights }]);
+            setPaymentRows([]);
         }
     }, [isOpen, editingReservation, initialRoom, initialStartDate, initialEndDate]);
+
+    const holidaySummary = useMemo(() => {
+        const totalA = roomsList.reduce((acc, r) => acc + (r.adults || 1), 0);
+        const totalC = roomsList.reduce((acc, r) => acc + (r.children || 0), 0);
+        return getStayHolidaySummary(checkIn, nights, totalA, totalC);
+    }, [getStayHolidaySummary, checkIn, nights, roomsList]);
 
     // Live Availability Report for selected stay dates
     const liveAvailabilityReport = useMemo(() => {
@@ -385,8 +407,8 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 if (!isCurrentAvailable && liveAvailabilityReport.availableRooms.length > 0) {
                     const freeMatches = liveAvailabilityReport.availableRooms.filter(ar =>
                         !usedInForm.has(ar.number) && (
-                            ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
-                            row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())
+                            String(ar?.roomTypeName || '').toLowerCase().includes(String(row?.roomType || '').toLowerCase()) ||
+                            String(row?.roomType || '').toLowerCase().includes(String(ar?.roomTypeName || '').toLowerCase())
                         )
                     );
                     const fallbackFree = liveAvailabilityReport.availableRooms.filter(ar => !usedInForm.has(ar.number));
@@ -428,29 +450,36 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Total inventory free for this type in the hotel (before any form selection)
     const getTotalInventoryForType = (typeName: string): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return liveAvailabilityReport.allRoomsStatus.filter(st => {
-            const matches = st.room.roomTypeName.toLowerCase().includes(typeName.toLowerCase()) ||
-                            typeName.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
+            const stNameLower = String(st?.room?.roomTypeName || '').toLowerCase();
+            const matches = stNameLower.includes(targetLower) ||
+                            targetLower.includes(stNameLower);
             return matches && st.isAvailable;
         }).length;
     };
 
     // Rooms of this type already allocated across ALL rows in this form
     const getAllocatedCountForType = (typeName: string): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return roomsList
-            .filter(r => (
-                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
-                typeName.toLowerCase().includes(r.roomType.toLowerCase())
-            ))
+            .filter(r => {
+                const rTypeLower = String(r?.roomType || '').toLowerCase();
+                return (
+                    rTypeLower.includes(targetLower) ||
+                    targetLower.includes(rTypeLower)
+                );
+            })
             .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
     };
 
     // Rooms of this type allocated in OTHER rows (excluding currentRowId)
     const getAllocatedCountInOtherRows = (typeName: string, currentRowId?: number): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return roomsList
             .filter(r => r.id !== currentRowId && (
-                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
-                typeName.toLowerCase().includes(r.roomType.toLowerCase())
+                String(r?.roomType || '').toLowerCase().includes(targetLower) ||
+                targetLower.includes(String(r?.roomType || '').toLowerCase())
             ))
             .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
     };
@@ -485,16 +514,24 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         for (const r of roomsList) {
             if (r.id === row.id) break;
             const rCount = Number(r.roomsCount) || 1;
+            const rTypeLower = String(r?.roomType || '').toLowerCase();
             const freeForPrev = liveAvailabilityReport.availableRooms
-                .filter(ar => (ar.roomTypeName.toLowerCase().includes(r.roomType.toLowerCase()) || r.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+                .filter(ar => {
+                    const arTypeLower = String(ar?.roomTypeName || '').toLowerCase();
+                    return (arTypeLower.includes(rTypeLower) || rTypeLower.includes(arTypeLower)) && !takenBefore.has(ar.number);
+                })
                 .slice(0, rCount)
                 .map(ar => ar.number);
             freeForPrev.forEach(rn => takenBefore.add(rn));
         }
 
         const countNeeded = Number(row.roomsCount) || 1;
+        const rowTypeLower = String(row?.roomType || '').toLowerCase();
         const matchingAvailable = liveAvailabilityReport.availableRooms
-            .filter(ar => (ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) || row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+            .filter(ar => {
+                const arTypeLower = String(ar?.roomTypeName || '').toLowerCase();
+                return (arTypeLower.includes(rowTypeLower) || rowTypeLower.includes(arTypeLower)) && !takenBefore.has(ar.number);
+            })
             .slice(0, countNeeded)
             .map(ar => ar.number);
 
@@ -592,10 +629,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     // ==========================================
     const [discountType, setDiscountType] = useState<'Percentage' | 'Fixed'>('Fixed');
     const [discountValue, setDiscountValue] = useState<number>(0);
-    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([
-        { id: 1, method: 'Cash', amount: 3000 }
-    ]);
-    const [keypadTargetIndex, setKeypadTargetIndex] = useState<number>(0);
+    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
 
     // Room Add-On Services (Full Bundle) State
     const [serviceModalConfig, setServiceModalConfig] = useState<{
@@ -696,8 +730,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const totalSpaCharge = roomsList.reduce((acc, r) => acc + getSpaWellnessTotal(r.servicesBundle?.spaWellness), 0);
     const totalTimingCharge = roomsList.reduce((acc, r) => acc + getTimingFlexTotal(r.servicesBundle?.timingFlex), 0);
     const totalCustomCharge = roomsList.reduce((acc, r) => acc + getCustomAddonsTotal(r.servicesBundle?.customAddons, nights), 0);
+    const totalGalaDinnerCharge = holidaySummary.hasGalaDinner ? holidaySummary.totalGalaFee : 0;
 
-    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge;
+    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge + totalGalaDinnerCharge;
     const grossTotal = roomBaseTotal + totalAllAddonsCharges;
 
     const discountedAmount = discountType === 'Percentage'
@@ -1003,43 +1038,32 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         }));
     };
 
-    // Payment Handlers
+    // Payment Handlers (Functional & Atomic to eliminate state loss)
     const handleAddPaymentRow = () => {
-        const nextId = paymentRows.length > 0 ? Math.max(...paymentRows.map(p => p.id)) + 1 : 1;
-        setPaymentRows([...paymentRows, { id: nextId, method: 'Cash', amount: totalDue }]);
+        setPaymentRows(prev => {
+            const nextId = prev.length > 0 ? Math.max(...prev.map(p => p.id)) + 1 : 1;
+            const currentPaid = prev.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const remainingDue = Math.max(0, Number((finalPayable - currentPaid).toFixed(2)));
+            return [...prev, { id: nextId, method: 'Cash', amount: remainingDue }];
+        });
     };
 
     const handleRemovePaymentRow = (id: number) => {
-        if (paymentRows.length === 1) return;
-        setPaymentRows(paymentRows.filter(p => p.id !== id));
+        setPaymentRows(prev => prev.filter(p => p.id !== id));
     };
 
-    const updatePaymentRow = (id: number, field: keyof PaymentRow, value: any) => {
-        setPaymentRows(paymentRows.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
-    // Keypad Handler
-    const handleKeypadPress = (val: string) => {
-        const currentTarget = paymentRows[keypadTargetIndex] || paymentRows[0];
-        if (!currentTarget) return;
-
-        let currentStr = String(currentTarget.amount || '');
-        if (val === 'CLEAR') {
-            updatePaymentRow(currentTarget.id, 'amount', 0);
-        } else if (val === 'BACK') {
-            const trimmed = currentStr.slice(0, -1);
-            updatePaymentRow(currentTarget.id, 'amount', Number(trimmed) || 0);
-        } else if (val === 'FULL') {
-            updatePaymentRow(currentTarget.id, 'amount', finalPayable);
-        } else {
-            if (currentStr === '0') currentStr = '';
-            const newStr = currentStr + val;
-            updatePaymentRow(currentTarget.id, 'amount', Number(newStr));
-        }
+    const updatePaymentRow = (id: number, fieldOrUpdates: keyof PaymentRow | Partial<PaymentRow>, value?: any) => {
+        setPaymentRows(prev => prev.map(p => {
+            if (p.id !== id) return p;
+            if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
+                return { ...p, ...fieldOrUpdates };
+            }
+            return { ...p, [fieldOrUpdates as keyof PaymentRow]: value };
+        }));
     };
 
     // Save Reservation to LocalStorage
-    const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+    const handleFinalizeBooking = async (actionType: 'reserve' | 'checkin' | 'hold') => {
         // Shared Pre-Commit Validation Guard
         const flightCheck = validatePreBookingFlight({
             actionType,
@@ -1113,7 +1137,12 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 return found && String(found.housekeepingStatus).toUpperCase() === 'DIRTY';
             });
             if (dirtyRooms.length > 0) {
-                const proceed = window.confirm(`⚠️ Room ${dirtyRooms.join(', ')} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with check-in?`);
+                const proceed = await confirmModal({
+                    title: 'Check-In to Dirty Room?',
+                    message: `Room ${dirtyRooms.join(', ')} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with instant check-in?`,
+                    confirmText: 'Proceed Check-In',
+                    variant: 'warning'
+                });
                 if (!proceed) return;
             }
         }
@@ -1151,7 +1180,8 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         });
 
         const subRoomsWithNumbers = assignedRoomsExpanded.map((rm, idx) => {
-            const subBookingNum = isGroup ? generateSubBookingNumber(reservationNumber, idx + 1) : `${reservationNumber}-01`;
+            const isSplit = !isGroup && assignedRoomsExpanded.length > 1;
+            const subBookingNum = isGroup ? `${reservationNumber}-${String(idx + 1).padStart(2, '0')}` : (isSplit ? `${reservationNumber}-L${idx + 1}` : reservationNumber);
             const roomRegNo = statusVal === 'in-house' ? generateRegistrationNumber(subBookingNum) : undefined;
             const roomFolioNo = generateFolioNumber(subBookingNum);
             return {
@@ -1175,7 +1205,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             groupCode,
             ownerFolio: editingReservation?.ownerFolio,
             groupOwner: editingReservation?.groupOwner,
-            subBookingNumber: isGroup ? `${reservationNumber}-01` : `${reservationNumber}-01`,
+            subBookingNumber: isGroup ? undefined : reservationNumber,
             isGroup,
             registrationNumber: regNo,
             registeredAt: statusVal === 'in-house' ? new Date().toISOString() : undefined,
@@ -1397,7 +1427,30 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         <input
                                             type="date"
                                             value={checkIn}
-                                            onChange={e => setCheckIn(e.target.value)}
+                                            onChange={e => {
+                                                const newIn = e.target.value;
+                                                setCheckIn(newIn);
+                                                const newOut = getNextDayISO(newIn, nights);
+                                                setCheckOut(newOut);
+                                                // Dynamic Holiday & Peak Tariff Recalculation across all room rows
+                                                setRoomsList(prev => prev.map(r => {
+                                                    const canonicalRoom = getCanonicalRooms().find(cr => cr.number === r.roomNumber);
+                                                    const dynamicTypes = getDynamicRoomTypes();
+                                                    const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                                                    const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                                                    const recalcedRate = calculateRoomRate({
+                                                        roomType: r.roomType,
+                                                        ratePlan: r.ratePlan,
+                                                        packageId: r.packageId,
+                                                        adults: r.adults,
+                                                        children: r.children,
+                                                        baseRate: canonicalRate,
+                                                        nights,
+                                                        checkInDate: newIn
+                                                    });
+                                                    return { ...r, rate: recalcedRate };
+                                                }));
+                                            }}
                                             className="w-full h-9 px-2.5 border border-gray-200 rounded-md text-xs bg-white text-gray-800 outline-none focus:border-blue-500"
                                         />
                                     </div>
@@ -1409,7 +1462,30 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         type="number"
                                         min={1}
                                         value={nights}
-                                        onChange={e => setNights(Math.max(1, Number(e.target.value)))}
+                                        onChange={e => {
+                                            const newNights = Math.max(1, Number(e.target.value));
+                                            setNights(newNights);
+                                            const newOut = getNextDayISO(checkIn, newNights);
+                                            setCheckOut(newOut);
+                                            // Dynamic Holiday & Peak Tariff Recalculation across all room rows
+                                            setRoomsList(prev => prev.map(r => {
+                                                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === r.roomNumber);
+                                                const dynamicTypes = getDynamicRoomTypes();
+                                                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                                                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                                                const recalcedRate = calculateRoomRate({
+                                                    roomType: r.roomType,
+                                                    ratePlan: r.ratePlan,
+                                                    packageId: r.packageId,
+                                                    adults: r.adults,
+                                                    children: r.children,
+                                                    baseRate: canonicalRate,
+                                                    nights: newNights,
+                                                    checkInDate: checkIn
+                                                });
+                                                return { ...r, rate: recalcedRate };
+                                            }));
+                                        }}
                                         className="w-full h-9 px-2.5 border border-gray-200 rounded-md text-xs bg-white text-gray-800 outline-none text-center font-bold"
                                     />
                                 </div>
@@ -1467,6 +1543,37 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Active Holiday & Festive Surge Alert Banner */}
+                            {holidaySummary.hasHoliday && (
+                                <div className={`p-2.5 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 border transition-all ${holidaySummary.hasSurge
+                                    ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-2xs'
+                                    : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-950 shadow-2xs'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base select-none">🎉</span>
+                                        <div>
+                                            <span className="font-bold">{holidaySummary.activeHolidays.join(', ')}</span>
+                                            {holidaySummary.hasSurge && (
+                                                <span className="ml-2 text-[10.5px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded">
+                                                    ⚡ +{Math.round((holidaySummary.maxMultiplier - 1) * 100)}% Peak Surge Active
+                                                </span>
+                                            )}
+                                            {holidaySummary.hasGalaDinner && (
+                                                <span className="ml-2 text-[10.5px] font-bold text-fuchsia-800 bg-fuchsia-100/90 border border-fuchsia-300 px-1.5 py-0.5 rounded">
+                                                    🍽️ Mandatory Gala Dinner Included
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {holidaySummary.isMlosViolated && (
+                                        <span className="text-[11px] font-bold text-rose-800 bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                            <span>⚠️</span>
+                                            <span>Min {holidaySummary.mlosRequiredNights} Nights Stay Policy Required</span>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Options Row */}
                             <div className="flex items-center justify-between pt-1">
@@ -1548,20 +1655,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                     </div>
                                 )}
 
-                                {availableRatePlans.length === 0 && (
-                                    <div className="mx-3.5 my-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
-                                        <div className="flex items-center gap-2">
-                                            <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
-                                            <span>
-                                                <strong>No Active Rate Plans Found:</strong> Please configure Rate Plans in{' '}
-                                                <a href="/rate-plans" className="underline text-blue-700 hover:text-blue-900">
-                                                    Rate Plan Management (/rate-plans)
-                                                </a>{' '}
-                                                first before creating reservations.
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 <div className="overflow-x-auto no-scrollbar">
                                     <table className="w-full text-left border-collapse min-w-[850px]">
@@ -1683,11 +1777,15 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                         className="w-full h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none cursor-pointer font-medium text-gray-800"
                                                                         title="Select Rate Plan or Bundled Stay Package"
                                                                     >
-                                                                        <optgroup label="── 🏷️ Rate Plans ──">
-                                                                            {availableRatePlans.length === 0 ? (
-                                                                                <option value="" disabled>No rate plans configured</option>
-                                                                            ) : (
-                                                                                availableRatePlans.map(p => {
+                                                                        <optgroup label="── 📋 Standard Direct Rate ──">
+                                                                            <option value="direct:Direct Standard Room Rate (Rack Rate)">
+                                                                                🏷️ Direct Standard Room Rate (Rack Rate)
+                                                                            </option>
+                                                                        </optgroup>
+
+                                                                        {availableRatePlans.length > 0 && (
+                                                                            <optgroup label="── 🏷️ Rate Plans ──">
+                                                                                {availableRatePlans.map((p: any) => {
                                                                                     const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
                                                                                     const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
                                                                                     return (
@@ -1695,22 +1793,29 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                                             🏷️ {p.name}{badge}
                                                                                         </option>
                                                                                     );
-                                                                                })
-                                                                            )}
-                                                                        </optgroup>
+                                                                                })}
+                                                                            </optgroup>
+                                                                        )}
 
-                                                                        {availablePackages.filter(p => !p.status || p.status === 'Active').length > 0 && (
+                                                                        {availablePackages.filter(p => {
+                                                                            if (p.status && p.status !== 'Active') return false;
+                                                                            const applicable = p.roomConfig?.applicableRoomTypes;
+                                                                            if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                            return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(row?.roomType || '').toLowerCase());
+                                                                        }).length > 0 && (
                                                                             <optgroup label="── 🎁 Bundled Packages ──">
                                                                                 {availablePackages
-                                                                                    .filter(p => !p.status || p.status === 'Active')
-                                                                                    .map(p => {
+                                                                                    .filter(p => {
+                                                                                        if (p.status && p.status !== 'Active') return false;
                                                                                         const applicable = p.roomConfig?.applicableRoomTypes;
-                                                                                        const isApplicable = !applicable || !Array.isArray(applicable) || applicable.length === 0 || applicable.some((t: string) => t.toLowerCase() === 'all' || t.toLowerCase() === row.roomType.toLowerCase());
-                                                                                        const roomTypeNote = (!isApplicable && applicable && applicable.length > 0) ? ` (${applicable[0]})` : '';
+                                                                                        if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                                        return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(row?.roomType || '').toLowerCase());
+                                                                                    })
+                                                                                    .map(p => {
                                                                                         const surchargeText = p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : '';
                                                                                         return (
                                                                                             <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
-                                                                                                🎁 {p.name}{roomTypeNote}{surchargeText}
+                                                                                                🎁 {p.name}{surchargeText}
                                                                                             </option>
                                                                                         );
                                                                                     })
@@ -2615,336 +2720,98 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     )}
 
                     {/* ========================================================
-                        STEP 3: PAYMENTS (2-COLUMN WITH KEYPAD)
+                        STEP 3: PAYMENTS & SUMMARY
                         ======================================================== */}
                     {step === 3 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-in fade-in duration-150">
-                            {/* Left Column (3 cols) */}
-                            <div className="lg:col-span-3 space-y-6">
-                                {/* Discount Section */}
-                                <div className="space-y-2">
-                                    <h3 className="text-base text-gray-900">Discount</h3>
-                                    <div className="flex items-center gap-3">
-                                        <select
-                                            value={discountType}
-                                            onChange={e => setDiscountType(e.target.value as any)}
-                                            className="w-36 h-9 px-2.5 border border-gray-300 rounded-md text-xs bg-white outline-none font-medium"
-                                        >
-                                            <option value="Percentage">Percentage (%)</option>
-                                            <option value="Fixed">Fixed ({currencySymbol})</option>
-                                        </select>
+                        <div className="flex flex-col gap-2.5 animate-in fade-in duration-150">
+                            {/* 1. Top Live Financial Status Strip */}
+                            <FinancialStatusStrip
+                                finalPayable={finalPayable}
+                                totalPaid={totalPaid}
+                                totalDue={totalDue}
+                                currencySymbol={currencySymbol}
+                            />
 
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={discountValue}
-                                            onChange={e => setDiscountValue(Number(e.target.value))}
-                                            className="w-44 h-9 px-3 border border-gray-300 rounded-md text-xs bg-white text-gray-800 outline-none"
-                                        />
+                            {/* 2. Main 2-Column Console */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+                                {/* Left Column: Payment Methods & Discount */}
+                                <div className="lg:col-span-7 space-y-2">
+                                    <PaymentTenderConsole
+                                        paymentRows={paymentRows}
+                                        totalDue={totalDue}
+                                        finalPayable={finalPayable}
+                                        currencySymbol={currencySymbol}
+                                        onAddRow={handleAddPaymentRow}
+                                        onRemoveRow={handleRemovePaymentRow}
+                                        onUpdateRow={updatePaymentRow}
+                                        onFillDue={(rowId) => {
+                                            const currentTotalPaid = paymentRows.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+                                            const remaining = Math.max(0, finalPayable - currentTotalPaid);
+                                            setPaymentRows(paymentRows.map(p => {
+                                                if (p.id === rowId) {
+                                                    return { ...p, amount: Number(((p.amount || 0) + remaining).toFixed(2)) };
+                                                }
+                                                return p;
+                                            }));
+                                        }}
+                                        onFill50Percent={(rowId) => {
+                                            setPaymentRows(paymentRows.map(p => {
+                                                if (p.id === rowId) {
+                                                    return { ...p, amount: Number((finalPayable * 0.5).toFixed(2)) };
+                                                }
+                                                return p;
+                                            }));
+                                        }}
+                                    />
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setDiscountValue(0)}
-                                            className="p-2 text-gray-400 hover:text-red-600 rounded cursor-pointer"
-                                            title="Clear Discount"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-                                    <p className="text-[11px] text-gray-500">Remarks: Added discount</p>
+                                    <DiscountConsole
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        discountedAmount={discountedAmount}
+                                        currencySymbol={currencySymbol}
+                                        onTypeChange={setDiscountType}
+                                        onValueChange={setDiscountValue}
+                                        onApplyPreset={(pct) => {
+                                            setDiscountType('Percentage');
+                                            setDiscountValue(pct);
+                                        }}
+                                        onClear={() => setDiscountValue(0)}
+                                    />
                                 </div>
 
-                                {/* Payment Method Section */}
-                                <div className="space-y-3">
-                                    <h3 className="text-base text-gray-900">Payment Method</h3>
-
-                                    <div className="space-y-2.5">
-                                        {paymentRows.map((p, idx) => (
-                                            <div
-                                                key={p.id}
-                                                onClick={() => setKeypadTargetIndex(idx)}
-                                                className={`p-3 bg-white border rounded-lg flex items-center gap-3 transition-colors ${
-                                                    keypadTargetIndex === idx ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-gray-200'
-                                                }`}
-                                            >
-                                                <div className="flex-1 flex flex-col gap-1">
-                                                    <label className="text-[10.5px] font-semibold text-gray-600">Method</label>
-                                                    <select
-                                                        value={p.method}
-                                                        onChange={e => updatePaymentRow(p.id, 'method', e.target.value)}
-                                                        className="h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none font-medium"
-                                                    >
-                                                        <option value="Cash">Cash at Desk</option>
-                                                        <option value="Card">Credit / Debit Card</option>
-                                                        <option value="bKash">bKash (MFS)</option>
-                                                        <option value="Nagad">Nagad (MFS)</option>
-                                                        <option value="Bank Transfer">Bank Transfer</option>
-                                                        <option value="Direct Billing">Company Direct Billing</option>
-                                                    </select>
-                                                </div>
-
-                                                <div className="flex-1 flex flex-col gap-1">
-                                                    <label className="text-[10.5px] font-semibold text-gray-600">Amount ({currencySymbol})</label>
-                                                    <input
-                                                        type="number"
-                                                        value={p.amount}
-                                                        onChange={e => updatePaymentRow(p.id, 'amount', Number(e.target.value))}
-                                                        className="h-8 px-2.5 border border-gray-300 rounded text-xs text-emerald-700"
-                                                    />
-                                                </div>
-
-                                                {paymentRows.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemovePaymentRow(p.id)}
-                                                        className="self-end mb-1 p-1 text-gray-400 hover:text-red-600 cursor-pointer"
-                                                        title="Delete Row"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex justify-end pt-1">
-                                        <button
-                                            type="button"
-                                            onClick={handleAddPaymentRow}
-                                            className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-xs font-semibold cursor-pointer shadow-2xs"
-                                        >
-                                            Add New Payment Method
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right Column (2 cols): Summary Box & Numeric Keypad */}
-                            <div className="lg:col-span-2">
-                                <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-2 text-xs">
-                                    <div className="flex justify-between py-1 border-b border-gray-100 text-gray-600">
-                                        <span>Room Base Tariff</span>
-                                        <span className="text-gray-900 font-mono">{currencySymbol} {roomBaseTotal.toFixed(2)}</span>
-                                    </div>
-
-                                    {totalPickupArrivalCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-blue-700">
-                                            <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
-                                            <span className="font-mono">+{currencySymbol} {totalPickupArrivalCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalDropDepartureCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-sky-700">
-                                            <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
-                                            <span className="font-mono">+{currencySymbol} {totalDropDepartureCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalExtraBedCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-indigo-700">
-                                            <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
-                                            <span className="font-mono">+{currencySymbol} {totalExtraBedCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalMealPlanCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-amber-700">
-                                            <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
-                                            <span className="font-mono">+{currencySymbol} {totalMealPlanCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalCelebrationCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-rose-700">
-                                            <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
-                                            <span className="font-mono">+{currencySymbol} {totalCelebrationCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalSpaCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-teal-700">
-                                            <span className="flex items-center gap-1"><Sparkles size={11} /> Spa Treatment</span>
-                                            <span className="font-mono">+{currencySymbol} {totalSpaCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalTimingCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-sky-700">
-                                            <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
-                                            <span className="font-mono">+{currencySymbol} {totalTimingCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    {totalCustomCharge > 0 && (
-                                        <div className="flex justify-between py-1 text-purple-700">
-                                            <span>Custom Services</span>
-                                            <span className="font-mono">+{currencySymbol} {totalCustomCharge.toFixed(2)}</span>
-                                        </div>
-                                    )}
-
-                                    <div className="flex justify-between py-1.5 border-t border-dashed border-gray-200 text-gray-700 font-semibold">
-                                        <span>Total Gross</span>
-                                        <span className="text-gray-900 font-mono">{currencySymbol} {grossTotal.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="flex justify-between py-1 border-b border-dashed border-gray-200 text-gray-600">
-                                        <span>Discounted Amount</span>
-                                        <span className="text-emerald-600 font-mono">-{currencySymbol} {discountedAmount.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="flex justify-between py-1 text-gray-700 text-xs">
-                                        <span>Net Base (Taxable)</span>
-                                        <span className="font-mono text-gray-900 font-semibold">{currencySymbol} {netBaseAmount.toFixed(2)}</span>
-                                    </div>
-
-                                    {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
-                                    {taxCalculation.isTaxApplicable && taxCalculation.breakdown.length > 0 ? (
-                                        <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
-                                            <div className="flex items-center justify-between text-[10px] text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
-                                                <span>{taxCalculation.configCode} Tax Rules</span>
-                                                <span className="text-blue-700 font-mono">+{currencySymbol} {taxCalculation.totalTaxAmount.toFixed(2)}</span>
-                                            </div>
-                                            {taxCalculation.breakdown.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between text-[11px] text-slate-600">
-                                                    <span title={item.formula}>
-                                                        {item.name} ({item.rate}%):
-                                                    </span>
-                                                    <span className="font-mono text-slate-800 font-semibold">
-                                                        +{currencySymbol} {item.amount.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="my-1 py-1 px-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 font-medium flex justify-between">
-                                            <span>Tax Exemption</span>
-                                            <span className="font-mono">{currencySymbol} 0.00 (Exempt)</span>
-                                        </div>
-                                    )}
-
-                                    <div className="flex justify-between py-1.5 bg-blue-50/80 -mx-1 px-2 rounded border border-blue-100 text-gray-900 font-bold">
-                                        <span className="text-blue-900 font-bold">Grand Total (Payable)</span>
-                                        <span className="font-mono text-blue-900 font-extrabold text-sm">{currencySymbol} {finalPayable.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="flex justify-between py-1 border-b border-dashed border-gray-200 text-gray-600">
-                                        <span>Total Paid</span>
-                                        <span className="text-emerald-700 font-mono">{currencySymbol} {totalPaid.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="flex justify-between py-1.5 text-sm text-gray-900 font-bold">
-                                        <span>Total Due</span>
-                                        <span className="text-rose-600 font-mono">{currencySymbol} {totalDue.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="bg-[#f8fafc] -mx-5 px-5 py-3 border-y border-gray-200 flex justify-between items-center text-sm font-bold">
-                                        <span className="text-gray-700">Active Amount</span>
-                                        <span className="text-[#1e3a8a] text-base font-mono">
-                                            {currencySymbol} {(paymentRows[keypadTargetIndex]?.amount || 0).toFixed(2)}
-                                        </span>
-                                    </div>
-
-                                    {/* Numeric Keypad Grid */}
-                                    <div className="pt-2">
-                                        <p className="text-[11px] text-gray-500 mb-2 font-medium">Select an input to start or tap keypad:</p>
-                                        <div className="grid grid-cols-4 gap-1.5">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('1')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                1
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('2')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                2
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('3')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                3
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('CLEAR')}
-                                                className="h-10 bg-red-50 text-red-700 border border-red-200 rounded text-xs hover:bg-red-100 cursor-pointer"
-                                            >
-                                                Clear
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('4')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                4
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('5')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                5
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('6')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                6
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('BACK')}
-                                                className="h-10 bg-gray-100 text-gray-700 border border-gray-200 rounded text-sm hover:bg-gray-200 flex items-center justify-center cursor-pointer"
-                                            >
-                                                <Delete size={18} />
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('7')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                7
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('8')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                8
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('9')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                9
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('0')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                0
-                                            </button>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleKeypadPress('FULL')}
-                                            className="w-full mt-2 h-7 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] cursor-pointer"
-                                        >
-                                            Pay Full Due ({currencySymbol} {totalDue.toFixed(2)})
-                                        </button>
-                                    </div>
+                                {/* Right Column: Settlement Summary Card */}
+                                <div className="lg:col-span-5">
+                                    <SettlementBreakdownCard
+                                        roomBaseTotal={roomBaseTotal}
+                                        nights={nights}
+                                        grossTotal={grossTotal}
+                                        discountedAmount={discountedAmount}
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        netBaseAmount={netBaseAmount}
+                                        taxCalculation={taxCalculation}
+                                        finalPayable={finalPayable}
+                                        totalPaid={totalPaid}
+                                        totalDue={totalDue}
+                                        currencySymbol={currencySymbol}
+                                        addons={{
+                                            pickup: totalPickupArrivalCharge,
+                                            drop: totalDropDepartureCharge,
+                                            extraBed: totalExtraBedCharge,
+                                            mealPlan: totalMealPlanCharge,
+                                            celebration: totalCelebrationCharge,
+                                            spa: totalSpaCharge,
+                                            timing: totalTimingCharge,
+                                            custom: totalCustomCharge,
+                                            galaDinner: totalGalaDinnerCharge,
+                                            totalAll: totalAllAddonsCharges
+                                        }}
+                                        holidaySurge={{
+                                            hasSurge: holidaySummary.hasSurge,
+                                            multiplier: holidaySummary.maxMultiplier,
+                                            holidayName: holidaySummary.activeHolidays[0]
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>

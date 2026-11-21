@@ -1,9 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { pgPool } from '../database/postgres.js';
+import { requireRole } from '../middleware/rbacGuard.js';
 
 const router = Router();
 
-// GET /api/schema/inspect - Complete relational database metadata, foreign keys, row counts & NF audits
+// Strict RBAC: Schema introspection and table diagnostics are restricted strictly to Super Admins
+router.use(requireRole(['super_admin']));
+
+// Tables containing credentials, tokens, or security keys
+const SENSITIVE_TABLES = new Set(['users', 'sessions', 'api_keys', 'credentials', 'tokens', 'passwords']);
+const SENSITIVE_COLUMNS = new Set(['password_hash', 'password', 'token', 'secret', 'access_token', 'refresh_token', 'private_key']);
+
+// GET /api/schema/inspect - Relational database metadata, foreign keys, row counts & NF audits
 router.get('/inspect', async (req: Request, res: Response) => {
     try {
         // Run bulk metadata queries concurrently
@@ -147,21 +155,21 @@ router.get('/inspect', async (req: Request, res: Response) => {
             normalizationAudit
         });
     } catch (e: any) {
-        res.status(500).json({ success: false, error: e?.message || 'Failed to inspect schema' });
+        res.status(500).json({ success: false, error: 'Failed to inspect schema' });
     }
 });
 
-// GET /api/schema/table/:name - Get table schema and first 100 rows
+// GET /api/schema/table/:name - Get table schema and sanitized rows (Dev/Staging Only)
 router.get('/table/:name', async (req: Request, res: Response) => {
     try {
         const rawName = Array.isArray(req.params.name) ? req.params.name[0] : req.params.name;
-        const tableName = String(rawName || '');
+        const tableName = String(rawName || '').trim().toLowerCase();
 
-        // Validate table exists to prevent SQL injection
+        // 1. Validate table exists in public schema
         const tableCheck = await pgPool.query(`
             SELECT table_name 
             FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = $1
+            WHERE table_schema = 'public' AND LOWER(table_name) = $1
         `, [tableName]);
 
         if (tableCheck.rows.length === 0) {
@@ -170,7 +178,7 @@ router.get('/table/:name', async (req: Request, res: Response) => {
 
         const safeTableName = tableName.replace(/"/g, '""');
 
-        const [colsRes, fkRes, rowsRes, countRes] = await Promise.all([
+        const [colsRes, fkRes, countRes] = await Promise.all([
             pgPool.query(`
                 SELECT 
                     ordinal_position as cid,
@@ -180,7 +188,7 @@ router.get('/table/:name', async (req: Request, res: Response) => {
                     column_default as "defaultValue",
                     CASE WHEN column_name = 'id' THEN true ELSE false END as pk
                 FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = $1
+                WHERE table_schema = 'public' AND LOWER(table_name) = $1
                 ORDER BY ordinal_position ASC
             `, [tableName]),
             pgPool.query(`
@@ -200,11 +208,29 @@ router.get('/table/:name', async (req: Request, res: Response) => {
                     AND ccu.table_schema = tc.table_schema
                 JOIN information_schema.referential_constraints AS rc
                     ON rc.constraint_name = tc.constraint_name
-                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND tc.table_name = $1
+                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND LOWER(tc.table_name) = $1
             `, [tableName]),
-            pgPool.query(`SELECT * FROM "${safeTableName}" LIMIT 100`),
             pgPool.query(`SELECT COUNT(*)::int as count FROM "${safeTableName}"`)
         ]);
+
+        // Security Defense: In production or for sensitive tables, never dump raw rows
+        let rows: any[] = [];
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isSensitiveTable = SENSITIVE_TABLES.has(tableName);
+
+        if (!isProduction && !isSensitiveTable) {
+            const rawRowsRes = await pgPool.query(`SELECT * FROM "${safeTableName}" LIMIT 100`);
+            // Mask any sensitive column names if they occur in non-sensitive tables
+            rows = rawRowsRes.rows.map(row => {
+                const sanitized = { ...row };
+                for (const key of Object.keys(sanitized)) {
+                    if (SENSITIVE_COLUMNS.has(key.toLowerCase())) {
+                        sanitized[key] = '[REDACTED]';
+                    }
+                }
+                return sanitized;
+            });
+        }
 
         res.json({
             success: true,
@@ -212,10 +238,11 @@ router.get('/table/:name', async (req: Request, res: Response) => {
             totalRows: Number(countRes.rows[0]?.count) || 0,
             columns: colsRes.rows,
             foreignKeys: fkRes.rows,
-            rows: rowsRes.rows
+            rows,
+            isDataRedacted: isProduction || isSensitiveTable
         });
     } catch (e: any) {
-        res.status(500).json({ success: false, error: e?.message || 'Failed to query table' });
+        res.status(500).json({ success: false, error: 'Failed to query table' });
     }
 });
 

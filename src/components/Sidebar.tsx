@@ -28,6 +28,7 @@ import {
     Printer,
     CalendarDays,
     Percent,
+    Globe,
     Shield,
     Layers,
     Coffee,
@@ -40,7 +41,12 @@ import {
     PanelLeftClose,
     PanelLeft,
     PackageSearch,
-    Receipt
+    Sliders,
+    DownloadCloud,
+    MessageSquare,
+    Store,
+    Dumbbell,
+    ShoppingBag
 } from 'lucide-react';
 
 export interface SubMenuItem {
@@ -79,6 +85,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
     toggleSidebar
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Dynamic Hotel Commercial Departments (Reacts in real-time to Outlet Configuration)
+    const [activeDepartments, setActiveDepartments] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_active_departments');
+            if (saved) return JSON.parse(saved);
+        } catch {
+            // fallback
+        }
+        return ['FOOD_BEVERAGE'];
+    });
+
+    const refreshDepartments = React.useCallback(async () => {
+        try {
+            const res = await fetch('/api/restaurant/outlets/departments/summary');
+            const data = await res.json();
+            if (data.success && data.data && Array.isArray(data.data.activeDepartments)) {
+                setActiveDepartments(data.data.activeDepartments);
+                try {
+                    localStorage.setItem('hotel_active_departments', JSON.stringify(data.data.activeDepartments));
+                } catch {}
+            }
+        } catch {
+            // fallback
+        }
+    }, []);
+
+    useEffect(() => {
+        refreshDepartments();
+        const handleUpdate = () => refreshDepartments();
+        window.addEventListener('hotel_outlets_updated', handleUpdate);
+        return () => window.removeEventListener('hotel_outlets_updated', handleUpdate);
+    }, [refreshDepartments]);
 
     // Accordion state - persisted in localStorage
     const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
@@ -138,6 +177,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (['kitchens', 'counters', 'floor'].includes(activePage)) {
             setOpenDropdowns(prev => ({ ...prev, 'Kitchen & Stations': true }));
         }
+        if (['banquet-venues', 'banquet-pos'].includes(activePage)) {
+            setOpenDropdowns(prev => ({ ...prev, 'BANQUET & EVENTS': true }));
+        }
+        if (['spa-pos', 'spa-services'].includes(activePage)) {
+            setOpenDropdowns(prev => ({ ...prev, 'SPA & WELLNESS': true }));
+        }
+        if (['retail-pos', 'retail-inventory'].includes(activePage)) {
+            setOpenDropdowns(prev => ({ ...prev, 'GIFT SHOP & RETAIL': true }));
+        }
         if ([
             'taxes-vat', 'tax-vat-settings', 'multi-property', 'properties', 'property-create',
             'printer-settings', 'policy-management', 'holiday-management',
@@ -159,11 +207,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title: 'FRONT OFFICE',
             items: [
                 { id: 'stay-view', label: 'Stay View', icon: <CalendarDays size={14} />, badge: 'Live', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'guestflow', label: 'GuestFlow (StayPulse)', icon: <MessageSquare size={14} />, badge: 'Live CX', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { id: 'add-reservation', label: 'New Reservation', icon: <Plus size={14} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { id: 'reservations', label: 'Reservations', icon: <ClipboardList size={14} /> },
                 { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={14} /> },
-                { id: 'folio-operations', label: 'Billing & Folios', icon: <Wallet size={14} />, badge: 'Billing', badgeColor: 'bg-blue-100 text-blue-700' },
-                { id: 'folio-hub', label: 'Folio Operations', icon: <Receipt size={14} />, badge: '16 Ops', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Layers size={14} /> },
                 { id: 'occupancy-heatmap', label: 'Occupancy Matrix', icon: <Grid3X3 size={14} /> },
                 { id: 'night-audit', label: 'Night Audit', icon: <Moon size={14} /> },
@@ -177,6 +224,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 { id: 'package-builder', label: 'Packages & Offers', icon: <Ticket size={14} /> },
                 { id: 'meal-plans', label: 'Meal Plans', icon: <Coffee size={14} /> },
                 { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={14} /> },
+            ]
+        },
+        {
+            title: 'CHANNEL MANAGER (OTA)',
+            items: [
+                { id: 'channel-manager', label: 'Connected Channels', icon: <Globe size={14} />, badge: '6 Live', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'channel-manager-ari', label: 'Rates & Inventory Grid', icon: <Calendar size={14} /> },
+                { id: 'channel-manager-wizard', label: 'Distribution Wizard', icon: <Sliders size={14} />, badge: 'Bulk', badgeColor: 'bg-amber-100 text-amber-700' },
+                { id: 'channel-manager-mappings', label: 'Channel Mappings', icon: <Layers size={14} /> },
+                { id: 'channel-manager-bookings', label: 'Inbound OTA Bookings', icon: <DownloadCloud size={14} /> },
+                { id: 'channel-manager-logs', label: 'Sync & Audit Logs', icon: <Clock size={14} /> },
             ]
         },
         {
@@ -199,10 +257,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
             title: 'RESTAURANT & F&B',
             items: [
+                { id: 'restaurant-outlets', label: 'Dining Outlets', icon: <Store size={14} />, badge: 'Admin', badgeColor: 'bg-purple-100 text-purple-700' },
                 { id: 'pos', label: 'Restaurant POS', icon: <Utensils size={14} />, badge: 'POS', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'kds', label: 'Kitchen Display (KDS)', icon: <ChefHat size={14} />, badge: 'Live', badgeColor: 'bg-amber-100 text-amber-700' },
-                { id: 'table-layout', label: 'Table Layout', icon: <Grid3X3 size={14} /> },
-                { id: 'waiters', label: 'Waiters & Staff', icon: <Users size={14} /> },
+                { id: 'table-layout', label: 'Tables & 2D Floor Plan', icon: <Grid3X3 size={14} /> },
                 {
                     label: 'Menu Management',
                     icon: <UtensilsCrossed size={14} />,
@@ -224,6 +282,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
             ]
         },
+        ...(activeDepartments.includes('BANQUET_EVENTS') ? [{
+            title: 'BANQUET & EVENTS',
+            items: [
+                { id: 'banquet-venues', label: 'Venues & Halls', icon: <Building2 size={14} />, badge: 'Venues', badgeColor: 'bg-purple-100 text-purple-700' },
+                { id: 'banquet-pos', label: 'Banquet POS & Billing', icon: <Calendar size={14} />, badge: 'BEO', badgeColor: 'bg-blue-100 text-blue-700' },
+            ]
+        }] : []),
+        ...(activeDepartments.includes('SPA_WELLNESS') ? [{
+            title: 'SPA & WELLNESS',
+            items: [
+                { id: 'spa-pos', label: 'Spa POS & Billing', icon: <Sparkles size={14} />, badge: 'POS', badgeColor: 'bg-pink-100 text-pink-700' },
+                { id: 'spa-services', label: 'Treatments & Services', icon: <Layers size={14} /> },
+            ]
+        }] : []),
+        ...(activeDepartments.includes('RETAIL_SHOP') || activeDepartments.includes('FRONT_OFFICE') ? [{
+            title: 'GIFT SHOP & RETAIL',
+            items: [
+                { id: 'retail-pos', label: 'Retail & Mini POS', icon: <ShoppingBag size={14} />, badge: 'Barcode', badgeColor: 'bg-amber-100 text-amber-700' },
+                { id: 'retail-inventory', label: 'Store Goods & Inventory', icon: <PackageSearch size={14} /> },
+            ]
+        }] : []),
+        ...(activeDepartments.includes('FITNESS_RECREATION') ? [{
+            title: 'FITNESS & RECREATION',
+            items: [
+                { id: 'fitness-pos', label: 'Gym & Pool Access POS', icon: <Dumbbell size={14} />, badge: 'Pass', badgeColor: 'bg-cyan-100 text-cyan-700' },
+            ]
+        }] : []),
         {
             title: 'FINANCE & ACCOUNTING',
             items: [
@@ -269,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
             ]
         }
-    ], []);
+    ], [activeDepartments]);
 
     // Auto-expand section if activePage belongs to it
     useEffect(() => {

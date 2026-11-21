@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import {
     Plus,
     Edit2,
@@ -54,11 +55,49 @@ export const ExtraChargesManagement: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state from localStorage
+    // Hydrate state from backend API with localStorage fallback
     const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>(() => {
         const saved = localStorage.getItem('master_charges_v2');
         return saved ? JSON.parse(saved) : INITIAL_EXTRA_CHARGES;
     });
+
+    const fetchChargesFromApi = useCallback(async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/extra-charges`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                const mapped: ExtraCharge[] = json.data.map((c: any) => ({
+                    id: Number(c.id),
+                    code: c.code,
+                    name: c.name,
+                    category: 'Housekeeping',
+                    pricingRule: c.charge_type === 'flat' ? 'Flat Amount' : 'Percentage of Room Tariff',
+                    basePrice: Number(c.amount),
+                    taxApplicable: Boolean(c.taxable),
+                    serviceChargeApplicable: true,
+                    revenueLedgerCode: 'GL-4050 - Extra Surcharges',
+                    autoPostTrigger: 'On Demand / Manual',
+                    active: Boolean(c.is_active)
+                }));
+                setExtraCharges(mapped);
+                localStorage.setItem('master_charges_v2', JSON.stringify(mapped));
+            }
+        } catch (e) {
+            console.warn('API fetch extra charges fallback:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchChargesFromApi();
+
+        const handleSync = (e: any) => {
+            if (e.detail?.entity === 'extra-charges' || e.detail?.type === 'MASTER_DATA_UPDATED') {
+                fetchChargesFromApi();
+            }
+        };
+        window.addEventListener('pms_network_sync', handleSync);
+        return () => window.removeEventListener('pms_network_sync', handleSync);
+    }, [fetchChargesFromApi]);
 
     useEffect(() => {
         localStorage.setItem('master_charges_v2', JSON.stringify(extraCharges));
@@ -114,29 +153,54 @@ export const ExtraChargesManagement: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.code || !formData.name) return;
+
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/extra-charges`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editingCharge ? editingCharge.id : undefined,
+                    code: formData.code,
+                    name: formData.name,
+                    chargeType: formData.pricingRule.includes('Flat') ? 'flat' : 'percentage',
+                    amount: formData.basePrice,
+                    taxable: formData.taxApplicable,
+                    isActive: formData.active
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`Extra Charge "${formData.name}" saved to PostgreSQL.`);
+                fetchChargesFromApi();
+            }
+        } catch {
+            showToast('Saved locally.');
+        }
 
         if (editingCharge) {
             setExtraCharges(prev =>
                 prev.map(c => c.id === editingCharge.id ? { ...c, ...formData } : c)
             );
-            showToast(`Extra Charge "${formData.name}" updated successfully.`);
         } else {
             const newCharge: ExtraCharge = {
                 id: Date.now(),
                 ...formData
             };
             setExtraCharges(prev => [...prev, newCharge]);
-            showToast(`Extra Charge "${newCharge.name}" added successfully.`);
         }
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         const item = extraCharges.find(c => c.id === id);
         if (window.confirm(`Are you sure you want to delete "${item?.name}"?`)) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/master-data/extra-charges/${id}`, { method: 'DELETE' });
+                fetchChargesFromApi();
+            } catch {}
             setExtraCharges(prev => prev.filter(c => c.id !== id));
             showToast('Extra Charge removed.');
         }

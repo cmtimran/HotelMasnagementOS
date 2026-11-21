@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest, ApiResponse } from '../types/index.js';
 import { bookingService } from '../services/booking.service.js';
 import { broadcastServerEvent } from '../routes/realtime.routes.js';
+import { NotificationService } from '../services/notification.service.js';
 
 const getReqPropertyId = (req: AuthenticatedRequest): string | number => {
   const raw = req.query.propertyId || req.headers['x-property-id'] || req.body?.propertyId || req.propertyId;
@@ -9,6 +10,68 @@ const getReqPropertyId = (req: AuthenticatedRequest): string | number => {
 };
 
 export const bookingController = {
+  getCommunications: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const data = await NotificationService.getCommunicationsForReservation(id);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  /**
+   * Dispatches official Booking Confirmation (WhatsApp, Email, SMS) on demand
+   */
+  sendConfirmation: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const booking = await bookingService.getBookingById(id, propertyId);
+      if (!booking) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      const reqChannels = req.body?.channels || {};
+      const targetPhone = req.body?.phone || booking.phone;
+      const targetEmail = req.body?.email || booking.email;
+
+      const channels = {
+        whatsapp: reqChannels.whatsapp !== undefined ? Boolean(reqChannels.whatsapp) : Boolean(targetPhone),
+        email: reqChannels.email !== undefined ? Boolean(reqChannels.email) : Boolean(targetEmail && !targetEmail.includes('guest.com')),
+        sms: reqChannels.sms !== undefined ? Boolean(reqChannels.sms) : false
+      };
+
+      const result = await NotificationService.dispatchBookingConfirmationNotification({
+        propertyId: propertyId || booking.propertyId || 1,
+        reservationId: booking.id,
+        reservationNumber: booking.reservationNumber,
+        guestName: booking.guestName,
+        guestEmail: targetEmail,
+        guestPhone: targetPhone,
+        roomNumber: booking.roomNumber,
+        roomTypeName: booking.roomType,
+        checkInDate: booking.checkIn,
+        checkOutDate: booking.checkOut,
+        nights: booking.nights,
+        adults: booking.adults,
+        children: booking.children,
+        totalAmount: booking.totalAmount,
+        paidAmount: booking.paidAmount,
+        dueAmount: booking.dueAmount,
+        currency: req.body?.currency || '৳',
+        specialRequests: booking.specialRequests,
+        channels
+      });
+
+      res.json({ success: true, message: 'Confirmation dispatched successfully', data: result });
+    } catch (error: any) {
+      console.error('[BookingController] sendConfirmation error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
   getAllBookings: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const propertyId = getReqPropertyId(req);
@@ -67,7 +130,53 @@ export const bookingController = {
         console.warn('Failed to broadcast reservation commit', err);
       }
 
-      res.status(201).json({ success: true, data: newBooking, message: 'Reservation created successfully' });
+      // Auto-dispatch booking confirmation across WhatsApp/Email if guest details provided
+      let notifResult = null;
+      const sendConf = req.body.sendConfirmation !== false;
+      const guestPhone = req.body.mobile || req.body.phone || newBooking.phone;
+      const guestEmail = req.body.email || newBooking.email;
+
+      if (sendConf && (guestPhone || guestEmail)) {
+        try {
+          const cfg = req.body.notificationConfig || {};
+          const channels = {
+            whatsapp: cfg.whatsapp !== undefined ? Boolean(cfg.whatsapp) : Boolean(guestPhone),
+            email: cfg.email !== undefined ? Boolean(cfg.email) : Boolean(guestEmail && !guestEmail.includes('guest.com')),
+            sms: cfg.sms !== undefined ? Boolean(cfg.sms) : false
+          };
+
+          notifResult = await NotificationService.dispatchBookingConfirmationNotification({
+            propertyId: propertyId || newBooking.propertyId || 1,
+            reservationId: newBooking.id,
+            reservationNumber: newBooking.reservationNumber,
+            guestName: newBooking.guestName,
+            guestEmail: guestEmail,
+            guestPhone: guestPhone,
+            roomNumber: newBooking.roomNumber,
+            roomTypeName: newBooking.roomType,
+            checkInDate: newBooking.checkIn,
+            checkOutDate: newBooking.checkOut,
+            nights: newBooking.nights,
+            adults: newBooking.adults,
+            children: newBooking.children,
+            totalAmount: newBooking.totalAmount,
+            paidAmount: newBooking.paidAmount,
+            dueAmount: newBooking.dueAmount,
+            currency: req.body.currency || '৳',
+            specialRequests: newBooking.specialRequests,
+            channels
+          });
+        } catch (notifErr) {
+          console.warn('[BookingController] Auto-dispatch confirmation failed:', notifErr);
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        data: newBooking,
+        notification: notifResult,
+        message: 'Reservation created successfully'
+      });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -80,7 +189,13 @@ export const bookingController = {
       const updated = await bookingService.updateBookingStatus(
         id,
         propertyId,
-        req.body.status
+        req.body.status,
+        {
+          skipRoomReadinessCheck: Boolean(req.body.skipRoomReadinessCheck || req.body.forceCheckin),
+          managerOverride: Boolean(req.body.managerOverride || req.body.manager_override),
+          allowDirectBillToCompany: Boolean(req.body.allowDirectBillToCompany || req.body.bill_to_company),
+          closedBy: req.body.closedBy || (req as any).user?.name || 'Front Desk'
+        }
       );
       if (!updated) {
         res.status(404).json({ success: false, error: 'Booking not found' });
@@ -149,6 +264,36 @@ export const bookingController = {
         return;
       }
 
+      let notifResult = null;
+      if (req.body?.notificationConfig && !req.body.notificationConfig.isSilent) {
+        try {
+          const cfg = req.body.notificationConfig;
+          notifResult = await NotificationService.dispatchStayAmendmentNotification({
+            propertyId,
+            reservationId: updated.id,
+            reservationNumber: updated.reservationNumber,
+            guestName: updated.guestName,
+            guestEmail: cfg.guestEmail || updated.email || (updated as any).guestEmail,
+            guestPhone: cfg.guestPhone || updated.phone || (updated as any).guestPhone,
+            roomNumber: updated.roomNumber,
+            roomTypeName: updated.roomType,
+            arrivalDate: updated.checkIn,
+            newDepartureDate: updated.checkOut,
+            nights: updated.nights,
+            totalAmount: updated.totalAmount,
+            dueAmount: updated.dueAmount,
+            reason: cfg.reason,
+            channels: {
+              email: Boolean(cfg.sendEmail),
+              sms: Boolean(cfg.sendSms),
+              whatsapp: Boolean(cfg.sendWhatsApp)
+            }
+          });
+        } catch (notifErr: any) {
+          console.warn('[BookingController] Failed to dispatch amendment notification:', notifErr.message);
+        }
+      }
+
       try {
         broadcastServerEvent({
           type: 'RESERVATION_COMMITTED',
@@ -163,7 +308,12 @@ export const bookingController = {
         console.warn('Failed to broadcast amend stay', err);
       }
 
-      res.json({ success: true, data: updated, message: 'Stay amended successfully' });
+      res.json({
+        success: true,
+        data: updated,
+        notificationResult: notifResult,
+        message: 'Stay amended successfully'
+      });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -177,6 +327,38 @@ export const bookingController = {
       if (!updated) {
         res.status(404).json({ success: false, error: 'Booking not found' });
         return;
+      }
+
+      let notifResult = null;
+      if (req.body?.notificationConfig && !req.body.notificationConfig.isSilent) {
+        try {
+          const cfg = req.body.notificationConfig;
+          notifResult = await NotificationService.dispatchRoomMoveNotification({
+            propertyId,
+            reservationId: updated.id,
+            reservationNumber: updated.reservationNumber,
+            guestName: updated.guestName,
+            guestEmail: cfg.guestEmail || updated.email || (updated as any).guestEmail,
+            guestPhone: cfg.guestPhone || updated.phone || (updated as any).guestPhone,
+            oldRoomNumber: req.body.oldRoomNumber || cfg.oldRoomNumber,
+            newRoomNumber: req.body.newRoomNumber,
+            oldRoomTypeName: cfg.oldRoomTypeName || updated.roomType,
+            newRoomTypeName: cfg.newRoomTypeName,
+            isUpgrade: cfg.isUpgrade,
+            upgradeBillingMode: cfg.upgradeBillingMode,
+            fromDate: req.body.newFromDate || updated.checkIn,
+            toDate: req.body.newToDate || updated.checkOut,
+            reason: cfg.reason,
+            segments: req.body.segments || cfg.segments,
+            channels: {
+              email: Boolean(cfg.sendEmail),
+              sms: Boolean(cfg.sendSms),
+              whatsapp: Boolean(cfg.sendWhatsApp)
+            }
+          });
+        } catch (notifErr: any) {
+          console.warn('[BookingController] Failed to dispatch room move notification:', notifErr.message);
+        }
       }
 
       try {
@@ -201,7 +383,12 @@ export const bookingController = {
         console.warn('Failed to broadcast room move', err);
       }
 
-      res.json({ success: true, data: updated, message: 'Room move executed successfully' });
+      res.json({
+        success: true,
+        data: updated,
+        notificationResult: notifResult,
+        message: 'Room move executed successfully'
+      });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }

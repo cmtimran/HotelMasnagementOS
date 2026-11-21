@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import type { FolioData, RevenueHead } from '../folioTypes';
@@ -89,16 +90,16 @@ export const ApplyDiscountModal: React.FC<ApplyDiscountModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/20 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
             {/* Slide-out Drawer Panel (Right Side) */}
-            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs">
                 {/* Header matching Screenshot 523da607.png */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <h3 className="text-xs font-bold tracking-wide">Apply Discount</h3>
@@ -236,6 +237,7 @@ export const ApplyDiscountModal: React.FC<ApplyDiscountModalProps> = ({
                     </div>
                 </form>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

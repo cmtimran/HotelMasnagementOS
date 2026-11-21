@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import { broadcastServerEvent } from './realtime.routes.js';
+import { extractIdDataLocally, checkOllamaKycStatus } from '../services/aiKyc.service.js';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ export function isSamePhoneNumber(rawA: string | null | undefined, rawB: string 
 // GET /api/guests - List all guest profiles with aggregated stay stats
 router.get('/', async (req: Request, res: Response) => {
     try {
-        const rows = await db.prepare(`
+        const rowsRes = await pgPool.query(`
             SELECT 
                 g.*,
                 (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_stays,
@@ -67,7 +68,8 @@ router.get('/', async (req: Request, res: Response) => {
                 (SELECT MAX(rr.check_in_date) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_stay_date
             FROM guests g
             ORDER BY g.id DESC
-        `).all() as any[];
+        `);
+        const rows = rowsRes.rows as any[];
 
         res.json({
             success: true,
@@ -126,7 +128,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id/history', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const rows = await db.prepare(`
+        const rowsRes = await pgPool.query(`
             SELECT 
                 r.id as reservation_id,
                 r.reservation_number,
@@ -159,9 +161,10 @@ router.get('/:id/history', async (req: Request, res: Response) => {
                 FROM folios
                 ORDER BY reservation_id, id ASC
             ) f ON f.reservation_id = r.id
-            WHERE r.booker_guest_id = ? OR rr.guest_id = ?
+            WHERE r.booker_guest_id = $1 OR rr.guest_id = $2
             ORDER BY r.id DESC, rr.id ASC
-        `).all(id, id) as any[];
+        `, [id, id]);
+        const rows = rowsRes.rows as any[];
 
         res.json({
             success: true,
@@ -175,13 +178,14 @@ router.get('/:id/history', async (req: Request, res: Response) => {
 // GET /api/guests/duplicates - Detect duplicate guest clusters based on phone, email, or ID number
 router.get('/duplicates', async (req: Request, res: Response) => {
     try {
-        const rows = await db.prepare(`
+        const rowsRes = await pgPool.query(`
             SELECT id, salutation, first_name, last_name, email, phone, id_type, id_number, vip_status,
                 (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = guests.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_stays,
                 (SELECT COALESCE(SUM(r.total_amount), 0) FROM reservations r WHERE r.booker_guest_id = guests.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_spend
             FROM guests
             ORDER BY id ASC
-        `).all() as any[];
+        `);
+        const rows = rowsRes.rows as any[];
 
         const emailMap = new Map<string, any[]>();
         const idMap = new Map<string, any[]>();
@@ -321,7 +325,8 @@ router.post('/', async (req: Request, res: Response) => {
         const cleanEmail = email.toLowerCase();
 
         // Check for duplicates
-        const allGuests = await db.prepare('SELECT id, first_name, last_name, phone, email, id_number FROM guests').all() as any[];
+        const allGuestsRes = await pgPool.query('SELECT id, first_name, last_name, phone, email, id_number FROM guests');
+        const allGuests = allGuestsRes.rows as any[];
         const conflict = allGuests.find(g => {
             const pMatch = isSamePhoneNumber(phone, g.phone);
             const eMatch = cleanEmail && g.email && g.email.trim().toLowerCase() === cleanEmail;
@@ -343,14 +348,15 @@ router.post('/', async (req: Request, res: Response) => {
             });
         }
 
-        const result = await db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO guests (
                 organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number,
                 vip_status, address, city, country, dob, gender, id_issue_date, id_expiry_date, id_issue_country,
                 id_issue_place, passport_visa_number, passport_visa_type, passport_visa_expiry, passport_entry_port,
                 driving_vehicle_class, identity_metadata, tags
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+            RETURNING id
+        `, [
             organizationId,
             salutation,
             firstName,
@@ -377,24 +383,25 @@ router.post('/', async (req: Request, res: Response) => {
             body.drivingVehicleClass || body.driving_vehicle_class || null,
             JSON.stringify(body.identityMetadata || body.identity_metadata || {}),
             body.tags || []
-        );
+        ]);
 
-        const newId = Number(result.lastInsertRowid);
-        const created = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newId);
+        const newId = Number(result.rows[0]?.id);
+        const createdRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [newId]);
+        const created = createdRes.rows[0];
 
         // Record initial profile creation in audit trail
         const actor = body.changedBy || body.staffName || 'System / Front Desk';
-        await db.prepare(`
+        await pgPool.query(`
             INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
-            VALUES (?, ?, ?, ?)
-        `).run(
+            VALUES ($1, $2, $3, $4)
+        `, [
             newId,
             actor,
             'Initial Guest Profile Created',
             JSON.stringify([
                 { field: 'profile', fieldLabel: 'Profile Created', oldValue: null, newValue: `${salutation} ${firstName} ${lastName}` }
             ])
-        );
+        ]);
 
         broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: newId });
 
@@ -413,7 +420,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const body = req.body || {};
-        const current = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id) as any;
+        const currentRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [id]);
+        const current = currentRes.rows[0] as any;
         if (!current) {
             return res.status(404).json({ success: false, error: 'Guest not found' });
         }
@@ -428,7 +436,8 @@ router.put('/:id', async (req: Request, res: Response) => {
 
         // Conflict check against other guests
         if (phone || cleanEmail || idNumber) {
-            const others = await db.prepare('SELECT id, first_name, last_name, phone, email, id_number FROM guests WHERE id != ?').all(id) as any[];
+            const othersRes = await pgPool.query('SELECT id, first_name, last_name, phone, email, id_number FROM guests WHERE id != $1', [id]);
+            const others = othersRes.rows as any[];
             const conflict = others.find(g => {
                 const pMatch = phone && isSamePhoneNumber(phone, g.phone);
                 const eMatch = cleanEmail && g.email && g.email.trim().toLowerCase() === cleanEmail;
@@ -478,36 +487,36 @@ router.put('/:id', async (req: Request, res: Response) => {
         checkDiff('id_expiry_date', 'ID Expiry Date', current.id_expiry_date, body.idExpiryDate || body.id_expiry_date);
         checkDiff('driving_vehicle_class', 'Driving Vehicle Class', current.driving_vehicle_class, body.drivingVehicleClass || body.driving_vehicle_class);
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE guests
-            SET salutation = COALESCE(?, salutation),
-                first_name = COALESCE(?, first_name),
-                last_name = COALESCE(?, last_name),
-                email = COALESCE(?, email),
-                phone = COALESCE(?, phone),
-                nationality = COALESCE(?, nationality),
-                id_type = COALESCE(?, id_type),
-                id_number = COALESCE(?, id_number),
-                vip_status = COALESCE(?, vip_status),
-                address = COALESCE(?, address),
-                city = COALESCE(?, city),
-                country = COALESCE(?, country),
-                dob = COALESCE(?, dob),
-                gender = COALESCE(?, gender),
-                id_issue_date = COALESCE(?, id_issue_date),
-                id_expiry_date = COALESCE(?, id_expiry_date),
-                id_issue_country = COALESCE(?, id_issue_country),
-                id_issue_place = COALESCE(?, id_issue_place),
-                passport_visa_number = COALESCE(?, passport_visa_number),
-                passport_visa_type = COALESCE(?, passport_visa_type),
-                passport_visa_expiry = COALESCE(?, passport_visa_expiry),
-                passport_entry_port = COALESCE(?, passport_entry_port),
-                driving_vehicle_class = COALESCE(?, driving_vehicle_class),
-                identity_metadata = COALESCE(?, identity_metadata),
-                tags = COALESCE(?, tags),
+            SET salutation = COALESCE($1, salutation),
+                first_name = COALESCE($2, first_name),
+                last_name = COALESCE($3, last_name),
+                email = COALESCE($4, email),
+                phone = COALESCE($5, phone),
+                nationality = COALESCE($6, nationality),
+                id_type = COALESCE($7, id_type),
+                id_number = COALESCE($8, id_number),
+                vip_status = COALESCE($9, vip_status),
+                address = COALESCE($10, address),
+                city = COALESCE($11, city),
+                country = COALESCE($12, country),
+                dob = COALESCE($13, dob),
+                gender = COALESCE($14, gender),
+                id_issue_date = COALESCE($15, id_issue_date),
+                id_expiry_date = COALESCE($16, id_expiry_date),
+                id_issue_country = COALESCE($17, id_issue_country),
+                id_issue_place = COALESCE($18, id_issue_place),
+                passport_visa_number = COALESCE($19, passport_visa_number),
+                passport_visa_type = COALESCE($20, passport_visa_type),
+                passport_visa_expiry = COALESCE($21, passport_visa_expiry),
+                passport_entry_port = COALESCE($22, passport_entry_port),
+                driving_vehicle_class = COALESCE($23, driving_vehicle_class),
+                identity_metadata = COALESCE($24, identity_metadata),
+                tags = COALESCE($25, tags),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $26
+        `, [
             body.salutation || null,
             firstName || null,
             lastName || null,
@@ -534,18 +543,19 @@ router.put('/:id', async (req: Request, res: Response) => {
             body.identityMetadata ? JSON.stringify(body.identityMetadata) : null,
             body.tags ? body.tags : null,
             id
-        );
+        ]);
 
         if (diffs.length > 0) {
             const actor = body.changedBy || body.staffName || 'Front Desk Staff';
             const summary = `Updated ${diffs.map(d => d.fieldLabel).join(', ')}`;
-            await db.prepare(`
+            await pgPool.query(`
                 INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
-                VALUES (?, ?, ?, ?)
-            `).run(id, actor, summary, JSON.stringify(diffs));
+                VALUES ($1, $2, $3, $4)
+            `, [id, actor, summary, JSON.stringify(diffs)]);
         }
 
-        const updated = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id);
+        const updatedRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [id]);
+        const updated = updatedRes.rows[0];
         broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: id });
 
         res.json({
@@ -564,28 +574,29 @@ router.post('/:id/blacklist', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const { isBlacklisted, reason, category, staffName } = req.body;
-        const current = await db.prepare('SELECT is_blacklisted, blacklist_reason, blacklisted_by FROM guests WHERE id = ?').get(id) as any;
+        const currentRes = await pgPool.query('SELECT is_blacklisted, blacklist_reason, blacklisted_by FROM guests WHERE id = $1', [id]);
+        const current = currentRes.rows[0] as any;
         if (!current) return res.status(404).json({ success: false, error: 'Guest not found' });
 
         const actor = staffName || 'Security / Duty Manager';
         const flag = Boolean(isBlacklisted);
         const fullReason = flag ? (category ? `[${category}] ${reason || 'Flagged by Management'}` : (reason || 'Flagged by Management')) : null;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE guests
-            SET is_blacklisted = ?,
-                blacklist_reason = ?,
-                blacklisted_by = ?,
-                blacklisted_at = CASE WHEN ? = TRUE THEN CURRENT_TIMESTAMP ELSE NULL END,
+            SET is_blacklisted = $1,
+                blacklist_reason = $2,
+                blacklisted_by = $3,
+                blacklisted_at = CASE WHEN $4 = TRUE THEN CURRENT_TIMESTAMP ELSE NULL END,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $5
+        `, [
             flag,
             fullReason,
             flag ? actor : null,
             flag,
             id
-        );
+        ]);
 
         // Record in audit log
         const actionText = flag ? 'Guest Blacklisted / Blocked' : 'Guest Unblocked / Restored to Active';
@@ -604,17 +615,18 @@ router.post('/:id/blacklist', async (req: Request, res: Response) => {
             }
         ];
 
-        await db.prepare(`
+        await pgPool.query(`
             INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
-            VALUES (?, ?, ?, ?)
-        `).run(
+            VALUES ($1, $2, $3, $4)
+        `, [
             id,
             actor,
             `${actionText}: ${reason || 'Status updated'}`,
             JSON.stringify(diffs)
-        );
+        ]);
 
-        const updated = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id);
+        const updatedRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [id]);
+        const updated = updatedRes.rows[0];
         broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: id });
 
         res.json({
@@ -631,12 +643,13 @@ router.post('/:id/blacklist', async (req: Request, res: Response) => {
 router.get('/:id/edit-history', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const rows = await db.prepare(`
+        const rowsRes = await pgPool.query(`
             SELECT id, guest_id, changed_by, changed_at, change_summary, changes
             FROM guest_edit_history
-            WHERE guest_id = ?
+            WHERE guest_id = $1
             ORDER BY changed_at DESC
-        `).all(id) as any[];
+        `, [id]);
+        const rows = rowsRes.rows as any[];
 
         res.json({
             success: true,
@@ -663,12 +676,13 @@ router.get('/lookup', async (req: Request, res: Response) => {
         }
 
         const normQ = query.replace(/[\s\-_]/g, '').toLowerCase();
-        const all = await db.prepare(`
+        const allRes = await pgPool.query(`
             SELECT id, salutation, first_name, last_name, email, phone, id_type, id_number,
                    is_blacklisted, blacklist_reason, blacklisted_by, blacklisted_at, vip_status,
                    dob, gender, id_issue_country, passport_visa_number, passport_visa_type
             FROM guests
-        `).all() as any[];
+        `);
+        const all = allRes.rows as any[];
 
         const match = all.find(g => {
             const p = (g.phone || '').replace(/[\s\-_]/g, '');
@@ -725,7 +739,7 @@ router.post('/lookup-by-document', async (req: Request, res: Response) => {
             return res.json({ success: true, matchType: 'NONE', guest: null });
         }
 
-        const all = await db.prepare(`
+        const allRes = await pgPool.query(`
             SELECT 
                 g.*,
                 (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOIDED')) as total_stays,
@@ -733,7 +747,8 @@ router.post('/lookup-by-document', async (req: Request, res: Response) => {
                 (SELECT MAX(rr.check_in_date) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_stay_date,
                 (SELECT rm.room_number FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id JOIN rooms rm ON rm.id = rr.room_id WHERE r.booker_guest_id = g.id ORDER BY rr.check_in_date DESC LIMIT 1) as last_room_number
             FROM guests g
-        `).all() as any[];
+        `);
+        const all = allRes.rows as any[];
 
         let match: any = null;
         let matchType: 'EXACT_ID' | 'PHONE' | 'DEMOGRAPHICS' | 'NONE' = 'NONE';
@@ -813,6 +828,36 @@ router.post('/lookup-by-document', async (req: Request, res: Response) => {
     }
 });
 
+// GET /api/guests/ai-kyc/status - Check Local Ollama Vision Daemon & Custom Model Health
+router.get('/ai-kyc/status', async (_req: Request, res: Response) => {
+    try {
+        const status = await checkOllamaKycStatus();
+        res.json({ success: true, status });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to check AI KYC status' });
+    }
+});
+
+// POST /api/guests/ai-vision-extract - Server-Side Deep AI Vision Document Parser (Local Ollama + Fallback)
+router.post('/ai-vision-extract', async (req: Request, res: Response) => {
+    try {
+        const { rawText, imageBase64 } = req.body || {};
+        const text = String(rawText || '').trim();
+
+        if (!text && !imageBase64) {
+            return res.status(400).json({ success: false, error: 'No text or image payload provided' });
+        }
+
+        const doc = await extractIdDataLocally(imageBase64 || '', text);
+        res.json({
+            success: true,
+            document: doc
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'AI Vision extraction failed' });
+    }
+});
+
 // POST /api/guests/scan-auto-create-or-update - Seamless Auto-Create or Update from Scanner
 router.post('/scan-auto-create-or-update', async (req: Request, res: Response) => {
     try {
@@ -827,18 +872,20 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
 
             let resRecord: any = null;
             // 1. Check by reservation_number (e.g. 'RES-681508')
-            resRecord = await db.prepare('SELECT id FROM reservations WHERE reservation_number = ?').get(String(resIdent));
+            const r1 = await pgPool.query('SELECT id FROM reservations WHERE reservation_number = $1', [String(resIdent)]);
+            resRecord = r1.rows[0];
 
             // 2. Fallback check by numeric id if not found by number
             if (!resRecord && !isNaN(Number(resIdent))) {
-                resRecord = await db.prepare('SELECT id FROM reservations WHERE id = ?').get(Number(resIdent));
+                const r2 = await pgPool.query('SELECT id FROM reservations WHERE id = $1', [Number(resIdent)]);
+                resRecord = r2.rows[0];
             }
 
             if (resRecord && resRecord.id) {
                 // Update booker on reservations table (schema column: booker_guest_id)
-                await db.prepare('UPDATE reservations SET booker_guest_id = ? WHERE id = ?').run(guestId, resRecord.id);
+                await pgPool.query('UPDATE reservations SET booker_guest_id = $1 WHERE id = $2', [guestId, resRecord.id]);
                 // Update guest on reservation_rooms table (schema columns: guest_id, reservation_id)
-                await db.prepare('UPDATE reservation_rooms SET guest_id = ? WHERE reservation_id = ?').run(guestId, resRecord.id);
+                await pgPool.query('UPDATE reservation_rooms SET guest_id = $1 WHERE reservation_id = $2', [guestId, resRecord.id]);
             }
         };
 
@@ -846,19 +893,19 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
             const guestId = Number(body.guestId);
             const updates = body.documentData || {};
 
-            await db.prepare(`
+            await pgPool.query(`
                 UPDATE guests
-                SET id_number = COALESCE(?, id_number),
-                    id_type = COALESCE(?, id_type),
-                    id_expiry_date = COALESCE(?, id_expiry_date),
-                    id_issue_country = COALESCE(?, id_issue_country),
-                    passport_visa_number = COALESCE(?, passport_visa_number),
-                    nationality = COALESCE(?, nationality),
-                    dob = COALESCE(?, dob),
-                    gender = COALESCE(?, gender),
+                SET id_number = COALESCE($1, id_number),
+                    id_type = COALESCE($2, id_type),
+                    id_expiry_date = COALESCE($3, id_expiry_date),
+                    id_issue_country = COALESCE($4, id_issue_country),
+                    passport_visa_number = COALESCE($5, passport_visa_number),
+                    nationality = COALESCE($6, nationality),
+                    dob = COALESCE($7, dob),
+                    gender = COALESCE($8, gender),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `).run(
+                WHERE id = $9
+            `, [
                 updates.idNumber || null,
                 updates.idType || null,
                 updates.idExpiryDate || null,
@@ -868,23 +915,24 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
                 updates.dob || null,
                 updates.gender || null,
                 guestId
-            );
+            ]);
 
             // Audit history
-            await db.prepare(`
+            await pgPool.query(`
                 INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
-                VALUES (?, ?, ?, ?)
-            `).run(
+                VALUES ($1, $2, $3, $4)
+            `, [
                 guestId,
                 actor,
                 'Updated identity document via Passport/ID Scanner',
                 JSON.stringify(updates)
-            );
+            ]);
 
             // Link reservation if requested
             await linkReservationGuest(guestId);
 
-            const updatedGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId) as any;
+            const updatedGuestRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [guestId]);
+            const updatedGuest = updatedGuestRes.rows[0] as any;
             const normalizedUpdated = updatedGuest ? {
                 ...updatedGuest,
                 name: `${updatedGuest.first_name || ''} ${updatedGuest.last_name || ''}`.trim(),
@@ -914,52 +962,57 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
         let existingGuest: any = null;
 
         if (cleanDocNo && cleanDocNo.length >= 4) {
-            existingGuest = await db.prepare(`
+            const exRes = await pgPool.query(`
                 SELECT * FROM guests 
-                WHERE REPLACE(REPLACE(REPLACE(LOWER(COALESCE(id_number, '')), ' ', ''), '-', ''), '_', '') = LOWER(?)
-                   OR REPLACE(REPLACE(REPLACE(LOWER(COALESCE(passport_visa_number, '')), ' ', ''), '-', ''), '_', '') = LOWER(?)
+                WHERE REPLACE(REPLACE(REPLACE(LOWER(COALESCE(id_number, '')), ' ', ''), '-', ''), '_', '') = LOWER($1)
+                   OR REPLACE(REPLACE(REPLACE(LOWER(COALESCE(passport_visa_number, '')), ' ', ''), '-', ''), '_', '') = LOWER($2)
                 LIMIT 1
-            `).get(cleanDocNo, cleanDocNo);
+            `, [cleanDocNo, cleanDocNo]);
+            existingGuest = exRes.rows[0];
         }
 
         if (!existingGuest && doc.dob && fullName.length >= 4) {
-            existingGuest = await db.prepare(`
+            const exRes = await pgPool.query(`
                 SELECT * FROM guests 
-                WHERE dob = ? AND (
-                    LOWER(first_name || ' ' || last_name) = LOWER(?) OR
-                    LOWER(last_name || ' ' || first_name) = LOWER(?)
+                WHERE dob = $1 AND (
+                    LOWER(first_name || ' ' || last_name) = LOWER($2) OR
+                    LOWER(last_name || ' ' || first_name) = LOWER($3)
                 )
                 LIMIT 1
-            `).get(doc.dob, fullName, fullName);
+            `, [doc.dob, fullName, fullName]);
+            existingGuest = exRes.rows[0];
         }
 
         if (existingGuest) {
             const guestId = Number(existingGuest.id);
             // Update any missing KYC attributes on the existing master profile
-            await db.prepare(`
+            await pgPool.query(`
                 UPDATE guests 
-                SET id_number = COALESCE(?, id_number),
-                    id_type = COALESCE(?, id_type),
-                    id_expiry_date = COALESCE(?, id_expiry_date),
-                    id_issue_country = COALESCE(?, id_issue_country),
-                    dob = COALESCE(?, dob),
-                    gender = COALESCE(?, gender),
+                SET id_number = COALESCE($1, id_number),
+                    id_type = COALESCE($2, id_type),
+                    id_expiry_date = COALESCE($3, id_expiry_date),
+                    id_issue_country = COALESCE($4, id_issue_country),
+                    address = COALESCE($5, address),
+                    dob = COALESCE($6, dob),
+                    gender = COALESCE($7, gender),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `).run(
+                WHERE id = $8
+            `, [
                 doc.idNumber || null,
                 doc.idType || null,
                 doc.idExpiryDate || null,
                 doc.idIssueCountry || null,
+                doc.address || null,
                 doc.dob || null,
                 doc.gender || null,
                 guestId
-            );
+            ]);
 
             // Link reservation if requested
             await linkReservationGuest(guestId);
 
-            const refreshed = await db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId) as any;
+            const refreshedRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [guestId]);
+            const refreshed = refreshedRes.rows[0] as any;
             const normalized = refreshed ? {
                 ...refreshed,
                 name: `${refreshed.first_name || ''} ${refreshed.last_name || ''}`.trim(),
@@ -977,13 +1030,21 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
         }
 
         // Truly New Guest: Insert clean record
-        const result = await db.prepare(`
+        const metadata = {
+            source: 'UNIVERSAL_SCANNER',
+            fatherName: doc.fatherName || null,
+            motherName: doc.motherName || null,
+            scannedAt: new Date().toISOString()
+        };
+
+        const result = await pgPool.query(`
             INSERT INTO guests (
                 organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number,
                 vip_status, address, city, country, dob, gender, id_issue_date, id_expiry_date, id_issue_country,
                 passport_visa_number, identity_metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+            RETURNING id
+        `, [
             1,
             salutation,
             firstName,
@@ -1003,15 +1064,16 @@ router.post('/scan-auto-create-or-update', async (req: Request, res: Response) =
             doc.idExpiryDate || null,
             doc.idIssueCountry || doc.nationality || null,
             doc.idType === 'Passport' ? doc.idNumber : null,
-            JSON.stringify({ source: 'PASSPORT_SCANNER', scannedAt: new Date().toISOString() })
-        );
+            JSON.stringify(metadata)
+        ]);
 
-        const newGuestId = Number(result.lastInsertRowid);
+        const newGuestId = Number(result.rows[0]?.id);
 
         // Link reservation if requested
         await linkReservationGuest(newGuestId);
 
-        const createdGuest = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newGuestId) as any;
+        const createdGuestRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [newGuestId]);
+        const createdGuest = createdGuestRes.rows[0] as any;
         const normalizedCreated = createdGuest ? {
             ...createdGuest,
             name: `${createdGuest.first_name || ''} ${createdGuest.last_name || ''}`.trim(),
@@ -1046,7 +1108,8 @@ router.post('/merge', async (req: Request, res: Response) => {
             });
         }
 
-        const primary = await db.prepare('SELECT * FROM guests WHERE id = ?').get(primaryGuestId) as any;
+        const primaryRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [primaryGuestId]);
+        const primary = primaryRes.rows[0] as any;
         if (!primary) {
             return res.status(404).json({ success: false, error: 'Primary guest profile not found' });
         }
@@ -1055,29 +1118,29 @@ router.post('/merge', async (req: Request, res: Response) => {
 
         // 1. Re-link reservations
         for (const secId of secondaryGuestIds) {
-            await db.prepare('UPDATE reservations SET booker_guest_id = ? WHERE booker_guest_id = ?').run(primaryGuestId, secId);
-            await db.prepare('UPDATE reservation_rooms SET guest_id = ? WHERE guest_id = ?').run(primaryGuestId, secId);
-            await db.prepare('UPDATE folios SET guest_id = ? WHERE guest_id = ?').run(primaryGuestId, secId);
+            await pgPool.query('UPDATE reservations SET booker_guest_id = $1 WHERE booker_guest_id = $2', [primaryGuestId, secId]);
+            await pgPool.query('UPDATE reservation_rooms SET guest_id = $1 WHERE guest_id = $2', [primaryGuestId, secId]);
+            await pgPool.query('UPDATE folios SET guest_id = $1 WHERE guest_id = $2', [primaryGuestId, secId]);
         }
 
         // 2. Update primary guest with preferred master fields
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE guests
-            SET salutation = COALESCE(?, salutation),
-                first_name = COALESCE(?, first_name),
-                last_name = COALESCE(?, last_name),
-                email = COALESCE(?, email),
-                phone = COALESCE(?, phone),
-                nationality = COALESCE(?, nationality),
-                id_type = COALESCE(?, id_type),
-                id_number = COALESCE(?, id_number),
-                vip_status = COALESCE(?, vip_status),
-                address = COALESCE(?, address),
-                city = COALESCE(?, city),
-                country = COALESCE(?, country),
+            SET salutation = COALESCE($1, salutation),
+                first_name = COALESCE($2, first_name),
+                last_name = COALESCE($3, last_name),
+                email = COALESCE($4, email),
+                phone = COALESCE($5, phone),
+                nationality = COALESCE($6, nationality),
+                id_type = COALESCE($7, id_type),
+                id_number = COALESCE($8, id_number),
+                vip_status = COALESCE($9, vip_status),
+                address = COALESCE($10, address),
+                city = COALESCE($11, city),
+                country = COALESCE($12, country),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $13
+        `, [
             targetFields.salutation || null,
             targetFields.firstName || targetFields.first_name || null,
             targetFields.lastName || targetFields.last_name || null,
@@ -1091,14 +1154,15 @@ router.post('/merge', async (req: Request, res: Response) => {
             targetFields.city || null,
             targetFields.country || null,
             primaryGuestId
-        );
+        ]);
 
         // 3. Remove duplicate secondary records
         for (const secId of secondaryGuestIds) {
-            await db.prepare('DELETE FROM guests WHERE id = ?').run(secId);
+            await pgPool.query('DELETE FROM guests WHERE id = $1', [secId]);
         }
 
-        const consolidated = await db.prepare('SELECT * FROM guests WHERE id = ?').get(primaryGuestId) as any;
+        const consolidatedRes = await pgPool.query('SELECT * FROM guests WHERE id = $1', [primaryGuestId]);
+        const consolidated = consolidatedRes.rows[0] as any;
 
         // 4. Realtime broadcast to all terminals
         broadcastServerEvent({

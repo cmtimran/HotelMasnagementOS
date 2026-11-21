@@ -1,4 +1,4 @@
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import net from 'net';
 
 export interface IssueKeycardPayload {
@@ -197,12 +197,13 @@ export class KeycardService {
         const { propertyId, roomNumber, guestName, encoderType = 'RFID_GENERIC' } = payload;
         
         // 1. Verify Room Exists
-        const room = await db.prepare(`
+        const roomRes = await pgPool.query(`
             SELECT id, room_number, keycard_rfid, lock_id, status 
             FROM rooms 
-            WHERE property_id = ? AND room_number = ?
+            WHERE property_id = $1 AND room_number = $2
             LIMIT 1
-        `).get(propertyId, roomNumber) as any;
+        `, [propertyId, roomNumber]);
+        const room = roomRes.rows[0] as any;
 
         if (!room) {
             throw new Error(`Room ${roomNumber} not found for property #${propertyId}`);
@@ -254,26 +255,26 @@ export class KeycardService {
         };
 
         // 5. Update Room Record
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms 
-            SET keycard_rfid = ?, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?
-        `).run(cardUid, room.id);
+            SET keycard_rfid = $1, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $2
+        `, [cardUid, room.id]);
 
         // 6. Invalidate any prior active keycards for this room in keycard_logs
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE keycard_logs 
             SET status = 'OVERWRITTEN' 
-            WHERE property_id = ? AND room_number = ? AND status = 'ACTIVE'
-        `).run(propertyId, roomNumber).catch(() => {});
+            WHERE property_id = $1 AND room_number = $2 AND status = 'ACTIVE'
+        `, [propertyId, roomNumber]).catch(() => {});
 
         // 7. Record in Audit Log
-        await db.prepare(`
+        await pgPool.query(`
             INSERT INTO keycard_logs (
                 property_id, room_number, card_uid, encoder_type, 
                 operation, issued_to, valid_from, valid_until, status
-            ) VALUES (?, ?, ?, ?, 'ISSUE', ?, ?, ?, 'ACTIVE')
-        `).run(propertyId, roomNumber, cardUid, encoderType, guestName, validFrom, validUntil).catch(() => {});
+            ) VALUES ($1, $2, $3, $4, 'ISSUE', $5, $6, $7, 'ACTIVE')
+        `, [propertyId, roomNumber, cardUid, encoderType, guestName, validFrom, validUntil]).catch(() => {});
 
         return {
             success: true,
@@ -293,12 +294,13 @@ export class KeycardService {
      * Revoke / Deactivate an active keycard (Checkout / Lost Card)
      */
     static async revokeKeycard(propertyId: number, roomNumber: string) {
-        const room = await db.prepare(`
+        const roomRes = await pgPool.query(`
             SELECT id, room_number, keycard_rfid 
             FROM rooms 
-            WHERE property_id = ? AND room_number = ?
+            WHERE property_id = $1 AND room_number = $2
             LIMIT 1
-        `).get(propertyId, roomNumber) as any;
+        `, [propertyId, roomNumber]);
+        const room = roomRes.rows[0] as any;
 
         if (!room) {
             throw new Error(`Room ${roomNumber} not found for property #${propertyId}`);
@@ -307,19 +309,19 @@ export class KeycardService {
         const prevCard = room.keycard_rfid;
 
         // Clear room's active keycard
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms 
             SET keycard_rfid = NULL, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?
-        `).run(room.id);
+            WHERE id = $1
+        `, [room.id]);
 
         // Update log status
         if (prevCard) {
-            await db.prepare(`
+            await pgPool.query(`
                 UPDATE keycard_logs 
                 SET status = 'REVOKED' 
-                WHERE property_id = ? AND room_number = ? AND card_uid = ?
-            `).run(propertyId, roomNumber, prevCard).catch(() => {});
+                WHERE property_id = $1 AND room_number = $2 AND card_uid = $3
+            `, [propertyId, roomNumber, prevCard]).catch(() => {});
         }
 
         return {
@@ -334,23 +336,25 @@ export class KeycardService {
      * Get active keycard status and history for a room
      */
     static async getKeycardStatus(propertyId: number, roomNumber: string) {
-        const room = await db.prepare(`
+        const roomRes = await pgPool.query(`
             SELECT id, room_number, keycard_rfid, lock_id, status 
             FROM rooms 
-            WHERE property_id = ? AND room_number = ?
+            WHERE property_id = $1 AND room_number = $2
             LIMIT 1
-        `).get(propertyId, roomNumber) as any;
+        `, [propertyId, roomNumber]);
+        const room = roomRes.rows[0] as any;
 
         if (!room) {
             throw new Error(`Room ${roomNumber} not found for property #${propertyId}`);
         }
 
-        const logs = await db.prepare(`
+        const logsRes = await pgPool.query(`
             SELECT * FROM keycard_logs 
-            WHERE property_id = ? AND room_number = ? 
+            WHERE property_id = $1 AND room_number = $2 
             ORDER BY created_at DESC 
             LIMIT 10
-        `).all(propertyId, roomNumber).catch(() => []) as any[];
+        `, [propertyId, roomNumber]).catch(() => ({ rows: [] }));
+        const logs = logsRes.rows as any[];
 
         return {
             success: true,

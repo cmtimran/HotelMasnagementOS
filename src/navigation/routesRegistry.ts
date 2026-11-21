@@ -31,6 +31,28 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
 
   // Front Office & Reception
   {
+    id: 'guestflow',
+    slug: '/guestflow',
+    title: 'GuestFlow (StayPulse)',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'frontdesk.access',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'express-checkin',
+    slug: '/express-checkin',
+    title: 'Express Check-In FastPass',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'frontdesk.access',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: false,
+  },
+  {
     id: 'front-desk',
     slug: '/front-desk',
     title: 'Front Desk',
@@ -431,6 +453,74 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     category: 'Rate & Channel Master',
     permission: 'rates.calendar.view',
     allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+
+  // Channel Manager (OTA)
+  {
+    id: 'channel-manager',
+    slug: '/channel-manager',
+    title: 'Connected Channels',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'channel-manager-ari',
+    slug: '/channel-manager-ari',
+    title: 'Rates & Inventory Grid',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'channel-manager-wizard',
+    slug: '/channel-manager-wizard',
+    title: 'Distribution Wizard',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'channel-manager-mappings',
+    slug: '/channel-manager-mappings',
+    title: 'Channel Mappings',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'channel-manager-bookings',
+    slug: '/channel-manager-bookings',
+    title: 'Inbound OTA Bookings',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'channel-manager-logs',
+    slug: '/channel-manager-logs',
+    title: 'Sync & Audit Logs',
+    panel: 'main',
+    category: 'Channel Manager (OTA)',
+    permission: 'rates.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
     minSubscriptionTier: 'starter',
     propertyScoped: true,
   },
@@ -1235,17 +1325,20 @@ for (const report of REPORT_PANEL_ROUTES) {
 // ============================================================================
 
 export const getRouteBySlug = (slug: string): RouteDefinition | undefined => {
-  const normalized = slug.startsWith('/') ? slug : `/${slug}`;
+  const cleanPath = (slug.split('?')[0] || '').split('#')[0];
+  const normalized = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
   return SLUG_TO_ROUTE_MAP.get(normalized);
 };
 
 export const getRouteByPageId = (pageId: string): RouteDefinition | undefined => {
-  return ID_TO_MAIN_ROUTE_MAP.get(pageId);
+  const cleanId = (pageId.split('?')[0] || '').split('#')[0];
+  return ID_TO_MAIN_ROUTE_MAP.get(cleanId);
 };
 
 export const getReportBySlug = (slug: string): ReportDefinition | undefined => {
-  const normalized = slug.startsWith('/') ? slug : `/${slug}`;
-  return SLUG_TO_REPORT_MAP.get(normalized) || SLUG_TO_REPORT_MAP.get(slug.replace('/reports/', ''));
+  const cleanPath = (slug.split('?')[0] || '').split('#')[0];
+  const normalized = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+  return SLUG_TO_REPORT_MAP.get(normalized) || SLUG_TO_REPORT_MAP.get(cleanPath.replace('/reports/', ''));
 };
 
 export const getReportByTitle = (title: string): ReportDefinition | undefined => {

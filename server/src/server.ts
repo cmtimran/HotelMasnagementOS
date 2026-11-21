@@ -10,6 +10,7 @@ import { initRedis } from './services/redis.service.js';
 import { broadcastServerEvent } from './routes/realtime.routes.js';
 import { pgPool } from './database/postgres.js';
 import { bookingService } from './services/booking.service.js';
+import { guestCxController } from './controllers/guestCx.controller.js';
 
 dotenv.config();
 
@@ -29,27 +30,50 @@ initRedis((clusterEvent) => {
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Global Middleware - Multi-Environment Dynamic CORS
+// Global Middleware - Strict Multi-Environment CORS Whitelist
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests, localhost, and Vercel domains
+    // Allow non-browser calls (e.g. server-to-server, curl, health checks)
     if (!origin) return callback(null, true);
+    
+    const lowerOrigin = origin.toLowerCase();
+    
+    // Check local dev origins
     if (
-      origin.includes('localhost') || 
-      origin.includes('127.0.0.1') || 
-      origin.includes('vercel.app') || 
-      origin.includes('hotelmasnagementos')
+      lowerOrigin.startsWith('http://localhost:') || 
+      lowerOrigin.startsWith('http://127.0.0.1:') ||
+      lowerOrigin.endsWith('.vercel.app') ||
+      lowerOrigin.endsWith('.hotelmanagementos.com') ||
+      allowedOrigins.includes(lowerOrigin)
     ) {
       return callback(null, true);
     }
-    return callback(null, true); // Allow all configured hotel client origins
+    
+    // Reject untrusted cross-origin requests
+    return callback(new Error(`CORS origin blocked: ${origin}`));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Property-Id', 'X-Internal-Secret', 'X-User-Role', 'X-User-Id', 'X-User-Email', 'X-User-Name'],
 }));
 
-// Body parser with 50mb limit for room data / logs / bulk sync
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Standard Security Headers Middleware
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Hardened Body Parser: Limit to 10MB to mitigate DoS / Memory Exhaustion
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Error handler for malformed JSON or oversized request bodies
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -57,7 +81,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     return res.status(400).json({ success: false, error: 'Malformed JSON payload' });
   }
   if (err.type === 'entity.too.large') {
-    return res.status(413).json({ success: false, error: 'Payload too large (exceeds 50MB)' });
+    return res.status(413).json({ success: false, error: 'Payload too large (exceeds 10MB limit)' });
   }
   next(err);
 });
@@ -81,8 +105,10 @@ app.use((req, res) => {
 });
 
 // Start HTTP listener only when running standalone (not in Serverless/Vercel)
-if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
+const isServerless = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+
+if (!isServerless) {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 HotelManagementOS Backend running at http://localhost:${PORT}`);
     console.log(`📊 Reports API: http://localhost:${PORT}/api/reports/overview/metrics`);
     console.log(`🏨 Rooms API: http://localhost:${PORT}/api/rooms`);
@@ -90,11 +116,18 @@ if (!process.env.VERCEL) {
     console.log(`🔒 Distributed Redlock API: http://localhost:${PORT}/api/realtime/locks`);
   });
 
-  // Background Worker: Auto-release expired Holds whose cutoff deadline has elapsed (Runs every 60s)
-  setInterval(async () => {
+  // Non-overlapping Background Worker Loop (Prevents connection pool exhaustion)
+  let isHoldWorkerRunning = false;
+  const runHoldCheckLoop = async () => {
+    if (isHoldWorkerRunning) return;
+    isHoldWorkerRunning = true;
     try {
       const activeProps = await pgPool.query("SELECT id FROM properties WHERE status = 'ACTIVE' LIMIT 50").catch(() => ({ rows: [] }));
       for (const row of activeProps.rows) {
+        // 1. Process GuestFlow AI Hold Lifecycle (Pre-cancellation follow-ups & auto-releases)
+        await guestCxController.processHoldLifecycle(row.id).catch(() => ({ remindersSent: 0, holdsReleased: 0 }));
+
+        // 2. Standard booking service check
         const res = await bookingService.checkExpiredHolds(row.id).catch(() => ({ releasedCount: 0 }));
         if (res && res.releasedCount > 0) {
           broadcastServerEvent({
@@ -103,10 +136,40 @@ if (!process.env.VERCEL) {
           });
         }
       }
-    } catch {
-      // background exception silently guarded
+    } catch (err: any) {
+      console.error('Hold lifecycle worker error:', err?.message);
+    } finally {
+      isHoldWorkerRunning = false;
     }
-  }, 60000);
+  };
+
+  const holdIntervalId = setInterval(runHoldCheckLoop, 60000);
+
+  // Graceful Shutdown: Handle process termination signals cleanly
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`\n🛑 Received ${signal}. Initiating Graceful Shutdown...`);
+    clearInterval(holdIntervalId);
+
+    server.close(async () => {
+      console.log('HTTP Server closed cleanly.');
+      try {
+        await pgPool.end();
+        console.log('PostgreSQL connection pool drained.');
+      } catch (err: any) {
+        console.error('Error draining PostgreSQL pool:', err?.message);
+      }
+      process.exit(0);
+    });
+
+    // Force exit if connections do not drain within 10 seconds
+    setTimeout(() => {
+      console.error('Forced shutdown after 10s timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 export default app;

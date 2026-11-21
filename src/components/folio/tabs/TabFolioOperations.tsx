@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     ChevronDown,
     Plus,
@@ -21,12 +22,19 @@ import {
     AlertTriangle,
     EyeOff,
     List,
-    Layers
+    Layers,
+    RotateCcw,
+    Unlock,
+    GitFork,
+    Users
 } from 'lucide-react';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { useActiveCurrency } from '../../../utils/currencyUtils';
+import { usePropertyLocalization } from '../../../utils/localizationEngine';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
+import { classifyReservation } from '../../../utils/reservationNumbering';
 import type { FolioData } from '../folioTypes';
 import type { AmendBookingData } from '../../modals/AmendStayModal';
+import { MoneyReceiptModal } from '../modals/MoneyReceiptModal';
 
 interface TabFolioOperationsProps {
     folio: FolioData | null;
@@ -65,12 +73,67 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
     onRefresh,
     onOpenVoid
 }) => {
-    const currency = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol: currency } = useActiveCurrency();
+    const { formatDate } = usePropertyLocalization();
     const [viewMode, setViewMode] = useState<'ledger' | 'operations'>('ledger');
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [expandedRowIds, setExpandedRowIds] = useState<Array<number | string>>([]);
     const [selectedItemIds, setSelectedItemIds] = useState<Array<number | string>>([]);
     const [openRowActionId, setOpenRowActionId] = useState<number | string | null>(null);
+    const [selectedSplitLegRoom, setSelectedSplitLegRoom] = useState<string | null>(null);
+
+    // Money Receipt Modal State (Double Copy Guest & Accounts Print)
+    const [moneyReceiptState, setMoneyReceiptState] = useState<{
+        isOpen: boolean;
+        payment: any | null;
+    }>({
+        isOpen: false,
+        payment: null
+    });
+
+    // Reopen Folio States (Supervisor Protocol)
+    const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
+    const [reopenReason, setReopenReason] = useState('Late Minibar / Room Service');
+    const [reopenNotes, setReopenNotes] = useState('');
+    const [isReopening, setIsReopening] = useState(false);
+
+    const isFolioSettled = Boolean(folio?.status === 'SETTLED' || folio?.status === 'CLOSED' || booking?.status === 'CHECKED_OUT' || booking?.status === 'CHECKED-OUT');
+
+    const handleReopenFolio = async () => {
+        if (!folio?.id) return;
+        setIsReopening(true);
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${folio.id}/reopen`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reason: `${reopenReason} ${reopenNotes ? `(${reopenNotes})` : ''}`.trim(),
+                    userName: 'Front Desk Supervisor'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setToastMessage({
+                    type: 'success',
+                    text: json.message || 'Folio reopened successfully.'
+                });
+                setIsReopenModalOpen(false);
+                if (onRefresh) onRefresh();
+            } else {
+                setToastMessage({
+                    type: 'error',
+                    text: json.error || 'Failed to reopen folio'
+                });
+            }
+        } catch (e: any) {
+            setToastMessage({
+                type: 'error',
+                text: e.message || 'Network error while reopening folio'
+            });
+        } finally {
+            setIsReopening(false);
+        }
+    };
 
     // Refs for safe outside-click handling (prevents full-screen backdrop click interception)
     const moreDropdownRef = useRef<HTMLDivElement>(null);
@@ -134,17 +197,56 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         return allFolios[0];
     }, [allFolios, booking?.roomNumber]);
 
+    const stayClassification = useMemo(() => {
+        return classifyReservation((booking as any) || {});
+    }, [booking]);
+    const isTrueSplitStay = stayClassification === 'SPLIT_STAY';
+    const isTrueGroupStay = stayClassification === 'GROUP';
+
+    // Extract Split Stay Legs (ONLY for genuine sequential room movement)
+    const splitStayLegs = useMemo(() => {
+        if (!isTrueSplitStay) return [];
+        if ((folio as any)?.split_legs && Array.isArray((folio as any).split_legs) && (folio as any).split_legs.length > 1) {
+            return (folio as any).split_legs;
+        }
+        const rNo = String(folio?.room_number || '');
+        if (rNo.includes('→')) {
+            return rNo.split('→').map((r, idx) => ({ roomNumber: r.trim(), nights: 1, idx }));
+        }
+        return [];
+    }, [folio, isTrueSplitStay]);
+
+    // Group Rooms List for Multi-room Navigation
+    const groupRoomsList = useMemo(() => {
+        if (!isTrueGroupStay) return [];
+        const uniqueRooms = new Set<string>();
+        allFolios.forEach(f => {
+            const rn = String(f.room_number || '').trim();
+            if (rn && !rn.includes(',') && !rn.includes('→') && !rn.toLowerCase().includes('all')) {
+                uniqueRooms.add(rn);
+            }
+        });
+        return Array.from(uniqueRooms);
+    }, [allFolios, isTrueGroupStay]);
+
     // Hierarchical Grouping by Room (Guarantees Room Number appears only ONCE with nested sub-folios)
     const foliosByRoom = useMemo(() => {
         const groups: Array<{
             roomNumber: string;
             isOwnerRoom: boolean;
             folios: FolioData[];
+            isSplitStay?: boolean;
+            isGroup?: boolean;
         }> = [];
 
         const roomMap = new Map<string, FolioData[]>();
         allFolios.forEach(f => {
-            const rNo = String(f.room_number || f.rooms?.[0]?.room_number || booking?.roomNumber || 'Unassigned');
+            let rNo = String(f.room_number || f.rooms?.[0]?.room_number || booking?.roomNumber || 'Unassigned').trim();
+            // ONLY for genuine split stays convert comma to arrow
+            if (isTrueSplitStay && (rNo.includes(',') || rNo.includes('→'))) {
+                const parts = rNo.split(/[,→]/).map(s => s.trim()).filter(Boolean);
+                rNo = parts.join(' → ');
+            }
             if (!roomMap.has(rNo)) {
                 roomMap.set(rNo, []);
             }
@@ -152,19 +254,22 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         });
 
         roomMap.forEach((roomFolios, rNo) => {
+            const isSplitStayRoute = isTrueSplitStay && rNo.includes('→');
             const isOwnerRoom = roomFolios.some(f => Boolean(ownerFolio && String(f.id) === String(ownerFolio.id))) ||
-                String(rNo) === String(booking?.roomNumber);
+                String(rNo) === String(booking?.roomNumber) || isSplitStayRoute;
             groups.push({
                 roomNumber: rNo,
                 isOwnerRoom,
-                folios: roomFolios
+                folios: roomFolios,
+                isSplitStay: isSplitStayRoute,
+                isGroup: isTrueGroupStay
             });
         });
 
-        // Sort so the owner room is placed at the top
+        // Sort so the owner / split-stay room is placed at the top
         groups.sort((a, b) => (b.isOwnerRoom ? 1 : 0) - (a.isOwnerRoom ? 1 : 0));
         return groups;
-    }, [allFolios, booking?.roomNumber, ownerFolio]);
+    }, [allFolios, booking?.roomNumber, ownerFolio, isTrueSplitStay, isTrueGroupStay]);
 
     const isAllSelected = allFolios.length > 0 && selectedRoomFolioIds.length === allFolios.length;
 
@@ -210,7 +315,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         }, 0);
     }, [allFolios]);
 
-    // Transfer Group Charges To Owner Folio (matching Yanolja Freshdesk Article & Screenshots)
+    // Transfer Group Charges To Owner Folio (Enterprise Group Folio Consolidation)
     const handleTransferToOwner = async () => {
         if (!ownerFolio) return;
 
@@ -425,12 +530,12 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [folio?.charges, folio?.payments]);
 
-    // Currently selected active charge for voiding
-    const selectedChargeToVoid = useMemo(() => {
-        return ledgerItems.find(i => selectedItemIds.includes(i.id) && !i.isVoided && i.type === 'charge');
+    // Currently selected active item (charge or payment) for voiding
+    const selectedItemToVoid = useMemo(() => {
+        return ledgerItems.find(i => selectedItemIds.includes(i.id) && !i.isVoided);
     }, [ledgerItems, selectedItemIds]);
 
-    // Filtered ledger items based on Unposted/Posted status filter and Hide Voided toggle
+    // Filtered ledger items based on Unposted/Posted status filter, Hide Voided toggle, and Split Stay Leg selector
     const filteredLedgerItems = useMemo(() => {
         let items = ledgerItems;
         if (hideVoided) {
@@ -441,8 +546,15 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
         } else if (statusFilter === 'unposted') {
             items = items.filter(i => i.status === 'Unposted');
         }
+        if (selectedSplitLegRoom) {
+            items = items.filter(i => {
+                if (i.type === 'payment') return true; // General payments apply to whole booking
+                const desc = (i.description || '').toLowerCase();
+                return desc.includes(`room ${selectedSplitLegRoom.toLowerCase()}`) || (i.rawItem as any)?.legRoomNumber === selectedSplitLegRoom;
+            });
+        }
         return items;
-    }, [ledgerItems, hideVoided, statusFilter]);
+    }, [ledgerItems, hideVoided, statusFilter, selectedSplitLegRoom]);
 
     // Grouped ledger items by Revenue Head for Consolidated / Layers view
     const groupedLedgerItems = useMemo(() => {
@@ -481,10 +593,13 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             type="button"
                             onClick={() => setViewMode('ledger')}
                             className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-blue-700 hover:bg-blue-50/70 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                            title="Return to Folio Transaction Ledger"
                         >
                             <ChevronLeft size={16} className="text-gray-500" />
-                            <span>Folio Operations</span>
+                            <span>← Back to Folio Ledger</span>
                         </button>
+                        <span className="text-xs font-bold text-slate-400">|</span>
+                        <span className="text-xs font-bold text-slate-700">Folio Operations &amp; Billing Settings</span>
                     </div>
 
                     {/* Toast Notification Pill matching Image 4 (605bdfde.png) */}
@@ -554,18 +669,32 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                                         onChange={() => handleToggleRoom(group.folios)}
                                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                                                     />
-                                                    <DoorClosed size={13} className="text-gray-500 shrink-0" />
-                                                    <span>{group.roomNumber}</span>
+                                                    {group.isSplitStay ? (
+                                                        <GitFork size={13} className="text-purple-600 shrink-0" />
+                                                    ) : isTrueGroupStay && group.isOwnerRoom ? (
+                                                        <Users size={13} className="text-blue-600 shrink-0" />
+                                                    ) : (
+                                                        <DoorClosed size={13} className="text-gray-500 shrink-0" />
+                                                    )}
+                                                    <span>{group.isSplitStay ? `Split Stay: ${group.roomNumber}` : (isTrueGroupStay && group.isOwnerRoom && group.roomNumber.includes(',') ? `Group Master (${group.roomNumber})` : group.roomNumber)}</span>
                                                     {group.folios.length > 1 && (
                                                         <span className="text-[10px] text-gray-400 font-normal">
                                                             ({group.folios.length} folios)
                                                         </span>
                                                     )}
-                                                    {group.isOwnerRoom && (
+                                                    {group.isSplitStay ? (
+                                                        <span className="ml-auto text-[8.5px] bg-purple-100 text-purple-800 px-1 py-0.2 rounded font-bold border border-purple-200 shrink-0">
+                                                            Sequential
+                                                        </span>
+                                                    ) : isTrueGroupStay && group.isOwnerRoom ? (
+                                                        <span className="ml-auto text-[9.5px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">
+                                                            Group Master
+                                                        </span>
+                                                    ) : group.isOwnerRoom ? (
                                                         <span className="ml-auto text-[9.5px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">
                                                             Owner
                                                         </span>
-                                                    )}
+                                                    ) : null}
                                                 </label>
 
                                                 {/* Sub-Folio Pills nested under this Room */}
@@ -816,7 +945,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         </div>
                     </td>
 
-                    <td className={`${cellPy} px-2.5 font-mono text-[11px] text-gray-600`}>{item.date}</td>
+                    <td className={`${cellPy} px-2.5 font-mono text-[11px] text-gray-600`}>{formatDate(item.date)}</td>
                     <td className={`${cellPy} px-2 font-mono text-[11px] text-gray-700`}>{item.refNo}</td>
                     <td className={`${cellPy} px-2.5 font-medium text-gray-800`}>{item.revenueHead}</td>
                     <td className={`${cellPy} px-3 truncate max-w-[200px]`}>
@@ -863,8 +992,22 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         {item.type === 'payment' ? (
                             <button
                                 type="button"
-                                title="View Payment Receipt"
-                                className="text-blue-600 hover:text-blue-800 cursor-pointer inline-flex items-center justify-center"
+                                onClick={() => {
+                                    setMoneyReceiptState({
+                                        isOpen: true,
+                                        payment: item.rawItem || {
+                                            id: item.id,
+                                            payment_number: item.refNo,
+                                            payment_method: item.revenueHead,
+                                            amount: item.amount,
+                                            transaction_date: item.date,
+                                            status: item.status,
+                                            user: item.user
+                                        }
+                                    });
+                                }}
+                                title="View & Print Money Receipt"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition-colors cursor-pointer inline-flex items-center justify-center"
                             >
                                 <Eye size={13} />
                             </button>
@@ -873,7 +1016,7 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                         )}
                     </td>
 
-                    {/* Row Action Menu ⋮ (Yanolja PMS Folio Operations) */}
+                    {/* Row Action Menu ⋮ (Folio Charge Operations) */}
                     <td className={`${cellPy} px-2 text-center relative`}>
                         <div ref={openRowActionId === item.id ? rowActionRef : undefined} className="inline-block relative">
                             <button
@@ -889,6 +1032,30 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             </button>
                             {openRowActionId === item.id && (
                                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 text-left animate-in fade-in zoom-in-95 duration-100">
+                                    {item.type === 'payment' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setOpenRowActionId(null);
+                                                setMoneyReceiptState({
+                                                    isOpen: true,
+                                                    payment: item.rawItem || {
+                                                        id: item.id,
+                                                        payment_number: item.refNo,
+                                                        payment_method: item.revenueHead,
+                                                        amount: item.amount,
+                                                        transaction_date: item.date,
+                                                        status: item.status,
+                                                        user: item.user
+                                                    }
+                                                });
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer font-medium border-b border-gray-100"
+                                        >
+                                            <Eye size={13} className="text-blue-600 shrink-0" />
+                                            <span>View Money Receipt</span>
+                                        </button>
+                                    )}
                                     {item.isVoided ? (
                                         <div className="px-3 py-1.5 text-[11px] text-gray-500 italic">
                                             Voided: {item.rawItem?.void_reason || 'Reversed'}
@@ -978,16 +1145,30 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     <div className="space-y-2 pt-1">
                         {foliosByRoom.map((group) => (
                             <div key={group.roomNumber} className="pl-1 space-y-1">
-                                <div className="text-gray-700 font-medium text-[11px] flex items-center justify-between py-1 px-1.5 rounded hover:bg-gray-50">
+                                <div className={`font-medium text-[11px] flex items-center justify-between py-1 px-1.5 rounded transition-colors ${
+                                    group.isSplitStay
+                                        ? 'bg-purple-50/80 border border-purple-200/80 text-purple-950 font-semibold'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                }`}>
                                     <div className="flex items-center gap-1.5 truncate">
-                                        <DoorClosed size={13} className="text-gray-500 shrink-0" />
-                                        <span className="truncate">{group.roomNumber} ({group.folios.length} folio{group.folios.length > 1 ? 's' : ''})</span>
+                                        {group.isSplitStay ? (
+                                            <GitFork size={12} className="text-purple-600 shrink-0" />
+                                        ) : (
+                                            <DoorClosed size={13} className="text-gray-500 shrink-0" />
+                                        )}
+                                        <span className="truncate">
+                                            {group.isSplitStay ? `Split Stay: ${group.roomNumber}` : `${group.roomNumber} (${group.folios.length} folio${group.folios.length > 1 ? 's' : ''})`}
+                                        </span>
                                     </div>
-                                    {group.isOwnerRoom && (
+                                    {group.isSplitStay ? (
+                                        <span className="ml-auto mr-1 text-[8px] bg-purple-100 text-purple-800 px-1 py-0.2 rounded font-bold border border-purple-200 shrink-0">
+                                            Sequential
+                                        </span>
+                                    ) : group.isOwnerRoom ? (
                                         <span className="ml-auto mr-1 text-[9px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-bold">
                                             Owner
                                         </span>
-                                    )}
+                                    ) : null}
                                     <ChevronDown size={12} className="text-gray-400 shrink-0" />
                                 </div>
 
@@ -1054,16 +1235,16 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
             <div className="flex-1 flex flex-col justify-between min-w-0 overflow-hidden h-full">
                 <div className="space-y-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* Action Bar matching Screenshot d529d73d.png & media_1793667186222_9c97dd2d.png */}
-                    <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 min-w-0 border-b border-gray-100/80">
+                    <div className="flex items-center justify-between gap-1 flex-nowrap shrink-0 pb-1.5 min-w-0 border-b border-gray-100/80 relative z-30">
                         {/* Left Action Buttons */}
-                        <div className="flex items-center gap-1.5 shrink min-w-0 py-0.5">
+                        <div className="flex items-center gap-1 flex-nowrap shrink-0 py-0.5 overflow-x-auto no-scrollbar">
                             <button
                                 type="button"
                                 onClick={() => onOpenNewFolio ? onOpenNewFolio() : onOpenSplitFolio()}
                                 title="New Folio"
-                                className="w-7 h-7 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold shrink-0"
+                                className="w-6.5 h-6.5 bg-white hover:bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-700 shadow-2xs cursor-pointer font-bold shrink-0"
                             >
-                                <Plus size={13} />
+                                <Plus size={12} />
                             </button>
 
                             {/* Add Payment Button (matching Screenshot d529d73d.png) */}
@@ -1071,9 +1252,9 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 <button
                                     type="button"
                                     onClick={onOpenAddPayment}
-                                    className="h-7 bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
+                                    className="h-6.5 bg-white hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-300 rounded px-2 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
                                 >
-                                    <CreditCard size={12} className="text-emerald-600" />
+                                    <CreditCard size={11} className="text-emerald-600" />
                                     <span>Add Payment</span>
                                 </button>
                             )}
@@ -1081,120 +1262,157 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                             <button
                                 type="button"
                                 onClick={onOpenAddCharge}
-                                className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                                className="h-6.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             >
                                 Add Charges
+                            </button>
+
+                            {/* Cut Folio Button (Incidental Isolation) */}
+                            <button
+                                type="button"
+                                onClick={onOpenSplitFolio}
+                                title="Cut Folio: Move extra charges to a new sub-bill"
+                                className="h-6.5 bg-white hover:bg-blue-50 text-blue-900 border border-blue-300 rounded px-2 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1"
+                            >
+                                <Scissors size={11} className="text-blue-600" />
+                                <span>Cut Folio</span>
                             </button>
 
                             <button
                                 type="button"
                                 onClick={onOpenAddDiscount}
-                                className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                                className="h-6.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             >
                                 Apply Discount
                             </button>
+
+                            {/* Reopen Folio (Post-Settlement Protocol) */}
+                            {isFolioSettled && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsReopenModalOpen(true)}
+                                    title="Reopen settled / closed folio for post-stay adjustments"
+                                    className="h-6.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded px-2 text-[11px] font-bold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1 animate-pulse"
+                                >
+                                    <RotateCcw size={11} className="text-amber-700" />
+                                    <span>Reopen</span>
+                                </button>
+                            )}
 
                             {/* Folio Operations Button (Box 4 in d529d73d.png) */}
                             <button
                                 type="button"
                                 onClick={() => setViewMode('operations')}
-                                className="h-7 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-2.5 text-xs shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
+                                className="h-6.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded px-2 text-[11px] shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
                             >
-                                <Settings2 size={12} className="text-amber-700" />
+                                <Settings2 size={11} className="text-amber-700" />
                                 <span>Folio Operations</span>
                             </button>
 
-                            {/* More Actions Dropdown (Adjustments, Transfer, Split Folio) */}
+                            {/* More Actions Dropdown (Adjustments, Transfer, Split Folio, Void) */}
                             <div ref={moreDropdownRef} className="relative shrink-0">
                                 <button
                                     type="button"
-                                    onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
-                                    className="h-7 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsMoreDropdownOpen(prev => !prev);
+                                    }}
+                                    className={`h-6.5 border rounded px-2 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                                        isMoreDropdownOpen
+                                            ? 'bg-blue-100 text-blue-900 border-blue-500 font-bold ring-1 ring-blue-400'
+                                            : selectedItemIds.length > 0
+                                                ? 'bg-blue-50 text-blue-800 border-blue-400 font-bold ring-1 ring-blue-300/60'
+                                                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
+                                    }`}
                                 >
                                     <span>More</span>
-                                    <ChevronDown size={11} className={`transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
+                                    {selectedItemIds.length > 0 && (
+                                        <span className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-bold">
+                                            {selectedItemIds.length}
+                                        </span>
+                                    )}
+                                    <ChevronDown size={10} className={`transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {isMoreDropdownOpen && (
-                                    <div className="absolute left-0 top-full mt-1.5 w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-50 text-gray-800 animate-in fade-in zoom-in-95 duration-100">
                                         <button
                                             type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenAdjustments(); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsMoreDropdownOpen(false);
+                                                onOpenAdjustments();
+                                            }}
                                             className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
                                         >
-                                            <Sliders size={13} className="text-gray-400" />
+                                            <Sliders size={13} className="text-gray-400 shrink-0" />
                                             <span>Adjustments</span>
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenTransfer(); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsMoreDropdownOpen(false);
+                                                onOpenTransfer();
+                                            }}
                                             className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
                                         >
-                                            <ArrowRightLeft size={13} className="text-gray-400" />
-                                            <span>Transfer</span>
+                                            <ArrowRightLeft size={13} className="text-gray-400 shrink-0" />
+                                            <span>Transfer Charges</span>
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => { setIsMoreDropdownOpen(false); onOpenSplitFolio(); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsMoreDropdownOpen(false);
+                                                onOpenSplitFolio();
+                                            }}
                                             className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
                                         >
-                                            <Scissors size={13} className="text-gray-400" />
+                                            <Scissors size={13} className="text-gray-400 shrink-0" />
                                             <span>Split Folio</span>
                                         </button>
                                         <div className="my-1 border-t border-gray-100" />
                                         <button
                                             type="button"
-                                            disabled={!selectedChargeToVoid}
-                                            onClick={() => {
+                                            disabled={!selectedItemToVoid}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 setIsMoreDropdownOpen(false);
-                                                if (selectedChargeToVoid) {
-                                                    onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
+                                                if (selectedItemToVoid) {
+                                                    onOpenVoid(selectedItemToVoid.type, selectedItemToVoid.id, selectedItemToVoid.description, selectedItemToVoid.amount);
                                                 }
                                             }}
                                             className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
-                                                selectedChargeToVoid
-                                                    ? 'text-rose-700 hover:bg-rose-50 font-medium cursor-pointer'
+                                                selectedItemToVoid
+                                                    ? 'text-rose-700 hover:bg-rose-50 font-semibold cursor-pointer'
                                                     : 'text-gray-400 hover:bg-gray-50 cursor-not-allowed opacity-60'
                                             }`}
                                         >
-                                            <AlertTriangle size={13} className={selectedChargeToVoid ? 'text-rose-600' : 'text-gray-400'} />
-                                            <span>Void Selected Charge</span>
+                                            <AlertTriangle size={13} className={selectedItemToVoid ? 'text-rose-600 shrink-0' : 'text-gray-400 shrink-0'} />
+                                            <span>Void Selected {selectedItemToVoid?.type === 'payment' ? 'Payment' : 'Charge'}</span>
                                         </button>
                                     </div>
                                 )}
                             </div>
-
-                            {/* Contextual Void Charge Button when charge is checked */}
-                            {selectedChargeToVoid && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onOpenVoid(selectedChargeToVoid.type, selectedChargeToVoid.id, selectedChargeToVoid.description, selectedChargeToVoid.amount);
-                                    }}
-                                    title="Void selected extra charge"
-                                    className="h-7 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded px-2.5 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap animate-in fade-in"
-                                >
-                                    <AlertTriangle size={12} className="text-rose-600" />
-                                    <span>Void Charge</span>
-                                </button>
-                            )}
                         </div>
 
                         {/* Right: Legend & View Toolbar Controls (Matching media_1793667186222_9c97dd2d.png) */}
-                        <div className="flex items-center gap-2 ml-auto shrink-0 select-none">
+                        <div className="flex items-center gap-1.5 ml-auto shrink-0 select-none flex-nowrap">
                             {/* Unposted Indicator / Filter Toggle */}
                             <button
                                 type="button"
                                 onClick={() => setStatusFilter(prev => prev === 'unposted' ? 'all' : 'unposted')}
                                 title="Click to filter by Unposted transactions"
-                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer whitespace-nowrap ${
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                                     statusFilter === 'unposted'
                                         ? 'bg-amber-100/90 text-amber-900 font-bold ring-1 ring-amber-400 shadow-2xs'
                                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
                             >
-                                <span className="w-2.5 h-2.5 rounded-xs bg-[#f59e0b] shadow-2xs shrink-0" />
-                                <span className="text-[11.5px] font-medium">Unposted</span>
+                                <span className="w-2 h-2 rounded-xs bg-[#f59e0b] shadow-2xs shrink-0" />
+                                <span className="font-medium">Unposted</span>
                             </button>
 
                             {/* Posted Indicator / Filter Toggle */}
@@ -1202,33 +1420,33 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                 type="button"
                                 onClick={() => setStatusFilter(prev => prev === 'posted' ? 'all' : 'posted')}
                                 title="Click to filter by Posted transactions"
-                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-all cursor-pointer whitespace-nowrap ${
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                                     statusFilter === 'posted'
                                         ? 'bg-gray-200 text-gray-900 font-bold ring-1 ring-gray-400 shadow-2xs'
                                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
                             >
-                                <span className="w-2.5 h-2.5 rounded-xs bg-[#6b7280] shadow-2xs shrink-0" />
-                                <span className="text-[11.5px] font-medium">Posted</span>
+                                <span className="w-2 h-2 rounded-xs bg-[#6b7280] shadow-2xs shrink-0" />
+                                <span className="font-medium">Posted</span>
                             </button>
 
                             {/* Divider */}
-                            <div className="h-4 w-px bg-gray-300 mx-0.5 shrink-0" />
+                            <div className="h-3.5 w-px bg-gray-300 mx-0.5 shrink-0" />
 
                             {/* 3 Icon Buttons */}
-                            <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200/90 rounded-md p-0.5 shadow-2xs shrink-0">
+                            <div className="flex items-center gap-0.5 bg-gray-50 border border-gray-200/90 rounded p-0.5 shadow-2xs shrink-0">
                                 {/* List / Density Toggle */}
                                 <button
                                     type="button"
                                     onClick={() => setIsCompactView(!isCompactView)}
                                     title={isCompactView ? 'Switch to Standard List View' : 'Switch to Compact List View'}
-                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                    className={`w-5.5 h-5.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
                                         isCompactView
                                             ? 'bg-white text-blue-600 shadow-xs font-bold ring-1 ring-blue-300'
                                             : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
                                     }`}
                                 >
-                                    <List size={13} />
+                                    <List size={11} />
                                 </button>
 
                                 {/* Show / Hide Voided Toggle */}
@@ -1236,13 +1454,13 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                     type="button"
                                     onClick={() => setHideVoided(!hideVoided)}
                                     title={hideVoided ? 'Show Voided Transactions' : 'Hide Voided Transactions'}
-                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                    className={`w-5.5 h-5.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
                                         hideVoided
                                             ? 'bg-rose-100 text-rose-700 shadow-xs font-bold ring-1 ring-rose-300'
                                             : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
                                     }`}
                                 >
-                                    {hideVoided ? <EyeOff size={13} /> : <Eye size={13} />}
+                                    {hideVoided ? <EyeOff size={11} /> : <Eye size={11} />}
                                 </button>
 
                                 {/* Group / Consolidated View by Revenue Head */}
@@ -1250,17 +1468,95 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                                     type="button"
                                     onClick={() => setIsGroupedView(!isGroupedView)}
                                     title={isGroupedView ? 'Switch to Chronological Ledger View' : 'Group by Revenue Head (Consolidated View)'}
-                                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                    className={`w-5.5 h-5.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
                                         isGroupedView
                                             ? 'bg-white text-indigo-600 shadow-xs font-bold ring-1 ring-indigo-300'
                                             : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/60'
                                     }`}
                                 >
-                                    <Layers size={13} />
+                                    <Layers size={11} />
                                 </button>
                             </div>
                         </div>
                     </div>
+
+                    {/* Split Stay Sequential Journey Filter Pills */}
+                    {isTrueSplitStay && splitStayLegs.length > 1 && (
+                        <div className="flex items-center gap-1.5 py-1 px-2.5 bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-blue-50/70 border border-purple-200/90 rounded-lg text-[11px] text-purple-900 shrink-0">
+                            <div className="flex items-center gap-1 font-bold text-purple-950 shrink-0 mr-1">
+                                <GitFork size={12} className="text-purple-600" />
+                                <span>Split Stay Journey:</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedSplitLegRoom(null)}
+                                className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-all cursor-pointer ${
+                                    !selectedSplitLegRoom
+                                        ? 'bg-purple-600 text-white shadow-2xs font-bold'
+                                        : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200/90'
+                                }`}
+                            >
+                                All Segments ({splitStayLegs.length} Rooms · Full Bill)
+                            </button>
+                            {splitStayLegs.map((leg: any, lIdx: number) => {
+                                const legNum = String(leg.roomNumber || leg.room_number || '').trim();
+                                const isAct = selectedSplitLegRoom === legNum;
+                                return (
+                                    <button
+                                        key={legNum || lIdx}
+                                        type="button"
+                                        onClick={() => setSelectedSplitLegRoom(legNum)}
+                                        className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                                            isAct
+                                                ? 'bg-purple-600 text-white shadow-2xs font-bold'
+                                                : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200/90'
+                                        }`}
+                                    >
+                                        <span>Leg {lIdx + 1}: Room {legNum}</span>
+                                        <span className="text-[9px] opacity-80">({leg.nights || 1}N)</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Group Multi-Room Folio Navigation Pills */}
+                    {isTrueGroupStay && groupRoomsList.length > 1 && (
+                        <div className="flex items-center gap-1.5 py-1 px-2.5 bg-gradient-to-r from-blue-50/90 via-sky-50/80 to-indigo-50/70 border border-blue-200/90 rounded-lg text-[11px] text-blue-900 shrink-0">
+                            <div className="flex items-center gap-1 font-bold text-blue-950 shrink-0 mr-1">
+                                <Users size={12} className="text-blue-600" />
+                                <span>Group Folio:</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedSplitLegRoom(null)}
+                                className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-all cursor-pointer ${
+                                    !selectedSplitLegRoom
+                                        ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                                        : 'bg-white text-blue-800 hover:bg-blue-100 border border-blue-200/90'
+                                }`}
+                            >
+                                Group Master Bill ({groupRoomsList.length} Rooms)
+                            </button>
+                            {groupRoomsList.map((rmNum: string) => {
+                                const isAct = selectedSplitLegRoom === rmNum;
+                                return (
+                                    <button
+                                        key={rmNum}
+                                        type="button"
+                                        onClick={() => setSelectedSplitLegRoom(rmNum)}
+                                        className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                                            isAct
+                                                ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                                                : 'bg-white text-blue-800 hover:bg-blue-100 border border-blue-200/90'
+                                        }`}
+                                    >
+                                        <span>Room {rmNum}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Transaction Ledger Table - ONLY MIDDLE SCROLLS */}
                     <div className="border border-gray-200/90 rounded-lg overflow-y-auto flex-1 min-h-0 bg-white shadow-xs">
@@ -1321,6 +1617,98 @@ export const TabFolioOperations: React.FC<TabFolioOperationsProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Modal: Reopen Settled Folio (Supervisor Protocol) */}
+            {isReopenModalOpen && createPortal(
+                <div className="fixed inset-0 z-[100010] bg-black/50 backdrop-blur-2xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-4 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-gray-800 text-xs">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                            <div className="flex items-center gap-2">
+                                <RotateCcw size={16} className="text-amber-600" />
+                                <h3 className="font-bold text-xs uppercase text-gray-900">Reopen Settled Folio</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsReopenModalOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-[11px] text-amber-900 space-y-1">
+                            <p className="font-semibold">Supervisor Reopening Policy:</p>
+                            <p>
+                                Reopening folio <strong>{folio?.folio_number}</strong> will restore its status to <strong>REOPENED</strong>, allowing post-stay charges, adjustments, or additional payments to be posted. All actions are logged in the audit trail.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2.5">
+                            <div>
+                                <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                    Primary Reason for Reopening *
+                                </label>
+                                <select
+                                    value={reopenReason}
+                                    onChange={(e) => setReopenReason(e.target.value)}
+                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    <option value="Late Minibar / Room Service">Late Minibar / Room Service</option>
+                                    <option value="Laundry / Valet Slip Delayed">Laundry / Valet Slip Delayed</option>
+                                    <option value="Billing Correction / Disputed Charge">Billing Correction / Disputed Charge</option>
+                                    <option value="Post-Stay Room Damage Assessment">Post-Stay Room Damage Assessment</option>
+                                    <option value="City Ledger / Corporate Re-Routing">City Ledger / Corporate Re-Routing</option>
+                                    <option value="Guest Extension Post-Checkout">Guest Extension Post-Checkout</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                    Supervisor Remarks / Notes
+                                </label>
+                                <textarea
+                                    value={reopenNotes}
+                                    onChange={(e) => setReopenNotes(e.target.value)}
+                                    placeholder="Enter authorization notes or slip reference..."
+                                    rows={2}
+                                    className="w-full bg-white border border-gray-300 rounded p-2 text-xs text-gray-800 focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => setIsReopenModalOpen(false)}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isReopening}
+                                onClick={handleReopenFolio}
+                                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                            >
+                                <Unlock size={12} />
+                                <span>{isReopening ? 'Reopening...' : 'Authorize & Reopen'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Enterprise Double-Copy Money Receipt Modal */}
+            {moneyReceiptState.isOpen && moneyReceiptState.payment && (
+                <MoneyReceiptModal
+                    isOpen={moneyReceiptState.isOpen}
+                    onClose={() => setMoneyReceiptState({ isOpen: false, payment: null })}
+                    payment={moneyReceiptState.payment}
+                    folio={folio}
+                    booking={booking}
+                />
+            )}
         </div>
     );
 };

@@ -27,10 +27,10 @@ export const getApiBaseUrl = (): string => {
       return `http://${hostname}:3002`;
     }
 
-    // When running on HTTPS (Vercel, custom domain, or cloud deployment):
+    // When running on HTTPS or Vercel (e.g. *.vercel.app or production domain):
     // Use relative path "" so requests route to `https://<domain>/api/...`
-    // This avoids port blocks and Mixed Content issues completely.
-    if (isHttps) {
+    // This avoids port blocks, mixed content issues, and CORS errors completely.
+    if (isHttps || hostname.endsWith('.vercel.app')) {
       return '';
     }
 
@@ -126,7 +126,22 @@ if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalle
         headers.set('x-property-id', String(propId));
       }
       modifiedInit.headers = headers;
-      return originalFetch.call(this, input, modifiedInit);
+      return originalFetch.call(this, input, modifiedInit).then((res: Response) => {
+        if (res.status === 401 && typeof window !== 'undefined') {
+          // Only purge credentials if a dedicated auth verification route explicitly rejects the token.
+          // This protects against transient operational 401s from kicking the user out of the app.
+          const isExplicitAuthVerify = urlStr.includes('/api/auth/me') || urlStr.includes('/api/auth/verify');
+          if (isExplicitAuthVerify) {
+            console.warn('⚠️ Dedicated auth verification route returned 401: purging stale credentials.');
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('hotel_token');
+          } else {
+            console.warn(`⚠️ API call to ${urlStr} returned 401 Unauthorized, but preserving active staff session.`);
+          }
+        }
+        return res;
+      });
     }
     return originalFetch.call(this, input, init);
   };

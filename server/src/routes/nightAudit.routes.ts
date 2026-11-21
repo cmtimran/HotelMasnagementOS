@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { NightAuditService } from '../services/nightAudit.service.js';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 
 export const nightAuditRoutes = Router();
 
@@ -67,15 +67,16 @@ nightAuditRoutes.get('/logs', async (req: Request, res: Response) => {
         const rawPropId = req.query.propertyId || req.headers['x-property-id'] || (req as any).propertyId;
         const propertyId = rawPropId ? Number(rawPropId) : 1;
 
-        const logs = await db.prepare(`
+        const logsRes = await pgPool.query(`
             SELECT id, property_id, audit_date, performed_by, rooms_posted, 
                    total_room_revenue, total_tax_posted, in_house_count, 
                    arrivals_pending, departures_pending, status, details_json, created_at
             FROM night_audit_logs
-            WHERE property_id = ?
+            WHERE property_id = $1
             ORDER BY created_at DESC
             LIMIT 30;
-        `).all(propertyId).catch(() => []);
+        `, [propertyId]).catch(() => ({ rows: [] }));
+        const logs = logsRes.rows;
 
         res.json({
             success: true,

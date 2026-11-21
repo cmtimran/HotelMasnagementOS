@@ -10,16 +10,17 @@ import {
     RefreshCw,
     User,
     Lock,
-    Sparkles
+    Sparkles,
+    ClipboardPaste
 } from 'lucide-react';
 import {
-    runTesseractOcr,
+    executeUniversalDocumentScanner,
     parseUniversalIdentityDocument,
     type ParsedIdentityDocument
 } from '../../utils/universalIdParser';
 import { parseTD3, parseTD1 } from '../../utils/mrzParser';
 import { getApiBaseUrl } from '../../utils/apiUrl';
-import { getCurrencySymbol } from '../../utils/currencyUtils';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 
 interface PassportIdScannerModalProps {
     isOpen: boolean;
@@ -36,7 +37,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
     reservationId,
     reservationNumber
 }) => {
-    const currency = getCurrencySymbol();
+    const { currencySymbol: currency } = useActiveCurrency();
     const [scanMode, setScanMode] = useState<'camera' | 'upload' | 'sample'>('upload');
     const [isScanning, setIsScanning] = useState(false);
     const [ocrProgress, setOcrProgress] = useState<string>('');
@@ -47,7 +48,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
 
     // Camera Stream States
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const cameraStreamRef = useRef<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
 
     // Matching & Deduplication States
@@ -55,24 +56,24 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
     const [matchedGuest, setMatchedGuest] = useState<any | null>(null);
     const [matchType, setMatchType] = useState<'EXACT_ID' | 'PHONE' | 'DEMOGRAPHICS' | 'NONE'>('NONE');
     const [actionLoading, setActionLoading] = useState(false);
-    const [statusToast, setStatusToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [statusToast, setStatusToast] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-    // Stop camera stream cleanly
+    // Stop camera stream cleanly without causing re-render cascades
     const stopCamera = useCallback(() => {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            setCameraStream(null);
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
         }
-    }, [cameraStream]);
+    }, []);
 
-    // Start camera stream when camera mode is active
+    // Start camera stream ONLY when camera mode is explicitly active
     useEffect(() => {
         if (isOpen && scanMode === 'camera') {
             setCameraError(null);
             navigator.mediaDevices?.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
             }).then(stream => {
-                setCameraStream(stream);
+                cameraStreamRef.current = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                 }
@@ -101,6 +102,12 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
 
     // Query backend for existing profile match by document number & demographics
     const lookupExistingProfile = async (doc: ParsedIdentityDocument) => {
+        if (!doc || doc.isValidDocument === false || (!doc.documentNumber && !doc.fullName)) {
+            setIsLookingUp(false);
+            setMatchedGuest(null);
+            return;
+        }
+
         setIsLookingUp(true);
         setMatchedGuest(null);
         setMatchType('NONE');
@@ -150,13 +157,11 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
             setCapturedImage(dataUrl);
 
             try {
-                setOcrProgress('Running Universal Document OCR engine...');
-                const extractedText = await runTesseractOcr(dataUrl, (pct, status) => {
+                setOcrProgress('Running Universal Multi-Modal Document Scanner...');
+                const doc = await executeUniversalDocumentScanner(dataUrl, (pct, status) => {
                     setOcrProgress(`${status} (${pct}%)`);
                 });
 
-                setOcrProgress('Dynamically parsing identity fields...');
-                const doc = parseUniversalIdentityDocument(extractedText);
                 setParsedDoc(doc);
                 setIsScanning(false);
                 setOcrProgress('');
@@ -166,7 +171,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                 setOcrProgress('');
                 setStatusToast({
                     type: 'error',
-                    text: 'OCR error: ' + (err?.message || 'Could not recognize document.')
+                    text: 'Scanner error: ' + (err?.message || 'Could not recognize document.')
                 });
             }
         }
@@ -185,13 +190,11 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
             setCapturedImage(dataUrl);
 
             try {
-                setOcrProgress('Running Universal Document OCR engine...');
-                const extractedText = await runTesseractOcr(file, (pct, status) => {
+                setOcrProgress('Running Universal Multi-Modal Document Scanner...');
+                const doc = await executeUniversalDocumentScanner(file, (pct, status) => {
                     setOcrProgress(`${status} (${pct}%)`);
                 });
 
-                setOcrProgress('Dynamically parsing identity fields...');
-                const doc = parseUniversalIdentityDocument(extractedText);
                 setParsedDoc(doc);
                 setIsScanning(false);
                 setOcrProgress('');
@@ -201,7 +204,7 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                 setOcrProgress('');
                 setStatusToast({
                     type: 'error',
-                    text: 'OCR error: ' + (err?.message || 'Could not recognize document text.')
+                    text: 'Scanner error: ' + (err?.message || 'Could not recognize document text.')
                 });
             }
         };
@@ -219,6 +222,109 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
         const file = e.dataTransfer.files?.[0];
         if (file) processFile(file);
     };
+
+    // Clipboard Paste Handler (Button Click & Programmatic)
+    const handleClipboardPaste = async () => {
+        try {
+            if (!navigator.clipboard?.read) {
+                setStatusToast({
+                    type: 'info',
+                    text: 'Press Ctrl + V on your keyboard to paste the copied image.'
+                });
+                return;
+            }
+
+            const clipboardItems = await navigator.clipboard.read();
+            let imageBlob: Blob | null = null;
+
+            for (const item of clipboardItems) {
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
+                    imageBlob = await item.getType(imageType);
+                    break;
+                }
+            }
+
+            if (imageBlob) {
+                const file = new File([imageBlob], `clipboard-${Date.now()}.${imageBlob.type.split('/')[1] || 'png'}`, { type: imageBlob.type });
+                setStatusToast({
+                    type: 'success',
+                    text: 'Pasted image from clipboard! Scanning...'
+                });
+                processFile(file);
+            } else {
+                setStatusToast({
+                    type: 'error',
+                    text: 'No image found in clipboard. Copy an image (Ctrl+C or Win+Shift+S) and paste (Ctrl+V).'
+                });
+            }
+        } catch {
+            setStatusToast({
+                type: 'info',
+                text: 'Press Ctrl + V on your keyboard to paste the copied image directly.'
+            });
+        }
+    };
+
+    // Global Paste Event Listener when modal is open
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleGlobalPaste = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement;
+            const isEditingInput = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            );
+
+            const items = e.clipboardData?.items;
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.type.startsWith('image/')) {
+                        const blob = item.getAsFile();
+                        if (blob) {
+                            e.preventDefault();
+                            const file = new File([blob], `clipboard-${Date.now()}.${blob.type.split('/')[1] || 'png'}`, { type: blob.type });
+                            setStatusToast({
+                                type: 'success',
+                                text: 'Pasted image from clipboard! Scanning...'
+                            });
+                            processFile(file);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: If raw MRZ text or document text is pasted outside input fields
+            if (!isEditingInput && e.clipboardData?.getData('text')) {
+                const pastedText = e.clipboardData.getData('text').trim();
+                if (pastedText.length >= 28 && (pastedText.includes('<') || /^[A-Z0-9<]{28,}/m.test(pastedText) || /Republic of Bangladesh|National ID/i.test(pastedText))) {
+                    e.preventDefault();
+                    setIsScanning(true);
+                    setOcrProgress('Parsing pasted document text stream...');
+                    setTimeout(() => {
+                        const doc = parseUniversalIdentityDocument(pastedText);
+                        setParsedDoc(doc);
+                        setIsScanning(false);
+                        setOcrProgress('');
+                        lookupExistingProfile(doc);
+                        setStatusToast({
+                            type: 'success',
+                            text: 'Pasted text stream parsed successfully!'
+                        });
+                    }, 50);
+                }
+            }
+        };
+
+        window.addEventListener('paste', handleGlobalPaste);
+        return () => {
+            window.removeEventListener('paste', handleGlobalPaste);
+        };
+    }, [isOpen]);
 
     // Fast Preset Samples
     const handleLoadSample = (type: 'robert' | 'anis' | 'nid_smart' | 'uk_passport') => {
@@ -323,7 +429,10 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         gender: parsedDoc.gender,
                         idExpiryDate: parsedDoc.expiryDate,
                         idIssueCountry: parsedDoc.issuingCountryName,
-                        phone: guestPhone.trim() || undefined
+                        phone: guestPhone.trim() || undefined,
+                        address: parsedDoc.address || undefined,
+                        fatherName: parsedDoc.fatherName || undefined,
+                        motherName: parsedDoc.motherName || undefined
                     }
                 })
             });
@@ -435,10 +544,20 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                 {/* Toast Notification */}
                 {statusToast && (
                     <div className={`mx-5 mt-3 p-2.5 rounded-lg text-xs font-medium flex items-center justify-between shadow-xs ${
-                        statusToast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                        statusToast.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : statusToast.type === 'info'
+                            ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
                     }`}>
                         <div className="flex items-center gap-2">
-                            {statusToast.type === 'success' ? <CheckCircle2 size={15} className="text-emerald-600" /> : <AlertTriangle size={15} className="text-rose-600" />}
+                            {statusToast.type === 'success' ? (
+                                <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                            ) : statusToast.type === 'info' ? (
+                                <ClipboardPaste size={15} className="text-blue-600 shrink-0" />
+                            ) : (
+                                <AlertTriangle size={15} className="text-rose-600 shrink-0" />
+                            )}
                             <span>{statusToast.text}</span>
                         </div>
                         <button type="button" onClick={() => setStatusToast(null)} className="text-gray-400 hover:text-gray-700 text-xs">✕</button>
@@ -508,13 +627,25 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                                     <UploadCloud size={12} />
                                 </div>
                                 <span className="text-[11px] text-gray-600 truncate">
-                                    Document parsed. Drag &amp; drop another photo or click to re-scan.
+                                    Document parsed. Drag &amp; drop another photo, Browse, or Paste with Ctrl+V.
                                 </span>
                             </div>
-                            <label className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 hover:border-blue-400 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors shrink-0">
-                                <span>Change / Re-upload File</span>
-                                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                            </label>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={handleClipboardPaste}
+                                    className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-500 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                                    title="Paste image from clipboard (Ctrl+V)"
+                                >
+                                    <ClipboardPaste size={11} />
+                                    <span>Paste (Ctrl+V)</span>
+                                </button>
+                                <label className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 hover:border-blue-400 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors shrink-0 flex items-center gap-1">
+                                    <UploadCloud size={11} />
+                                    <span>Change / Re-upload</span>
+                                    <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                                </label>
+                            </div>
                         </div>
                     )}
 
@@ -534,22 +665,37 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                                     <UploadCloud size={18} />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                                        <span>Drag &amp; drop Passport or ID Card image</span>
+                                    <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5 flex-wrap">
+                                        <span>Drag &amp; drop, Browse, or Paste ID image</span>
                                         <span className="text-[9.5px] text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded font-semibold">
                                             All Countries
                                         </span>
+                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1">
+                                            <ClipboardPaste size={10} />
+                                            <span>Ctrl + V Supported</span>
+                                        </span>
                                     </h4>
                                     <p className="text-[10px] text-gray-500 mt-0.5">
-                                        Supports NID, Smart Card, Passport, Driver's License &bull; JPG, PNG, WEBP, PDF (Max 10MB)
+                                        Supports NID, Smart Card, Passport, Driver's License &bull; Paste with Ctrl+V &bull; JPG, PNG, WEBP, PDF (Max 10MB)
                                     </p>
                                 </div>
                             </div>
-                            <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs transition-colors shrink-0 flex items-center gap-1.5">
-                                <UploadCloud size={12} />
-                                <span>Browse Files</span>
-                                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                            </label>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={handleClipboardPaste}
+                                    className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-500 font-semibold rounded-lg text-xs cursor-pointer shadow-2xs transition-colors flex items-center gap-1.5"
+                                    title="Paste copied image from clipboard (Ctrl+V)"
+                                >
+                                    <ClipboardPaste size={13} />
+                                    <span>Paste (Ctrl+V)</span>
+                                </button>
+                                <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs transition-colors flex items-center gap-1.5">
+                                    <UploadCloud size={12} />
+                                    <span>Browse Files</span>
+                                    <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                                </label>
+                            </div>
                         </div>
                     )}
 
@@ -614,7 +760,87 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                     )}
 
                     {/* EXTRACTED IDENTITY DOCUMENT DETAILS */}
-                    {parsedDoc && (
+                    {parsedDoc && parsedDoc.isValidDocument === false && (
+                        <div className="bg-rose-50/90 border-2 border-rose-300 rounded-2xl p-4 sm:p-5 text-gray-800 space-y-3.5 shadow-sm animate-in fade-in duration-200">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                                    <AlertTriangle size={22} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-sm font-bold text-rose-900">
+                                            Unrecognized Document (অপ্রাসঙ্গিক বা অবৈধ ডকুমেন্ট)
+                                        </h3>
+                                        <span className="text-[10px] font-bold bg-rose-200/80 text-rose-800 px-2 py-0.5 rounded-full">
+                                            Scan Rejected
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-rose-700 mt-1">
+                                        {parsedDoc.rejectionReason || 'The uploaded image does not appear to be an official government travel or identity document (Passport, Smart NID, Driving License, or National ID).'}
+                                    </p>
+                                </div>
+                                {capturedImage && (
+                                    <img src={capturedImage} alt="Uploaded" className="h-12 w-16 object-cover rounded-lg border border-rose-300 shadow-2xs shrink-0" />
+                                )}
+                            </div>
+
+                            <div className="bg-white/90 rounded-xl p-3 border border-rose-200/80 text-xs space-y-2">
+                                <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                                    <ShieldCheck size={14} className="text-blue-600" />
+                                    <span>Acceptable Travel &amp; Identity Documents:</span>
+                                </div>
+                                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-gray-600">
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="text-emerald-600 font-bold">✓</span>
+                                        <span>Official Passport (ICAO 9303 MRZ visible)</span>
+                                    </li>
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="text-emerald-600 font-bold">✓</span>
+                                        <span>Bangladesh Smart NID or National ID card</span>
+                                    </li>
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="text-emerald-600 font-bold">✓</span>
+                                        <span>Driver's License (AAMVA, UK, International)</span>
+                                    </li>
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="text-rose-600 font-bold">✕</span>
+                                        <span>Invoices, receipts, scenery, selfies, or random photos</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setParsedDoc(null);
+                                        setCapturedImage(null);
+                                    }}
+                                    className="text-xs text-gray-500 hover:text-gray-800 font-semibold cursor-pointer underline"
+                                >
+                                    Clear &amp; Try Again
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleClipboardPaste}
+                                        className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-500 font-semibold rounded-lg text-xs cursor-pointer shadow-2xs transition-colors flex items-center gap-1.5"
+                                    >
+                                        <ClipboardPaste size={13} />
+                                        <span>Paste Another (Ctrl+V)</span>
+                                    </button>
+                                    <label className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs transition-colors flex items-center gap-1.5">
+                                        <UploadCloud size={13} />
+                                        <span>Upload Valid ID Card</span>
+                                        <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* EXTRACTED IDENTITY DOCUMENT DETAILS (VALID ONLY) */}
+                    {parsedDoc && parsedDoc.isValidDocument !== false && (
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 animate-in fade-in zoom-in-95 duration-150">
                             <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                                 <div className="flex items-center gap-2">
@@ -625,13 +851,26 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                                     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
                                         Parsed {parsedDoc.documentType} ({parsedDoc.format})
                                     </h3>
-                                    {parsedDoc.isChecksumValid ? (
+                                    {parsedDoc.detectionMethod === 'PDF417_BARCODE' ? (
                                         <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <CheckCircle2 size={10} /> Verified
+                                            <CheckCircle2 size={10} /> 2D Barcode (PDF417)
+                                        </span>
+                                    ) : parsedDoc.detectionMethod === 'QR_CODE' ? (
+                                        <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <CheckCircle2 size={10} /> QR Code Verified
+                                        </span>
+                                    ) : parsedDoc.detectionMethod === 'MRZ_ICAO' ? (
+                                        <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <CheckCircle2 size={10} /> ICAO 9303 MRZ Checked
                                         </span>
                                     ) : (
-                                        <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <AlertTriangle size={10} /> Visual OCR
+                                        <span className="bg-indigo-100 text-indigo-800 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <Sparkles size={10} /> Multi-Script OCR &amp; NLP
+                                        </span>
+                                    )}
+                                    {parsedDoc.confidenceScore && (
+                                        <span className="bg-slate-200/80 text-slate-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                                            {parsedDoc.confidenceScore}% Confidence
                                         </span>
                                     )}
                                 </div>
@@ -734,6 +973,40 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                                         onChange={e => setGuestPhone(e.target.value)}
                                         className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
                                         placeholder="Optional phone"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Extended Family & Address Details (KYC Vault) */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-slate-200 text-xs">
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Father's Name</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.fatherName || ''}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, fatherName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                        placeholder="Father's Legal Name"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Mother's Name</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.motherName || ''}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, motherName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                        placeholder="Mother's Legal Name"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-gray-500 text-[10px] uppercase font-bold block mb-1">Permanent Address</label>
+                                    <input
+                                        type="text"
+                                        value={parsedDoc.address || ''}
+                                        onChange={e => setParsedDoc({ ...parsedDoc, address: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-gray-800 bg-white outline-none text-xs"
+                                        placeholder="Village, Post Office, Police Station, District"
                                     />
                                 </div>
                             </div>
@@ -852,8 +1125,8 @@ export const PassportIdScannerModal: React.FC<PassportIdScannerModalProps> = ({
                         </div>
                     )}
 
-                    {/* SCENARIO B: NEW GUEST (No Existing Match Found) */}
-                    {parsedDoc && !matchedGuest && !isLookingUp && (
+                    {/* SCENARIO B: NEW GUEST (No Existing Match Found - Valid Document Only) */}
+                    {parsedDoc && parsedDoc.isValidDocument !== false && (parsedDoc.documentNumber || parsedDoc.fullName) && !matchedGuest && !isLookingUp && (
                         <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 space-y-3 shadow-md animate-in fade-in duration-200">
                             <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
                                 <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { db } from '../../database/db.js';
+import { pgPool } from '../../database/postgres.js';
 import type { ReportFilterQuery } from '../../types/index.js';
 
 const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
@@ -16,7 +16,7 @@ export const reservationReportsService = {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return [];
 
-    const rows = await db.prepare(`
+    const rowsRes = await pgPool.query(`
       SELECT 
         r.reservation_number as "resNo",
         g.first_name || ' ' || g.last_name as "guestName",
@@ -37,11 +37,11 @@ export const reservationReportsService = {
         r.paid_amount as charge
       FROM reservations r
       JOIN guests g ON g.id = r.booker_guest_id
-      WHERE r.property_id = ? AND r.status = 'CANCELLED'
+      WHERE r.property_id = $1 AND r.status = 'CANCELLED'
       ORDER BY r.updated_at DESC
-    `).all(propId) as any[];
+    `, [propId]);
 
-    return rows || [];
+    return rowsRes.rows || [];
   },
 
   /**
@@ -51,7 +51,7 @@ export const reservationReportsService = {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return [];
 
-    const rows = await db.prepare(`
+    const rowsRes = await pgPool.query(`
       SELECT 
         r.reservation_number as "resNo",
         g.first_name || ' ' || g.last_name as "guestName",
@@ -66,12 +66,12 @@ export const reservationReportsService = {
       LEFT JOIN reservation_rooms rr ON rr.reservation_id = r.id
       LEFT JOIN rooms rm ON rm.id = rr.room_id
       LEFT JOIN room_types rt ON rt.id = rm.room_type_id
-      WHERE r.property_id = ? AND r.status IN ('CONFIRMED', 'HOLD')
+      WHERE r.property_id = $1 AND r.status IN ('CONFIRMED', 'HOLD')
       ORDER BY r.id DESC
       LIMIT 20
-    `).all(propId) as any[];
+    `, [propId]);
 
-    return rows || [];
+    return rowsRes.rows || [];
   },
 
   /**
@@ -81,7 +81,7 @@ export const reservationReportsService = {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return [];
 
-    const rows = await db.prepare(`
+    const rowsRes = await pgPool.query(`
       SELECT 
         r.reservation_number as "resNo",
         COALESCE(rm.room_number, 'TBD') as "roomNo",
@@ -93,11 +93,11 @@ export const reservationReportsService = {
       JOIN guests g ON g.id = r.booker_guest_id
       LEFT JOIN reservation_rooms rr ON rr.reservation_id = r.id
       LEFT JOIN rooms rm ON rm.id = rr.room_id
-      WHERE r.property_id = ? AND r.status = 'IN_HOUSE'
+      WHERE r.property_id = $1 AND r.status = 'IN_HOUSE'
       ORDER BY r.id DESC
       LIMIT 20
-    `).all(propId) as any[];
+    `, [propId]);
 
-    return rows || [];
+    return rowsRes.rows || [];
   },
 };

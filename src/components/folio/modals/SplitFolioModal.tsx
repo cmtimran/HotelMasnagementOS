@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronRight, Inbox, Scissors } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { useActiveCurrency } from '../../../utils/currencyUtils';
 import type { FolioData } from '../folioTypes';
 
 interface SplitFolioModalProps {
@@ -19,7 +20,7 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
     allFolios,
     onSuccess
 }) => {
-    const currency = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol: currency } = useActiveCurrency();
     const [sourceFolioId, setSourceFolioId] = useState<string | number>('');
     const [destFolioId, setDestFolioId] = useState<string | number>('');
     const [selectedChargeIds, setSelectedChargeIds] = useState<Array<number | string>>([]);
@@ -57,6 +58,19 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
             setSelectedChargeIds([]);
         } else {
             setSelectedChargeIds(available.map(c => c.id));
+        }
+    };
+
+    const selectExtraCharges = () => {
+        const available = activeSourceFolio?.charges?.filter(c => !c.is_voided) || [];
+        const extraCharges = available.filter(c => {
+            const code = (c.charge_code || '').toLowerCase();
+            const head = (c.revenue_head || '').toLowerCase();
+            return code !== 'room_chg' && !head.includes('room charge') && !head.includes('room tariff');
+        });
+        setSelectedChargeIds(extraCharges.map(c => c.id));
+        if (!destFolioId || destFolioId === '') {
+            setDestFolioId('NEW_CUT_FOLIO');
         }
     };
 
@@ -101,21 +115,24 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
     const sourceCharges = activeSourceFolio?.charges?.filter(c => !c.is_voided) || [];
     const destCharges = activeDestFolio?.charges?.filter(c => !c.is_voided) || [];
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/25 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
             {/* Slide-out Drawer Panel (Right Side) */}
-            <div className="fixed inset-y-0 right-0 w-[580px] sm:w-[720px] max-w-full bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
+            <div className="fixed inset-y-0 right-0 w-[580px] sm:w-[720px] max-w-full bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
                 {/* Header */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <div className="flex items-center gap-2">
                         <Scissors size={16} className="text-amber-300" />
-                        <h3 className="text-xs font-bold tracking-wide uppercase">Split Folio</h3>
+                        <div>
+                            <h3 className="text-xs font-bold tracking-wide uppercase">Cut / Split Folio</h3>
+                            <p className="text-[10px] text-blue-200">Enterprise Folio Operations &amp; Incidental Isolation</p>
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -131,6 +148,27 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
                         {errorMsg}
                     </div>
                 )}
+
+                {/* 1-Click Cut Extra Charges Quick Bar */}
+                <div className="px-3 pt-3">
+                    <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-2 flex items-center justify-between text-xs shadow-2xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                            <div className="truncate">
+                                <span className="font-bold text-blue-950">Cut Folio Shortcut: </span>
+                                <span className="text-blue-800 text-[11px]">Separate all non-room extra charges (F&B, Laundry, Transport) into a new bill</span>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={selectExtraCharges}
+                            className="px-2.5 py-1 bg-[#1e3a8a] hover:bg-blue-800 text-white rounded text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ml-2 active:scale-95"
+                        >
+                            <Scissors size={11} className="text-amber-300" />
+                            <span>Select All Extra Charges</span>
+                        </button>
+                    </div>
+                </div>
 
                 {/* Body: Two columns side-by-side with transfer button in middle */}
                 <div className="p-3 grid grid-cols-12 gap-2.5 flex-1 min-h-0 overflow-y-auto items-stretch">
@@ -330,6 +368,7 @@ export const SplitFolioModal: React.FC<SplitFolioModalProps> = ({
                     </button>
                 </div>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

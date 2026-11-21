@@ -6,7 +6,6 @@ import {
     Edit3,
     Calendar,
     ChevronDown,
-    Calculator,
     DollarSign,
     CreditCard,
     Wallet,
@@ -33,21 +32,53 @@ import {
     ArrowRight,
     ArrowLeft,
     ArrowRightLeft,
-    Sparkles,
     CheckCircle2,
     RotateCcw,
+    Mail,
+    MessageSquare,
+    MessageCircle,
+    Tag,
+    Send,
     Undo2,
     Clock,
     LogOut,
+    LogIn,
+    Wine,
+    Moon,
+    Receipt,
+    BedDouble,
+    Globe,
     Percent,
-    Camera
+    Camera,
+    Phone,
+    Bell,
+    Sparkles,
+    AlertTriangle,
+    Scissors,
+    GitMerge,
+    Minus,
+    Landmark,
+    Smartphone
 } from 'lucide-react';
 import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
-import { getCurrencySymbol } from '../../utils/currencyUtils';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 import type { AmendBookingData } from './AmendStayModal';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
 import {
+    resolveDynamicPropertyId,
+    getPropertyPaymentConfig,
+    getPaymentMethodsForOutlet,
+    calculateMdrCommission,
+    detectPaymentCategory,
+    getDynamicTaxVatRate,
+    getDynamicExpenseGlCode,
+    getDynamicMasterBanks,
+    type PaymentMethodItem,
+    type PropertyPaymentConfig
+} from '../../utils/propertyPaymentMethodEngine';
+import {
     getStandardDailyRateForRoom,
+    resolveReservationDailyBaseRate,
     getAvailableRoomsForStay,
     getRoomTypeCapacity,
     calculateTariffForRatePlan,
@@ -64,13 +95,17 @@ import {
     getDynamicRatePlans,
     getDynamicPackages,
     syncRatePlansAndPackagesFromDB,
+    sanitizeRatePlanName,
     broadcastPMSEvent
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
+import { classifyReservation } from '../../utils/reservationNumbering';
 
 import { DrawerFolioOperations } from '../folio/DrawerFolioOperations';
 import { DigitalRegCardModal } from './DigitalRegCardModal';
 import { PassportIdScannerModal } from './PassportIdScannerModal';
+import { KeycardEncoderModal } from './KeycardEncoderModal';
+import { MinibarAuditModal } from './MinibarAuditModal';
 
 export type DrawerMode =
     | 'overview'
@@ -78,6 +113,8 @@ export type DrawerMode =
     | 'amend'
     | 'move'
     | 'swap'
+    | 'keycard'
+    | 'minibar'
     | 'reg_card'
     | 'payment'
     | 'split'
@@ -97,7 +134,18 @@ export type DrawerMode =
     | 'checkout'
     | 'checkin'
     | 'tax_exemption'
-    | 'scan_id';
+    | 'scan_id'
+    | 'send_confirmation';
+
+export interface MoveStaySegment {
+    id: string;
+    fromDate: string;
+    toDate: string;
+    roomType: string;
+    roomNumber: string;
+    dailyRate?: number;
+    nights?: number;
+}
 
 export interface ReservationActionDrawerProps {
     isOpen: boolean;
@@ -105,11 +153,12 @@ export interface ReservationActionDrawerProps {
     booking: AmendBookingData | null;
     initialMode?: DrawerMode;
     allRooms?: Array<{ id?: string; roomNumber: string; type: string; status: string }>;
+    initialTargetArrival?: string;
     initialTargetDeparture?: string;
     initialTargetNights?: number;
     initialTargetRoomNumber?: string;
     // Core PMS Action Handlers
-    onSaveAmendStay?: (bookingId: string, newDeparture: string, newNights: number, newAdults?: number, newChildren?: number) => void;
+    onSaveAmendStay?: (bookingId: string, newDeparture: string, newNights: number, newAdults?: number, newChildren?: number, notificationConfig?: any, newArrival?: string, customSegments?: any[]) => void;
     onSaveRoomMove?: (
         bookingId: string,
         newRoomNumber: string,
@@ -117,10 +166,13 @@ export interface ReservationActionDrawerProps {
         newToDate: string,
         newRoomType?: string,
         newRatePlan?: string,
-        upgradeAdjustment?: { mode: 'complimentary' | 'charge'; amount: number }
+        upgradeAdjustment?: { mode: 'complimentary' | 'charge'; amount: number },
+        notificationConfig?: any,
+        multiSegments?: MoveStaySegment[],
+        overrideRoomRate?: boolean
     ) => void;
     onSavePayment?: (bookingId: string, method: string, amount: number, remarks: string) => void;
-    onSaveRoomSplit?: (bookingId: string, targetRoomNumber: string, fromDate: string, toDate: string) => void;
+    onSaveRoomSplit?: (bookingId: string, targetRoomNumber: string, fromDate?: string, toDate?: string, customSegments?: any[]) => void;
     onStopRoomMove?: (bookingId: string, allowRoomMove: boolean) => void;
     onProceedNewBooking?: (bookingId: string, ownerFolio: string, groupOwner: string, sourceBooking?: AmendBookingData) => void;
     onConfirmCancel?: (bookingId: string, fee: number, refund: number, reason: string) => void;
@@ -153,6 +205,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     booking,
     initialMode = 'overview',
     allRooms = [],
+    initialTargetArrival,
     initialTargetDeparture,
     initialTargetNights,
     initialTargetRoomNumber,
@@ -179,7 +232,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 }) => {
     const operatingSystemDate = systemDate || getOperatingSystemDate();
     const isBookingInHouse = booking?.status === 'IN-HOUSE' || booking?.status === 'ARRIVED' || booking?.status === 'STAYOVER';
-    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol } = useActiveCurrency();
+
+    // Strict PMS Filter: Physical rooms only (Never allow virtual UNASSIGNED buffer rooms in room moves, swaps, or assignments)
+    const validRooms = useMemo(() => {
+        return (allRooms || [])
+            .filter(r => !isRoomUnassigned(r.roomNumber) && !String(r.type || '').toLowerCase().includes('buffer') && !String(r.roomNumber || '').toLowerCase().includes('unassign'));
+    }, [allRooms]);
 
     // Current Active Mode State
     const [mode, setMode] = useState<DrawerMode>(initialMode);
@@ -216,31 +275,126 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     // 1. Amend Stay Form States
     const [amendSelectedRoom, setAmendSelectedRoom] = useState(true);
+    const [splitViewMode, setSplitViewMode] = useState<'total' | 'segment'>('total');
+    // Guest Communication & Notification States
+    const [notifSendEmail, setNotifSendEmail] = useState<boolean>(true);
+    const [notifSendSms, setNotifSendSms] = useState<boolean>(true);
+    const [notifSendWhatsApp, setNotifSendWhatsApp] = useState<boolean>(false);
+    const [notifSilentUpdate, setNotifSilentUpdate] = useState<boolean>(false);
+    const [notifReason, setNotifReason] = useState<string>('Guest Requested Extension');
+    const [notifCustomEmail, setNotifCustomEmail] = useState<string>('');
+    const [notifCustomPhone, setNotifCustomPhone] = useState<string>('');
+    const [arrivalDate, setArrivalDate] = useState<string>('');
     const [departureDate, setDepartureDate] = useState<string>('');
     const [nights, setNights] = useState<number>(1);
     const [amendAdults, setAmendAdults] = useState<number>(2);
     const [amendChildren, setAmendChildren] = useState<number>(0);
 
-    // 2. Room Move Form States
+    // 2. Room Move Form States (Enterprise Split Stay Supported)
     const [moveSelectedRoom, setMoveSelectedRoom] = useState<string>('');
     const [moveFromDate, setMoveFromDate] = useState<string>('');
     const [moveToDate, setToDate] = useState<string>('');
     const [moveRoomType, setMoveRoomType] = useState<string>('All');
     const [moveRateType, setMoveRateType] = useState<string>('BAR');
     const [upgradeBillingMode, setUpgradeBillingMode] = useState<'complimentary' | 'charge'>('complimentary');
+    const [moveSegments, setMoveSegments] = useState<MoveStaySegment[]>([]);
+    const [overrideRoomRate, setOverrideRoomRate] = useState<boolean>(false);
 
-    // 3. Add Payment Form States
+    // 3. Add Payment Form States (Full Dynamic Tender Architecture)
+    const activePropertyId = useMemo(() => resolveDynamicPropertyId(), []);
+    const [paymentConfig, setPaymentConfig] = useState<PropertyPaymentConfig>(() => getPropertyPaymentConfig(activePropertyId));
+    const [frontOfficePaymentMethods, setFrontOfficePaymentMethods] = useState<PaymentMethodItem[]>(() => getPaymentMethodsForOutlet(activePropertyId, 'FRONT_OFFICE'));
+
+    useEffect(() => {
+        const handleSync = () => {
+            try {
+                setPaymentConfig(getPropertyPaymentConfig(activePropertyId));
+                setFrontOfficePaymentMethods(getPaymentMethodsForOutlet(activePropertyId, 'FRONT_OFFICE'));
+            } catch {}
+        };
+        window.addEventListener('hotel_payment_methods_updated', handleSync);
+        return () => window.removeEventListener('hotel_payment_methods_updated', handleSync);
+    }, [activePropertyId]);
+
     const [paymentFolio, setPaymentFolio] = useState<string>('');
     const [paymentMethod, setPaymentMethod] = useState<string>('Cash');
     const [paymentAmount, setPaymentAmount] = useState<number>(0);
     const [paymentRemarks, setPaymentRemarks] = useState<string>('');
+    const [paymentAcquiringBank, setPaymentAcquiringBank] = useState<string>('');
+    const [paymentPosTerminalId, setPaymentPosTerminalId] = useState<string>('');
+    const [paymentReferenceCode, setPaymentReferenceCode] = useState<string>('');
 
-    // 4. Room Split Form States
+    const matchedPaymentMethod = useMemo(() => {
+        return frontOfficePaymentMethods.find(m => m.displayName === paymentMethod || m.subType === paymentMethod);
+    }, [frontOfficePaymentMethods, paymentMethod]);
+
+    const activePaymentCategory = useMemo(() => {
+        return detectPaymentCategory(paymentMethod, frontOfficePaymentMethods);
+    }, [paymentMethod, frontOfficePaymentMethods]);
+
+    const drawerDynamicVatRate = useMemo(() => getDynamicTaxVatRate(), []);
+    const drawerDynamicExpenseGl = useMemo(() => getDynamicExpenseGlCode('BANK_CHARGES'), []);
+
+    const attachedAcquiringBanks = useMemo(() => {
+        if (matchedPaymentMethod?.acquiringBanks && matchedPaymentMethod.acquiringBanks.length > 0) {
+            return matchedPaymentMethod.acquiringBanks;
+        }
+        const availableBanks = (paymentConfig.registeredBanks && paymentConfig.registeredBanks.length > 0)
+            ? paymentConfig.registeredBanks
+            : getDynamicMasterBanks(activePropertyId);
+
+        if (availableBanks.length > 0) {
+            return availableBanks.map(b => ({
+                id: `dyn-${b.id}`,
+                bankName: b.bankName,
+                commissionRule: {
+                    commissionRatePercent: matchedPaymentMethod?.defaultCommissionRate ?? 0,
+                    flatFeeBdt: 0,
+                    vatOnCommissionPercent: drawerDynamicVatRate,
+                    feeAbsorbedBy: 'HOTEL' as const,
+                    expenseGlCode: b.linkedGlCode || drawerDynamicExpenseGl
+                },
+                settlementAccount: b.accountTitle ? `${b.accountTitle} (${b.accountNumber})` : b.accountNumber,
+                enabled: true
+            }));
+        }
+        return [];
+    }, [matchedPaymentMethod, paymentConfig.registeredBanks, activePropertyId, drawerDynamicVatRate, drawerDynamicExpenseGl]);
+
+    useEffect(() => {
+        if (attachedAcquiringBanks.length > 0 && !paymentAcquiringBank) {
+            setPaymentAcquiringBank(attachedAcquiringBanks[0].bankName);
+        }
+    }, [attachedAcquiringBanks, paymentAcquiringBank]);
+
+    const availablePosTerminals = useMemo(() => {
+        return (paymentConfig.posTerminals || []).filter(t =>
+            t.status === 'Active' &&
+            (!paymentAcquiringBank || t.bankName.toLowerCase() === paymentAcquiringBank.toLowerCase())
+        );
+    }, [paymentConfig.posTerminals, paymentAcquiringBank]);
+
+    const drawerMdrCalc = useMemo(() => {
+        const amt = Number(paymentAmount) || 0;
+        if (amt <= 0) return null;
+        const bankObj = attachedAcquiringBanks.find(b => b.bankName === paymentAcquiringBank) || attachedAcquiringBanks[0];
+        const rule = bankObj?.commissionRule || (matchedPaymentMethod?.defaultCommissionRate !== undefined ? {
+            commissionRatePercent: matchedPaymentMethod.defaultCommissionRate,
+            flatFeeBdt: 0,
+            vatOnCommissionPercent: drawerDynamicVatRate,
+            feeAbsorbedBy: 'HOTEL' as const,
+            expenseGlCode: drawerDynamicExpenseGl
+        } : null);
+        return rule ? calculateMdrCommission(amt, rule) : null;
+    }, [paymentAmount, attachedAcquiringBanks, paymentAcquiringBank, matchedPaymentMethod, drawerDynamicVatRate, drawerDynamicExpenseGl]);
+
+    // 4. Room Split & Split Stay Journey States
     const [splitRoom, setSplitRoom] = useState<string>('');
     const [splitFromDate, setSplitFromDate] = useState<string>('');
     const [splitToDate, setSplitToDate] = useState<string>('');
+    const [splitStaySegments, setSplitStaySegments] = useState<MoveStaySegment[]>([]);
 
-    // 5. Stop Room Move Form States (Yanolja PMS Lock & Move Guard)
+    // 5. Stop Room Move Form States (HotelManagementOS Lock & Move Guard)
     const [stopMoveLocked, setStopMoveLocked] = useState(false);
     const [stopMoveReason, setStopMoveReason] = useState('Guest requested fixed room assignment');
     const [stopMovePreset, setStopMovePreset] = useState('Guest Special Request');
@@ -257,6 +411,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     // 5d. Passport & ID Card Auto-Scanner Modal State
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+    // 5e. Keycard Hardware Encoder Modal State
+    const [isKeycardModalOpen, setIsKeycardModalOpen] = useState(false);
+
+    // 5f. In-Room Minibar Billing Modal State
+    const [isMinibarModalOpen, setIsMinibarModalOpen] = useState(false);
 
     // 6. Add New Booking Form States
     const [newBookingFolio, setNewBookingFolio] = useState<string>('');
@@ -303,6 +463,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [isIssuingKeycard, setIsIssuingKeycard] = useState(false);
     const [ratesVersion, setRatesVersion] = useState(0);
 
+    // 14. Send Confirmation Voucher Form States
+    const [confirmSendPhone, setConfirmSendPhone] = useState<string>('');
+    const [confirmSendEmail, setConfirmSendEmail] = useState<string>('');
+    const [confirmChannelWhatsApp, setConfirmChannelWhatsApp] = useState<boolean>(true);
+    const [confirmChannelEmail, setConfirmChannelEmail] = useState<boolean>(true);
+    const [showManualContactEntry, setShowManualContactEntry] = useState<boolean>(false);
+    const [showAddPhoneInput, setShowAddPhoneInput] = useState<boolean>(false);
+    const [showAddEmailInput, setShowAddEmailInput] = useState<boolean>(false);
+    const [isSendingConfirmation, setIsSendingConfirmation] = useState<boolean>(false);
+    const [lastDispatchedInfo, setLastDispatchedInfo] = useState<{ time: string; channels: string } | null>(null);
+
     // Proactively sync rate plans & packages dynamically from database
     useEffect(() => {
         syncRatePlansAndPackagesFromDB().then(() => {
@@ -315,26 +486,78 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         if (booking) {
             setActiveRoomNumber(booking.roomNumber);
             setLinkTargetResNo('');
-            const arr = booking.arrivalDate || '2026-07-01';
+            const arr = initialTargetArrival || booking.arrivalDate || '2026-07-01';
             const dep = initialTargetDeparture || booking.departureDate || '2026-07-03';
             const n = initialTargetNights || booking.nights || 2;
-            const daily = booking.avgDailyRate || getStandardDailyRateForRoom(booking.roomNumber, booking.roomType);
+            const daily = resolveReservationDailyBaseRate(booking, booking.roomNumber);
             const total = booking.totalAmount !== undefined ? booking.totalAmount : (n * daily);
             const due = booking.dueAmount !== undefined
                 ? booking.dueAmount
                 : Math.max(0, total - (booking.paidAmount || 0));
 
+            setArrivalDate(arr);
             setDepartureDate(dep);
             setNights(n);
             setAmendAdults(booking.adults ?? 2);
             setAmendChildren(booking.children ?? 0);
             setAmendSelectedRoom(true);
+            const cleanPhoneVal = (val?: any): string => {
+                if (!val) return '';
+                const s = String(val).trim();
+                if (s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return '';
+                return s;
+            };
+            const cleanEmailVal = (val?: any): string => {
+                if (!val) return '';
+                const s = String(val).trim();
+                if (s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return '';
+                return s;
+            };
 
-            const initialTargetRoom = initialTargetRoomNumber || booking.roomNumber;
-            setMoveSelectedRoom(initialTargetRoom);
-            const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(initialTargetRoom));
-            const targetRoomType = targetRoomObj?.type || booking.roomType || 'All';
+            let gEmail = cleanEmailVal((booking as any)?.guestEmail || (booking as any)?.email || (booking as any)?.guest_email);
+            let gPhone = cleanPhoneVal((booking as any)?.guestPhone || (booking as any)?.phone || (booking as any)?.mobile || (booking as any)?.guest_phone);
+            setNotifCustomEmail(gEmail);
+            setNotifCustomPhone(gPhone);
+            setNotifSendEmail(Boolean(gEmail));
+            setNotifSendSms(Boolean(gPhone));
+            setNotifSendWhatsApp(Boolean(gPhone));
+            setNotifSilentUpdate(false);
+
+            // Hydrate confirmation voucher state (100% dynamic from reservation record)
+            setConfirmSendPhone(gPhone);
+            setConfirmSendEmail(gEmail);
+            setConfirmChannelWhatsApp(Boolean(gPhone));
+            setConfirmChannelEmail(Boolean(gEmail));
+            setShowManualContactEntry(false);
+            setShowAddPhoneInput(false);
+            setShowAddEmailInput(false);
+            setLastDispatchedInfo(null);
+
+            const isUnassigned = isRoomUnassigned(booking.roomNumber);
+            const targetRoomObj = validRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
+            const bookedType = (booking.roomType && !booking.roomType.toLowerCase().includes('unassigned') && !booking.roomType.toLowerCase().includes('buffer'))
+                ? booking.roomType
+                : 'Deluxe Suite';
+
+            const targetRoomType = isUnassigned ? bookedType : (targetRoomObj?.type || bookedType || 'All');
             setMoveRoomType(targetRoomType);
+
+            if (isUnassigned) {
+                const moveAvail = getAvailableRoomsForStay(arr, dep, undefined, {
+                    excludeReservationId: booking.reservationNumber || booking.id
+                });
+                const firstRealAvail = validRooms.find(r => 
+                    (r.type === targetRoomType || targetRoomType === 'All') &&
+                    moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber))?.isAvailable
+                ) || validRooms.find(r => 
+                    moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber))?.isAvailable
+                ) || validRooms[0];
+
+                setMoveSelectedRoom(firstRealAvail ? firstRealAvail.roomNumber : '');
+            } else {
+                const initialTargetRoom = initialTargetRoomNumber || booking.roomNumber;
+                setMoveSelectedRoom(initialTargetRoom);
+            }
             const initialPlan = (booking.ratePlan && booking.ratePlan !== 'Direct' && booking.ratePlan !== 'Summer Vacation')
                 ? booking.ratePlan
                 : 'BAR';
@@ -345,8 +568,44 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             const effectiveMoveStart = isGuestInHouse
                 ? (arr > operatingSystemDate ? arr : operatingSystemDate)
                 : arr;
+            let validatedMoveDep = dep;
+            if (!validatedMoveDep || validatedMoveDep <= effectiveMoveStart) {
+                const d = new Date(effectiveMoveStart);
+                d.setDate(d.getDate() + Math.max(1, n));
+                validatedMoveDep = d.toISOString().split('T')[0];
+            }
             setMoveFromDate(effectiveMoveStart);
-            setToDate(dep);
+            setToDate(validatedMoveDep);
+
+            // Initialize Multi-Segment Stay (Split Stay Pattern)
+            const initialTargetRoomVal = initialTargetRoomNumber || booking.roomNumber || '';
+
+            const hasMultiRooms = Array.isArray(booking.roomsList) && booking.roomsList.length > 1;
+            if (hasMultiRooms) {
+                const mappedSegs: MoveStaySegment[] = (booking.roomsList || []).map((r: any, idx: number) => ({
+                    id: r.id || `seg-${Date.now()}-${idx}`,
+                    fromDate: r.checkInDate || r.fromDate || effectiveMoveStart,
+                    toDate: r.checkOutDate || r.toDate || validatedMoveDep,
+                    roomType: r.roomType || booking.roomType || 'Deluxe Suite',
+                    roomNumber: String(r.roomNumber || booking.roomNumber),
+                    dailyRate: r.dailyRate || resolveReservationDailyBaseRate(booking, r.roomNumber),
+                    nights: r.nights || 1
+                }));
+                setMoveSegments(mappedSegs);
+            } else {
+                setMoveSegments([
+                    {
+                        id: `seg-${Date.now()}-0`,
+                        fromDate: effectiveMoveStart,
+                        toDate: validatedMoveDep,
+                        roomType: targetRoomType !== 'All' ? targetRoomType : (booking.roomType || 'Deluxe Suite'),
+                        roomNumber: initialTargetRoomVal,
+                        dailyRate: resolveReservationDailyBaseRate(booking, initialTargetRoomVal),
+                        nights: Math.max(1, n)
+                    }
+                ]);
+            }
+            setOverrideRoomRate(false);
 
             setPaymentFolio(`${booking.guestName} - ${booking.folioNumber || `FOL-${booking.reservationNumber}-1`}`);
             setPaymentMethod('Cash');
@@ -356,6 +615,48 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setSplitRoom(booking.roomNumber);
             setSplitFromDate(arr);
             setSplitToDate(dep);
+
+            const allStored = getAllStoredReservations();
+            const storedMatch = allStored.find(r => r.reservationNumber === booking.reservationNumber);
+            const candidateRoomsList = (booking.roomsList && booking.roomsList.length > 1)
+                ? booking.roomsList
+                : (storedMatch?.roomsList && storedMatch.roomsList.length > 1)
+                    ? storedMatch.roomsList
+                    : null;
+
+            if (candidateRoomsList && candidateRoomsList.length > 0) {
+                const sorted = [...candidateRoomsList].sort((a: any, b: any) => {
+                    const da = a.checkInDate || a.checkIn || a.fromDate || '';
+                    const db = b.checkInDate || b.checkIn || b.fromDate || '';
+                    return da.localeCompare(db);
+                });
+                setSplitStaySegments(sorted.map((r: any, idx: number) => {
+                    const sIn = r.checkInDate || r.checkIn || r.fromDate || arr;
+                    const sOut = r.checkOutDate || r.checkOut || r.toDate || dep;
+                    const sNights = Number(r.nights) || Math.max(1, Math.round((new Date(sOut).getTime() - new Date(sIn).getTime()) / 86400000));
+                    const sRm = String(r.roomNumber || booking.roomNumber);
+                    const sType = r.roomType || booking.roomType || 'Superior King Room';
+                    return {
+                        id: r.id ? String(r.id) : `split-seg-${Date.now()}-${idx}`,
+                        fromDate: sIn,
+                        toDate: sOut,
+                        roomNumber: sRm,
+                        roomType: sType,
+                        nights: sNights,
+                        dailyRate: Number(r.rate || r.price || resolveReservationDailyBaseRate(booking, sRm))
+                    };
+                }));
+            } else {
+                setSplitStaySegments([{
+                    id: `split-seg-${Date.now()}-0`,
+                    fromDate: arr,
+                    toDate: dep,
+                    roomNumber: String(booking.roomNumber),
+                    roomType: booking.roomType || 'Superior King Room',
+                    nights: Math.max(1, n),
+                    dailyRate: resolveReservationDailyBaseRate(booking, booking.roomNumber)
+                }]);
+            }
 
             const isLocked = Boolean((booking as any).stopRoomMove);
             setStopMoveLocked(isLocked);
@@ -390,7 +691,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setSelectedUngroupRooms([booking.roomNumber]);
             setSelectedNewOwner(`${booking.guestName} - ${booking.roomNumber} (Current Owner)`);
         }
-    }, [booking, initialTargetDeparture, initialTargetNights, initialTargetRoomNumber]);
+    }, [booking, initialTargetArrival, initialTargetDeparture, initialTargetNights, initialTargetRoomNumber]);
 
     // Resolve all room bookings associated with this group or multi-room reservation
     const resolvedGroupRooms = useMemo(() => {
@@ -399,12 +700,38 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             return booking.groupRoomsList;
         }
 
+        // Check if this is a Split Stay (single guest moving between rooms across sequential dates)
+        const hasMultipleRooms = (booking.roomsList && booking.roomsList.length > 1) || (booking.groupRoomsList && booking.groupRoomsList.length > 1);
+        const isSplitStayRes = Boolean(
+            !booking.isGroup &&
+            !booking.groupCode &&
+            hasMultipleRooms &&
+            (
+                Boolean((booking as any).isSplitStay) ||
+                (booking.roomsList && booking.roomsList.length > 1 && booking.roomsList.some((rm: any) => {
+                    const first = booking.roomsList![0];
+                    const rmIn = rm.checkInDate || rm.checkIn;
+                    const rmOut = rm.checkOutDate || rm.checkOut;
+                    const fIn = first.checkInDate || first.checkIn;
+                    const fOut = first.checkOutDate || first.checkOut;
+                    return (rmIn && fIn && rmIn !== fIn) || (rmOut && fOut && rmOut !== fOut);
+                })) ||
+                (booking.groupRoomsList && booking.groupRoomsList.length > 1 && booking.groupRoomsList.some((rm: any) => {
+                    const first = booking.groupRoomsList![0];
+                    const rmIn = rm.checkIn || rm.checkInDate;
+                    const rmOut = rm.checkOut || rm.checkOutDate;
+                    const fIn = first.checkIn || first.checkInDate;
+                    const fOut = first.checkOut || first.checkOutDate;
+                    return (rmIn && fIn && rmIn !== fIn) || (rmOut && fOut && rmOut !== fOut);
+                }))
+            )
+        );
+
         // Special case: Interconnecting Suite with component rooms
-        const isConn = Boolean(
+        const isConn = !isSplitStayRes && Boolean(
             booking.isConnectingSuite ||
             (booking.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
-            (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
-            (Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1)
+            (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+'))
         );
 
         if (isConn) {
@@ -426,7 +753,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 roomNumber: roomDisplay,
                 allocatedRooms: rooms,
                 roomType: booking.roomType || 'Interconnecting Suite',
-                ratePlan: booking.ratePlan || 'Standard Rate',
+                ratePlan: sanitizeRatePlanName(booking.ratePlan, 'Best Available Rate (BAR)'),
                 guestName: booking.guestName,
                 adults: booking.adults ?? 2,
                 children: booking.children ?? 0,
@@ -453,7 +780,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             reservationNumber: rm.subBookingNumber || mr.reservationNumber,
                             subBookingNumber: rm.subBookingNumber || mr.reservationNumber,
                             guestName: rm.guestName || mr.guestName,
-                            ratePlan: rm.ratePlan || mr.ratePlan || 'Standard Rate',
+                            ratePlan: sanitizeRatePlanName(rm.ratePlan || mr.ratePlan, 'Best Available Rate (BAR)'),
                             status: rm.status || mr.status,
                             isPrimary: mIdx === 0 && rIdx === 0,
                             registrationNumber: rm.registrationNumber || mr.registrationNumber,
@@ -463,7 +790,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     return [{
                         roomNumber: mr.roomNumber,
                         roomType: mr.roomType,
-                        ratePlan: mr.ratePlan || 'Standard Rate',
+                        ratePlan: sanitizeRatePlanName(mr.ratePlan, 'Best Available Rate (BAR)'),
                         guestName: mr.guestName,
                         adults: mr.adults ?? 2,
                         children: mr.children ?? 0,
@@ -479,12 +806,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         }
         // 2. Multi-room list within same reservation
         if (booking.roomsList && booking.roomsList.length > 1) {
+            const isSplitStay = classifyReservation((booking as any) || {}) === 'SPLIT_STAY';
             return booking.roomsList.map((rm: any, idx: number) => ({
                 ...rm,
-                reservationNumber: rm.subBookingNumber || `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
-                subBookingNumber: rm.subBookingNumber || `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
+                reservationNumber: isSplitStay ? booking.reservationNumber : (rm.subBookingNumber || `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`),
+                subBookingNumber: isSplitStay ? `${booking.reservationNumber}-L${idx + 1}` : (rm.subBookingNumber || `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`),
                 guestName: rm.guestName || booking.guestName,
-                ratePlan: rm.ratePlan || booking.ratePlan || 'Standard Rate',
+                ratePlan: sanitizeRatePlanName(rm.ratePlan || booking.ratePlan, 'Best Available Rate (BAR)'),
                 isPrimary: idx === 0,
                 status: rm.status || booking.status,
                 registrationNumber: rm.registrationNumber || booking.registrationNumber,
@@ -495,7 +823,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         return [{
             roomNumber: booking.roomNumber,
             roomType: booking.roomType,
-            ratePlan: booking.ratePlan || 'Standard Rate',
+            ratePlan: sanitizeRatePlanName(booking.ratePlan, 'Best Available Rate (BAR)'),
             guestName: booking.guestName,
             adults: booking.adults ?? 2,
             children: booking.children ?? 0,
@@ -549,13 +877,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         );
     }, [booking]);
 
-    // Dynamic Room Types available for selection
+    // Dynamic Room Types available for selection (excludes internal unassigned buffer rooms)
     const dynamicRoomTypes = useMemo(() => {
-        const listFromRooms = Array.from(new Set(allRooms.map(r => r.type).filter(Boolean)));
+        const listFromRooms = Array.from(new Set(validRooms.map(r => r.type).filter(Boolean)));
         const listFromEngine = getDynamicRoomTypes().map(t => t.name).filter(Boolean);
-        const combined = Array.from(new Set([...listFromRooms, ...listFromEngine]));
-        return combined.length > 0 ? combined : ['Deluxe Suite', 'Deluxe Double', 'Superior King', 'Executive Suite'];
-    }, [allRooms]);
+        const combined = Array.from(new Set([...listFromRooms, ...listFromEngine]))
+            .filter(t => !t.toLowerCase().includes('buffer') && !t.toLowerCase().includes('unassigned'));
+        return combined.length > 0 ? combined : ['Deluxe Suite'];
+    }, [validRooms]);
 
     // Dynamic Rate Plans and Packages available for selection
     const dynamicRatePlansAndPackages = useMemo(() => {
@@ -584,7 +913,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         // Add booking's current rate plan if valid and unique
         const rawCurrentPlan = booking?.ratePlan;
         const currentPlan = sanitizeLabel(rawCurrentPlan) || rawCurrentPlan;
-        if (currentPlan && currentPlan !== 'Direct' && currentPlan !== 'Summer Vacation') {
+        const isChannelLeak = (str?: string) => {
+            if (!str) return false;
+            const s = str.toLowerCase().trim();
+            return ['whatsapp', 'booking_com', 'booking.com', 'agoda', 'airbnb', 'expedia', 'direct', 'front desk', 'staypulse', 'staypulse ai', 'ota', 'walk-in', 'walk in'].includes(s);
+        };
+        if (currentPlan && !isChannelLeak(currentPlan) && currentPlan !== 'Direct' && currentPlan !== 'Summer Vacation') {
             if (!result.some(r => r.value.toLowerCase() === currentPlan.toLowerCase())) {
                 result.unshift({ label: currentPlan, value: currentPlan });
             }
@@ -608,24 +942,34 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // Comprehensive Room Move & Upgrade Analysis Engine
     const roomMoveAnalysis = useMemo(() => {
         if (!booking) return null;
-        const currentRoomObj = allRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
+        const currentRoomObj = validRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
         const currentRoomType = booking.roomType || currentRoomObj?.type || 'Standard';
-        const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
+        const targetRoomObj = validRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
         const targetRoomType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : currentRoomType);
-
-        const currentDailyRate = getStandardDailyRateForRoom(booking.roomNumber, currentRoomType);
-        const targetDailyRate = getStandardDailyRateForRoom(moveSelectedRoom, targetRoomType);
-        const dailyDiff = targetDailyRate - currentDailyRate;
-
-        const stayNights = Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / 86400000) || (booking.nights || 1));
-        const totalDiff = dailyDiff * stayNights;
 
         const isDifferentRoom = String(moveSelectedRoom) !== String(booking.roomNumber);
         const isDifferentCategory = targetRoomType !== currentRoomType;
 
+        const currentDailyRate = resolveReservationDailyBaseRate(booking, booking.roomNumber);
+        const currentRackRate = getStandardDailyRateForRoom(booking.roomNumber, currentRoomType);
+        const targetRackRate = getStandardDailyRateForRoom(moveSelectedRoom, targetRoomType);
+
+        // If target room is in the same category or target is the same room, rate stays identical
+        const targetDailyRate = !isDifferentCategory
+            ? currentDailyRate
+            : targetRackRate;
+
+        const rawDailyDiff = !isDifferentCategory
+            ? 0
+            : (targetRackRate - (currentRackRate > 0 ? currentRackRate : currentDailyRate));
+        const dailyDiff = Math.abs(rawDailyDiff);
+
+        const stayNights = Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / 86400000) || (booking.nights || 1));
+        const totalDiff = dailyDiff * stayNights;
+
         // Smart Category Hierarchy Check (Suite > Executive > Deluxe > Superior > Standard)
         const isHigherCategory = (() => {
-            if (dailyDiff > 0) return true;
+            if (rawDailyDiff > 0) return true;
             const normTarget = targetRoomType.toLowerCase();
             const normCurrent = currentRoomType.toLowerCase();
             if (normTarget.includes('suite') && !normCurrent.includes('suite')) return true;
@@ -634,8 +978,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             return false;
         })();
 
-        const isUpgrade = isDifferentRoom && (isHigherCategory || (isDifferentCategory && dailyDiff >= 0));
-        const isDowngrade = isDifferentRoom && isDifferentCategory && !isHigherCategory && dailyDiff < 0;
+        const isUpgrade = isDifferentRoom && (isHigherCategory || (isDifferentCategory && rawDailyDiff >= 0));
+        const isDowngrade = isDifferentRoom && isDifferentCategory && !isHigherCategory && rawDailyDiff < 0;
         const isSameCategory = isDifferentRoom && !isDifferentCategory;
 
         return {
@@ -657,14 +1001,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     // Derived status and flags for hook execution order compliance
     const activeStatus = ((activeRoom?.status || booking?.status) || 'CONFIRMED').toUpperCase();
-    const isConnectingSuite = Boolean(
+    const stayClassification = useMemo(() => {
+        return classifyReservation((booking as any) || {});
+    }, [booking]);
+    const isSplitStay = stayClassification === 'SPLIT_STAY';
+
+    const isConnectingSuite = !isSplitStay && Boolean(
         booking?.isConnectingSuite ||
         (booking?.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
-        (typeof booking?.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
-        (Array.isArray(booking?.allocatedRooms) && booking.allocatedRooms.length > 1)
+        (typeof booking?.roomNumber === 'string' && booking.roomNumber.includes('+'))
     );
 
-    // Dynamic Status-Driven Categorized Options List (matching Yanolja Cloud / eZee / Wings PMS standards)
+    // Dynamic Status-Driven Categorized Options List (Enterprise PMS Standard)
     const groupedOptions = useMemo(() => {
         if (!booking) return [];
 
@@ -703,6 +1051,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     { key: 'payment', label: 'Settle / Refund Folio', icon: CreditCard, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700' }
                 ]
             });
+            groups.push({
+                title: 'Guest Communications',
+                items: [
+                    { key: 'send_confirmation', label: 'Send Confirmation / Folio Voucher', icon: Send, badge: 'WhatsApp / Email', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold' }
+                ]
+            });
             return groups;
         }
 
@@ -715,6 +1069,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 items: [
                     { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                     { key: 'payment', label: 'Settle / Refund Cancellation Fee', icon: CreditCard }
+                ]
+            });
+            groups.push({
+                title: 'Guest Communications',
+                items: [
+                    { key: 'send_confirmation', label: 'Send Cancellation / Voucher Copy', icon: Send, badge: 'WhatsApp / Email', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold' }
                 ]
             });
             groups.push({
@@ -745,6 +1105,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 items: [
                     { key: 'amend', label: 'Amend Stay (Extend/Shorten)', icon: Calendar },
                     { key: 'move', label: 'Room Move & Upgrade', icon: DoorOpen, badge: 'Transfer', badgeColor: 'bg-blue-100 text-blue-700' },
+                    { key: 'keycard', label: 'Issue / Encode Keycard', icon: Key, badge: 'RFID', badgeColor: 'bg-amber-100 text-amber-800' },
+                    { key: 'minibar', label: 'Minibar Audit & Billing', icon: Wine, badge: 'In-Room', badgeColor: 'bg-orange-100 text-orange-800' },
                     { key: 'swap', label: 'Swap Rooms (Atomic)', icon: ArrowRightLeft, badge: 'Atomic', badgeColor: 'bg-emerald-100 text-emerald-700' },
                     { key: 'split', label: 'Room Split (Multi-Room)', icon: GitFork, badge: 'Split Stay', badgeColor: 'bg-purple-100 text-purple-700' },
                     { key: 'stop_move', label: 'Stop Room Move (Lock)', icon: Hand, badge: (booking as any)?.stopRoomMove ? 'Locked' : undefined, badgeColor: 'bg-amber-100 text-amber-800' },
@@ -773,6 +1135,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 title: 'Exceptions',
                 items: [
                     { key: 'undo_checkin', label: 'Undo Check-In', icon: Undo2, badge: 'Reverse', badgeColor: 'bg-amber-100 text-amber-800' }
+                ]
+            });
+
+            groups.push({
+                title: 'Guest Communications',
+                items: [
+                    { key: 'send_confirmation', label: 'Send Confirmation Voucher', icon: Send, badge: 'WhatsApp / Email', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold' }
                 ]
             });
 
@@ -826,6 +1195,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             }
 
             groups.push({
+                title: 'Guest Communications',
+                items: [
+                    { key: 'send_confirmation', label: 'Send Hold & Booking Voucher', icon: Send, badge: 'WhatsApp / Email', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold' }
+                ]
+            });
+
+            groups.push({
                 title: 'Cancellation & Exception',
                 items: [
                     { key: 'release_hold', label: 'Release / Cancel Held Room', icon: CircleSlash, isDanger: true },
@@ -845,6 +1221,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 { key: 'folio', label: 'Folio Operations', icon: FileText, badge: 'Folio', badgeColor: 'bg-blue-100 text-blue-700 font-bold' },
                 { key: 'payment', label: 'Add Advance / Deposit', icon: CreditCard },
                 { key: 'tax_exemption', label: 'Tax Operation / Exemption', icon: Percent }
+            ]
+        });
+
+        groups.push({
+            title: 'Guest Communications',
+            items: [
+                { key: 'send_confirmation', label: 'Send Confirmation Voucher', icon: Send, badge: 'WhatsApp / Email', badgeColor: 'bg-emerald-100 text-emerald-800 font-bold' }
             ]
         });
 
@@ -890,14 +1273,75 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         return groups;
     }, [activeStatus, booking, isConnectingSuite]);
 
+    const activeRoomNum = String(activeRoom?.roomNumber || booking?.roomNumber || '');
+    const activeRoomType = activeRoom?.roomType || booking?.roomType || (dynamicRoomTypes[0] || 'Standard');
+
+    // Split Stay Journey Metadata & Cumulative Calculation (Must remain above early returns to adhere to React Hook rules)
+    const splitStayMeta = useMemo(() => {
+        if (!booking || !isSplitStay || resolvedGroupRooms.length <= 1) {
+            return {
+                isSplit: false,
+                overallArrival: activeRoom?.checkInDate || booking?.arrivalDate || '',
+                overallDeparture: activeRoom?.checkOutDate || booking?.departureDate || '',
+                totalStayNights: Number(booking?.nights || nights || 1),
+                roomSequence: activeRoom ? [{
+                    roomNumber: String(activeRoomNum),
+                    roomType: activeRoomType,
+                    checkIn: activeRoom.checkInDate || booking?.arrivalDate || '',
+                    checkOut: activeRoom.checkOutDate || booking?.departureDate || '',
+                    nights: Number(booking?.nights || nights || 1)
+                }] : []
+            };
+        }
+
+        const ins = resolvedGroupRooms.map((r: any) => r.checkIn || r.checkInDate || booking.arrivalDate).filter(Boolean).sort();
+        const outs = resolvedGroupRooms.map((r: any) => r.checkOut || r.checkOutDate || booking.departureDate).filter(Boolean).sort();
+        const overallArrival = ins[0] || booking.arrivalDate || '';
+        const overallDeparture = outs[outs.length - 1] || booking.departureDate || '';
+
+        let totalNightsAcc = 0;
+        const seq = resolvedGroupRooms.map((r: any) => {
+            const sIn = r.checkIn || r.checkInDate;
+            const sOut = r.checkOut || r.checkOutDate;
+            const n = (sIn && sOut)
+                ? Math.max(1, Math.round((new Date(sOut).getTime() - new Date(sIn).getTime()) / (1000 * 3600 * 24)))
+                : Number(r.nights || 1);
+            totalNightsAcc += n;
+            return {
+                roomNumber: String(r.roomNumber),
+                roomType: r.roomType || 'Standard',
+                checkIn: sIn || overallArrival,
+                checkOut: sOut || overallDeparture,
+                nights: n
+            };
+        });
+
+        const diffNights = Math.max(1, Math.round((new Date(overallDeparture).getTime() - new Date(overallArrival).getTime()) / (1000 * 3600 * 24)));
+        const finalNights = totalNightsAcc > 0 ? totalNightsAcc : diffNights;
+
+        return {
+            isSplit: true,
+            overallArrival,
+            overallDeparture,
+            totalStayNights: finalNights,
+            roomSequence: seq
+        };
+    }, [isSplitStay, resolvedGroupRooms, booking, activeRoom, nights, activeRoomNum, activeRoomType]);
+
     if (!isOpen || !booking || !activeRoom) return null;
 
-    const activeRoomNum = String(activeRoom.roomNumber || booking.roomNumber);
-    const activeRoomType = activeRoom.roomType || booking.roomType || (dynamicRoomTypes[0] || 'Standard');
     const rawActivePlan = activeRoom.ratePlan || booking.ratePlan;
-    const activeRatePlan = (rawActivePlan && rawActivePlan !== 'Direct' && rawActivePlan !== 'Summer Vacation')
-        ? rawActivePlan
-        : (dynamicRatePlansAndPackages[0]?.value || 'Standard Rate');
+    const activeRatePlan = sanitizeRatePlanName(
+        rawActivePlan,
+        dynamicRatePlansAndPackages.find(p => sanitizeRatePlanName(p.value, '') !== '')?.value || 'Best Available Rate (BAR)'
+    );
+    const isWhatsAppBooking = booking?.source?.toUpperCase() === 'WHATSAPP' || 
+        booking?.channel?.toUpperCase() === 'WHATSAPP' || 
+        booking?.channel === 'StayPulse AI' || 
+        Boolean(booking?.specialRequests && booking.specialRequests.includes('AI Inbound'));
+    const channelDisplayName = isWhatsAppBooking
+        ? 'WhatsApp AI'
+        : (booking?.channel || booking?.source || 'Direct Walk-In');
     const activeSubBookingNo = activeRoom.reservationNumber || activeRoom.subBookingNumber || booking.subBookingNumber || booking.reservationNumber;
     const isCurrentActiveInHouse = activeStatus === 'IN-HOUSE' || activeStatus === 'ARRIVED' || activeStatus === 'STAYOVER';
     const isCurrentActiveConfirmed = activeStatus === 'CONFIRMED' || activeStatus === 'ARRIVING';
@@ -908,13 +1352,69 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const activeGuestName = activeRoom.guestName || booking.guestName;
     const bookingAny = booking as any;
 
+    const statusBadgeConfig = (() => {
+        const s = (activeStatus || 'CONFIRMED').toUpperCase();
+        if (s === 'IN-HOUSE' || s === 'ARRIVED' || s === 'STAYOVER') {
+            return {
+                bg: 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200',
+                dot: 'bg-emerald-400',
+                label: activeStatus
+            };
+        }
+        if (s === 'CONFIRMED' || s === 'ASSIGNED' || s === 'ARRIVING') {
+            return {
+                bg: 'bg-teal-500/20 border-teal-400/40 text-teal-200',
+                dot: 'bg-teal-400',
+                label: activeStatus
+            };
+        }
+        if (s === 'HOLD') {
+            return {
+                bg: 'bg-amber-500/20 border-amber-400/40 text-amber-200',
+                dot: 'bg-amber-400',
+                label: activeStatus
+            };
+        }
+        if (s === 'CANCELLED' || s === 'VOID') {
+            return {
+                bg: 'bg-rose-500/20 border-rose-400/40 text-rose-200',
+                dot: 'bg-rose-400',
+                label: activeStatus
+            };
+        }
+        if (s === 'CHECKED-OUT' || s === 'COMPLETED' || s === 'DEPARTED') {
+            return {
+                bg: 'bg-slate-500/20 border-slate-400/40 text-slate-200',
+                dot: 'bg-slate-400',
+                label: activeStatus
+            };
+        }
+        return {
+            bg: 'bg-blue-500/20 border-blue-400/40 text-blue-200',
+            dot: 'bg-blue-400',
+            label: activeStatus || 'CONFIRMED'
+        };
+    })();
+
+    const activeRoomObj = (allRooms || []).find((r: any) => String(r.roomNumber) === String(activeRoomNum));
+    const housekeepingStatus = activeRoomObj?.status || 'Clean & Inspected';
+    const roomFloorDisplay = (activeRoomObj as any)?.floor ? `${(activeRoomObj as any).floor}` : '';
+
+    const boardBasisCode = (() => {
+        const p = (activeRatePlan || '').toUpperCase();
+        if (p.includes('AP') || p.includes('FULL BOARD')) return { code: 'AP', name: 'Full Board (All Meals)', color: 'text-purple-300 bg-purple-500/20 border-purple-400/30' };
+        if (p.includes('MAP') || p.includes('HALF BOARD')) return { code: 'MAP', name: 'Half Board (Breakfast + Dinner)', color: 'text-indigo-300 bg-indigo-500/20 border-indigo-400/30' };
+        if (p.includes('EP') || p.includes('ROOM ONLY')) return { code: 'EP', name: 'Room Only (No Meals)', color: 'text-slate-300 bg-slate-500/20 border-slate-400/30' };
+        return { code: 'CP', name: 'Bed & Breakfast (CP)', color: 'text-emerald-300 bg-emerald-500/20 border-emerald-400/30' };
+    })();
+
     const isTaxApplicable = booking.taxApplicable !== false;
     const taxConfigId = booking.taxConfigId;
     const taxConfigCode = booking.taxConfigCode || 'HOSP-STD';
 
     // Original values from booking record
     const origNights = booking.nights || 1;
-    const standardDaily = booking.avgDailyRate || getStandardDailyRateForRoom(booking.roomNumber, booking.roomType);
+    const standardDaily = resolveReservationDailyBaseRate(booking, booking.roomNumber);
     const origTotal = booking.totalAmount !== undefined ? booking.totalAmount : (origNights * standardDaily);
     const origTax = booking.totalTaxAmount !== undefined ? booking.totalTaxAmount : 0;
     const origBase = booking.baseAmount !== undefined ? booking.baseAmount : Math.max(0, origTotal - origTax);
@@ -940,17 +1440,23 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const currentBaseAmount = isAmendingStay ? (effectiveDailyBase * nights) : origBase;
 
     // Evaluate taxes with central taxCalculationEngine
+    const calculatedTaxes = calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId);
     const activeTaxCalc = isAmendingStay
-        ? calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId)
-        : (booking.taxDetails || calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId));
+        ? calculatedTaxes
+        : (booking.taxDetails && Array.isArray((booking.taxDetails as any).breakdown) && (booking.taxDetails as any).breakdown.length > 0
+            ? booking.taxDetails
+            : calculatedTaxes);
 
     const totalAmount = isAmendingStay
         ? activeTaxCalc.grandTotal
         : (isTaxApplicable && activeTaxCalc.totalTaxAmount > 0 ? (currentBaseAmount + activeTaxCalc.totalTaxAmount) : origTotal);
-    const paidAmount = Number(booking.paidAmount || 0);
-    const dueAmount = isAmendingStay
-        ? Math.max(0, totalAmount - paidAmount)
-        : (booking.dueAmount !== undefined ? booking.dueAmount : Math.max(0, totalAmount - paidAmount));
+    const advancePaymentsList = Array.isArray((booking as any).paymentRows) && (booking as any).paymentRows.length > 0
+        ? (booking as any).paymentRows
+        : (Array.isArray((booking as any).advancePayments) && (booking as any).advancePayments.length > 0
+            ? (booking as any).advancePayments
+            : []);
+    const paidAmount = advancePaymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0) || Number(booking.paidAmount || 0);
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
     const serviceCharge = activeTaxCalc.serviceChargeAmount || 0;
     const vatAmount = activeTaxCalc.vatAmount || 0;
     const totalTax = activeTaxCalc.totalTaxAmount || 0;
@@ -973,6 +1479,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 grandTotal: totalAmount,
                 paidAmount: paidAmount,
                 dueAmount: dueAmount,
+                taxBreakdown: activeTaxCalc.breakdown || [],
                 rooms: [{
                     ...activeRoom,
                     effectiveRate: standardDaily,
@@ -986,14 +1493,21 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
         let totalBase = 0;
         let totalPax = 0;
+        let sumNights = 0;
         const roomRows = resolvedGroupRooms.map((rm: any, idx: number) => {
             const rRate = Number(rm.rate || rm.avgDailyRate || booking.avgDailyRate || getStandardDailyRateForRoom(rm.roomNumber, rm.roomType));
-            const rNights = Number(rm.nights || booking.nights || 1);
+            const sIn = rm.checkIn || rm.checkInDate;
+            const sOut = rm.checkOut || rm.checkOutDate;
+            const rNights = (sIn && sOut)
+                ? Math.max(1, Math.round((new Date(sOut).getTime() - new Date(sIn).getTime()) / (1000 * 3600 * 24)))
+                : Number(rm.nights || booking.nights || 1);
             const rBase = rRate * rNights;
             const rPax = Number(rm.adults ?? 2) + Number(rm.children ?? 0);
             totalBase += rBase;
             totalPax += rPax;
-            const rResNo = rm.reservationNumber || rm.subBookingNumber || (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber);
+            sumNights += rNights;
+            const isSplitStaySegment = isSplitStay;
+            const rResNo = rm.reservationNumber || rm.subBookingNumber || (isSplitStaySegment ? `${booking.reservationNumber}-L${idx + 1}` : (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber));
             return {
                 ...rm,
                 effectiveRate: rRate,
@@ -1012,7 +1526,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         return {
             totalRooms: resolvedGroupRooms.length,
             totalPax,
-            totalNights: origNights,
+            totalNights: sumNights > 0 ? sumNights : origNights,
             totalBase,
             totalTax: taxCalc.totalTaxAmount,
             serviceCharge: taxCalc.serviceChargeAmount,
@@ -1020,13 +1534,58 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             grandTotal: grpTotal,
             paidAmount: grpPaid,
             dueAmount: grpDue,
+            taxBreakdown: taxCalc.breakdown || [],
             rooms: roomRows
         };
     })();
 
+    // Active Display values (Switches seamlessly between Split Stay Master Total and Single Segment)
+    const showSplitTotal = isSplitStay && splitViewMode === 'total';
+    const displayArrival = showSplitTotal ? splitStayMeta.overallArrival : (activeRoom.checkInDate || booking.arrivalDate);
+    const displayDeparture = showSplitTotal ? splitStayMeta.overallDeparture : (activeRoom.checkOutDate || departureDate);
+    const displayNights = showSplitTotal ? splitStayMeta.totalStayNights : (activeRoom.nights || nights);
+    const displayBase = showSplitTotal ? groupFinancials.totalBase : baseAmount;
+    const displayTax = showSplitTotal ? groupFinancials.totalTax : totalTax;
+    const displayServiceCharge = showSplitTotal ? groupFinancials.serviceCharge : serviceCharge;
+    const displayVat = showSplitTotal ? groupFinancials.vatAmount : vatAmount;
+    const displayTaxBreakdown = showSplitTotal ? ((groupFinancials as any).taxBreakdown || []) : (activeTaxCalc.breakdown || []);
+    const displayGrandTotal = showSplitTotal ? groupFinancials.grandTotal : totalAmount;
+    const displayPaid = showSplitTotal ? groupFinancials.paidAmount : paidAmount;
+    const displayDue = showSplitTotal ? groupFinancials.dueAmount : dueAmount;
+    const displayDailyRate = showSplitTotal ? Math.round(displayBase / Math.max(1, displayNights)) : dailyRate;
+
+    // Handle arrival date change in amend mode (with collision validation)
+    const handleArrivalChange = (newArr: string) => {
+        if (!newArr) return;
+        const curDep = departureDate || booking?.departureDate || '2026-07-03';
+        const start = new Date(newArr);
+        const end = new Date(curDep);
+        const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        if (diff < 1) {
+            toast.warning('Check-in date must be at least 1 night before departure date.');
+            return;
+        }
+        const avail = getAvailableRoomsForStay(newArr, curDep, undefined, {
+            excludeReservationId: booking.reservationNumber || booking.id
+        });
+        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(booking.roomNumber));
+        if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+            const cr = rmStatus.conflictingReservation;
+            toast.error(`Cannot change Check-In for Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) until ${cr.checkOut}!`);
+            return;
+        }
+        setArrivalDate(newArr);
+        setNights(diff);
+    };
+
     // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
         if (!booking?.arrivalDate) return;
+        const sysDate = getOperatingSystemDate();
+        if (isBookingInHouse && newDep < sysDate) {
+            toast.warning(`Cannot shorten stay before current PMS Business Date (${sysDate}) for an in-house guest.`);
+            return;
+        }
         const start = new Date(booking.arrivalDate);
         const end = new Date(newDep);
         const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -1066,6 +1625,325 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         }
         setNights(n);
         setDepartureDate(candidateDep);
+    };
+
+    // Helper to calculate nights between 2 dates
+    const calcSegmentNights = (from: string, to: string) => {
+        if (!from || !to) return 1;
+        const d1 = new Date(from);
+        const d2 = new Date(to);
+        const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(1, diff);
+    };
+
+    // Multi-Segment (Split Stay Pattern) Handlers
+    const handleAddRoomSegment = () => {
+        setMoveSegments(prev => {
+            if (prev.length === 0) {
+                return [{
+                    id: `seg-${Date.now()}`,
+                    fromDate: moveFromDate || booking?.arrivalDate || '',
+                    toDate: moveToDate || booking?.departureDate || '',
+                    roomType: booking?.roomType || 'Deluxe Suite',
+                    roomNumber: booking?.roomNumber || '',
+                    nights: 1,
+                    dailyRate: resolveReservationDailyBaseRate(booking, booking?.roomNumber)
+                }];
+            }
+            const lastIdx = prev.length - 1;
+            const last = prev[lastIdx];
+            const d1 = new Date(last.fromDate);
+            const d2 = new Date(last.toDate);
+            const diffDays = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+
+            if (diffDays >= 2) {
+                // Split the last segment into two
+                const midDays = Math.floor(diffDays / 2);
+                const midDate = new Date(d1);
+                midDate.setDate(midDate.getDate() + midDays);
+                const midDateStr = midDate.toISOString().split('T')[0];
+
+                const updatedLast: MoveStaySegment = {
+                    ...last,
+                    toDate: midDateStr,
+                    nights: midDays
+                };
+
+                const otherType = dynamicRoomTypes.find(t => t !== last.roomType) || last.roomType;
+                const availRooms = validRooms.filter(r => r.type === otherType);
+                const targetRoom = availRooms.find(r => String(r.roomNumber) !== String(last.roomNumber)) || availRooms[0] || validRooms[0];
+
+                const newSeg: MoveStaySegment = {
+                    id: `seg-${Date.now()}-${prev.length}`,
+                    fromDate: midDateStr,
+                    toDate: last.toDate,
+                    roomType: otherType,
+                    roomNumber: targetRoom ? targetRoom.roomNumber : '',
+                    nights: diffDays - midDays,
+                    dailyRate: getStandardDailyRateForRoom(targetRoom ? targetRoom.roomNumber : '', otherType)
+                };
+
+                const nextList = [...prev];
+                nextList[lastIdx] = updatedLast;
+                nextList.push(newSeg);
+                return nextList;
+            } else {
+                // Last segment is 1 night, extend by 1 night
+                const nextEnd = new Date(d2);
+                nextEnd.setDate(nextEnd.getDate() + 1);
+                const nextEndStr = nextEnd.toISOString().split('T')[0];
+
+                const otherType = dynamicRoomTypes.find(t => t !== last.roomType) || last.roomType;
+                const availRooms = validRooms.filter(r => r.type === otherType);
+                const targetRoom = availRooms.find(r => String(r.roomNumber) !== String(last.roomNumber)) || availRooms[0] || validRooms[0];
+
+                const newSeg: MoveStaySegment = {
+                    id: `seg-${Date.now()}-${prev.length}`,
+                    fromDate: last.toDate,
+                    toDate: nextEndStr,
+                    roomType: otherType,
+                    roomNumber: targetRoom ? targetRoom.roomNumber : '',
+                    nights: 1,
+                    dailyRate: getStandardDailyRateForRoom(targetRoom ? targetRoom.roomNumber : '', otherType)
+                };
+                return [...prev, newSeg];
+            }
+        });
+    };
+
+    const handleRemoveRoomSegment = (idx: number) => {
+        setMoveSegments(prev => {
+            if (prev.length <= 1) return prev;
+            const nextList = [...prev];
+            const removed = nextList.splice(idx, 1)[0];
+            if (idx > 0 && nextList[idx - 1]) {
+                nextList[idx - 1] = {
+                    ...nextList[idx - 1],
+                    toDate: removed.toDate,
+                    nights: calcSegmentNights(nextList[idx - 1].fromDate, removed.toDate)
+                };
+            } else if (nextList[0]) {
+                nextList[0] = {
+                    ...nextList[0],
+                    fromDate: removed.fromDate,
+                    nights: calcSegmentNights(removed.fromDate, nextList[0].toDate)
+                };
+            }
+            return nextList;
+        });
+    };
+
+    // =========================================================================
+    // SPLIT STAY JOURNEY & MULTI-SEGMENT AMEND CONTROLLERS
+    // =========================================================================
+    const handleUpdateSplitStaySegmentNights = (idx: number, newNights: number) => {
+        const safeNights = Math.max(1, newNights);
+        setSplitStaySegments(prev => {
+            if (!prev[idx]) return prev;
+            const nextList = prev.map(s => ({ ...s }));
+            nextList[idx].nights = safeNights;
+            const d1 = new Date(nextList[idx].fromDate);
+            d1.setDate(d1.getDate() + safeNights);
+            nextList[idx].toDate = d1.toISOString().split('T')[0];
+
+            // Contiguous Ripple forward to subsequent legs
+            for (let k = idx + 1; k < nextList.length; k++) {
+                if (nextList[k] && nextList[k - 1]) {
+                    nextList[k].fromDate = nextList[k - 1].toDate;
+                    const dk = new Date(nextList[k].fromDate);
+                    dk.setDate(dk.getDate() + (nextList[k].nights || 1));
+                    nextList[k].toDate = dk.toISOString().split('T')[0];
+                }
+            }
+
+            const finalDep = nextList[nextList.length - 1]?.toDate || '';
+            const totalNts = nextList.reduce((sum, s) => sum + (s.nights || 1), 0);
+            if (finalDep) setDepartureDate(finalDep);
+            setNights(totalNts);
+
+            return nextList;
+        });
+    };
+
+    const handleUpdateSplitStayArrival = (newArrival: string) => {
+        setArrivalDate(newArrival);
+        setSplitStaySegments(prev => {
+            if (prev.length === 0 || !prev[0]) return prev;
+            const nextList = prev.map(s => ({ ...s }));
+            nextList[0].fromDate = newArrival;
+            const d0 = new Date(newArrival);
+            d0.setDate(d0.getDate() + (nextList[0].nights || 1));
+            nextList[0].toDate = d0.toISOString().split('T')[0];
+
+            for (let k = 1; k < nextList.length; k++) {
+                if (nextList[k] && nextList[k - 1]) {
+                    nextList[k].fromDate = nextList[k - 1].toDate;
+                    const dk = new Date(nextList[k].fromDate);
+                    dk.setDate(dk.getDate() + (nextList[k].nights || 1));
+                    nextList[k].toDate = dk.toISOString().split('T')[0];
+                }
+            }
+
+            const finalDep = nextList[nextList.length - 1]?.toDate || '';
+            if (finalDep) setDepartureDate(finalDep);
+            return nextList;
+        });
+    };
+
+    const handleUpdateSplitStaySegmentRoom = (idx: number, newRoomNumber: string) => {
+        setSplitStaySegments(prev => {
+            if (!prev[idx]) return prev;
+            const nextList = prev.map(s => ({ ...s }));
+            const rmObj = validRooms.find(r => String(r.roomNumber) === String(newRoomNumber));
+            const rmType = rmObj?.type || nextList[idx].roomType;
+            nextList[idx].roomNumber = String(newRoomNumber);
+            nextList[idx].roomType = rmType;
+            nextList[idx].dailyRate = getStandardDailyRateForRoom(newRoomNumber, rmType);
+            return nextList;
+        });
+    };
+
+    const handleSubSplitLeg = (idx: number) => {
+        setSplitStaySegments(prev => {
+            if (!prev[idx] || (prev[idx].nights || 1) < 2) return prev;
+            const target = prev[idx];
+            const targetNts = target.nights || 2;
+            const half1 = Math.floor(targetNts / 2);
+            const half2 = targetNts - half1;
+
+            const dMid = new Date(target.fromDate);
+            dMid.setDate(dMid.getDate() + half1);
+            const midDateStr = dMid.toISOString().split('T')[0];
+
+            const leg1: MoveStaySegment = {
+                ...target,
+                toDate: midDateStr,
+                nights: half1
+            };
+
+            const otherRooms = validRooms.filter(r => String(r.roomNumber) !== String(target.roomNumber));
+            const nextRm = otherRooms[0] || validRooms[0];
+
+            const leg2: MoveStaySegment = {
+                id: `split-seg-${Date.now()}-${idx + 1}`,
+                fromDate: midDateStr,
+                toDate: target.toDate,
+                roomNumber: nextRm ? String(nextRm.roomNumber) : target.roomNumber,
+                roomType: nextRm?.type || target.roomType,
+                nights: half2,
+                dailyRate: getStandardDailyRateForRoom(nextRm ? String(nextRm.roomNumber) : target.roomNumber, nextRm?.type || target.roomType)
+            };
+
+            const nextList = [...prev];
+            nextList.splice(idx, 1, leg1, leg2);
+            return nextList;
+        });
+    };
+
+    const handleMergeLegWithPrevious = (idx: number) => {
+        setSplitStaySegments(prev => {
+            if (idx <= 0 || !prev[idx] || !prev[idx - 1]) return prev;
+            const nextList = [...prev];
+            const legToRemove = nextList[idx];
+            const prevLeg = nextList[idx - 1];
+
+            nextList[idx - 1] = {
+                ...prevLeg,
+                toDate: legToRemove.toDate,
+                nights: (prevLeg.nights || 1) + (legToRemove.nights || 1)
+            };
+            nextList.splice(idx, 1);
+
+            const totalNts = nextList.reduce((sum, s) => sum + (s.nights || 1), 0);
+            setNights(totalNts);
+            const finalDep = nextList[nextList.length - 1]?.toDate || '';
+            if (finalDep) setDepartureDate(finalDep);
+
+            return nextList;
+        });
+    };
+
+    const handleAddSplitStayMove = () => {
+        setSplitStaySegments(prev => {
+            if (prev.length === 0) return prev;
+            const last = prev[prev.length - 1];
+            const dEnd = new Date(last.toDate);
+            dEnd.setDate(dEnd.getDate() + 1);
+            const nextEndStr = dEnd.toISOString().split('T')[0];
+
+            const otherRooms = validRooms.filter(r => String(r.roomNumber) !== String(last.roomNumber));
+            const nextRm = otherRooms[0] || validRooms[0];
+
+            const newLeg: MoveStaySegment = {
+                id: `split-seg-${Date.now()}-${prev.length}`,
+                fromDate: last.toDate,
+                toDate: nextEndStr,
+                roomNumber: nextRm ? String(nextRm.roomNumber) : last.roomNumber,
+                roomType: nextRm?.type || last.roomType,
+                nights: 1,
+                dailyRate: getStandardDailyRateForRoom(nextRm ? String(nextRm.roomNumber) : last.roomNumber, nextRm?.type || last.roomType)
+            };
+
+            const nextList = [...prev, newLeg];
+            const totalNts = nextList.reduce((sum, s) => sum + (s.nights || 1), 0);
+            setNights(totalNts);
+            setDepartureDate(nextEndStr);
+            return nextList;
+        });
+    };
+
+    const handleUpdateSegment = (idx: number, field: keyof MoveStaySegment, value: any) => {
+        setMoveSegments(prev => {
+            const nextList = prev.map(s => ({ ...s }));
+            if (!nextList[idx]) return prev;
+
+            if (field === 'toDate') {
+                const newTo = value;
+                nextList[idx].toDate = newTo;
+                nextList[idx].nights = calcSegmentNights(nextList[idx].fromDate, newTo);
+                if (idx === 0) setToDate(newTo);
+                // Auto-chain with subsequent segment if it exists
+                if (nextList[idx + 1]) {
+                    nextList[idx + 1].fromDate = newTo;
+                    if (nextList[idx + 1].toDate <= newTo) {
+                        const d = new Date(newTo);
+                        d.setDate(d.getDate() + 1);
+                        nextList[idx + 1].toDate = d.toISOString().split('T')[0];
+                    }
+                    nextList[idx + 1].nights = calcSegmentNights(nextList[idx + 1].fromDate, nextList[idx + 1].toDate);
+                }
+            } else if (field === 'fromDate') {
+                const newFrom = value;
+                nextList[idx].fromDate = newFrom;
+                nextList[idx].nights = calcSegmentNights(newFrom, nextList[idx].toDate);
+                if (idx === 0) setMoveFromDate(newFrom);
+                // If previous segment exists, sync its toDate
+                if (idx > 0 && nextList[idx - 1]) {
+                    nextList[idx - 1].toDate = newFrom;
+                    nextList[idx - 1].nights = calcSegmentNights(nextList[idx - 1].fromDate, newFrom);
+                }
+            } else if (field === 'roomType') {
+                nextList[idx].roomType = value;
+                if (idx === 0) setMoveRoomType(value);
+                const availRooms = validRooms.filter(r => r.type === value);
+                const firstAvail = availRooms[0];
+                if (firstAvail) {
+                    nextList[idx].roomNumber = firstAvail.roomNumber;
+                    nextList[idx].dailyRate = getStandardDailyRateForRoom(firstAvail.roomNumber, value);
+                    if (idx === 0) setMoveSelectedRoom(firstAvail.roomNumber);
+                }
+            } else if (field === 'roomNumber') {
+                nextList[idx].roomNumber = value;
+                if (idx === 0) setMoveSelectedRoom(value);
+                const rObj = validRooms.find(r => String(r.roomNumber) === String(value));
+                if (rObj?.type) {
+                    nextList[idx].roomType = rObj.type;
+                    nextList[idx].dailyRate = getStandardDailyRateForRoom(value, rObj.type);
+                    if (idx === 0) setMoveRoomType(rObj.type);
+                }
+            }
+            return nextList;
+        });
     };
 
     // Primary Action Execution based on active mode
@@ -1113,8 +1991,70 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         }
     };
 
+    const handleSendConfirmation = async () => {
+        if (!booking) return;
+        const targetId = booking.id || booking.reservationNumber;
+        if (!targetId) {
+            toast.error('Reservation ID not found');
+            return;
+        }
+        if (!confirmChannelWhatsApp && !confirmChannelEmail) {
+            toast.error('Please select at least one delivery channel (WhatsApp or Email)');
+            return;
+        }
+        if (confirmChannelWhatsApp && !confirmSendPhone) {
+            toast.error('Please provide a valid WhatsApp phone number');
+            return;
+        }
+
+        try {
+            setIsSendingConfirmation(true);
+            const token = localStorage.getItem('token');
+            const propertyId = getActivePropertyId() || 1;
+            const res = await fetch(`${getApiBaseUrl()}/api/bookings/${targetId}/send-confirmation`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                    'x-property-id': String(propertyId)
+                },
+                body: JSON.stringify({
+                    phone: confirmSendPhone,
+                    email: confirmSendEmail,
+                    channels: {
+                        whatsapp: confirmChannelWhatsApp,
+                        email: confirmChannelEmail,
+                        sms: false
+                    }
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                toast.success('Official Booking Confirmation Voucher dispatched successfully!');
+                const channelNames = [];
+                if (confirmChannelWhatsApp) channelNames.push('WhatsApp');
+                if (confirmChannelEmail) channelNames.push('Email');
+                setLastDispatchedInfo({
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    channels: channelNames.join(' & ')
+                });
+            } else {
+                toast.error(data.message || 'Failed to dispatch confirmation voucher');
+            }
+        } catch (err: any) {
+            console.error('Error sending confirmation voucher:', err);
+            toast.error('Network error dispatching voucher. Please try again.');
+        } finally {
+            setIsSendingConfirmation(false);
+        }
+    };
+
     const handlePrimaryAction = async () => {
         switch (mode) {
+            case 'send_confirmation':
+                await handleSendConfirmation();
+                return;
             case 'link_group':
                 handleLinkGroup();
                 return;
@@ -1122,16 +2062,62 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 handleUngroup();
                 return;
             case 'amend': {
-                const avail = getAvailableRoomsForStay(booking.arrivalDate, departureDate, undefined, {
+                const effectiveArr = arrivalDate || booking.arrivalDate;
+
+                // Split Stay Multi-Segment Itinerary
+                if (splitStaySegments.length > 1) {
+                    for (let i = 0; i < splitStaySegments.length; i++) {
+                        const seg = splitStaySegments[i];
+                        const avail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                            excludeReservationId: booking.reservationNumber || booking.id
+                        });
+                        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(seg.roomNumber));
+                        if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+                            const cr = rmStatus.conflictingReservation;
+                            toast.error(`Cannot amend Split Stay: Room ${seg.roomNumber} (Leg ${i + 1}/${splitStaySegments.length}) collides with ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}!`);
+                            return;
+                        }
+                    }
+
+                    const masterDep = splitStaySegments[splitStaySegments.length - 1].toDate;
+                    const masterNts = splitStaySegments.reduce((sum, s) => sum + (s.nights || 1), 0);
+                    const masterArr = splitStaySegments[0].fromDate;
+
+                    if (onSaveAmendStay) {
+                        onSaveAmendStay(booking.id, masterDep, masterNts, amendAdults, amendChildren, {
+                            sendEmail: notifSendEmail,
+                            sendSms: notifSendSms,
+                            sendWhatsApp: notifSendWhatsApp,
+                            guestEmail: notifCustomEmail,
+                            guestPhone: notifCustomPhone,
+                            reason: notifReason,
+                            isSilent: notifSilentUpdate
+                        }, masterArr, splitStaySegments);
+                    }
+                    break;
+                }
+
+                // Standard Single Room Amend
+                const avail = getAvailableRoomsForStay(effectiveArr, departureDate, undefined, {
                     excludeReservationId: booking.reservationNumber || booking.id
                 });
                 const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(booking.roomNumber));
                 if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
                     const cr = rmStatus.conflictingReservation;
-                    toast.error(`Cannot extend Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn}!`);
+                    toast.error(`Cannot amend Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}!`);
                     return;
                 }
-                if (onSaveAmendStay) onSaveAmendStay(booking.id, departureDate, nights, amendAdults, amendChildren);
+                if (onSaveAmendStay) {
+                    onSaveAmendStay(booking.id, departureDate, nights, amendAdults, amendChildren, {
+                        sendEmail: notifSendEmail,
+                        sendSms: notifSendSms,
+                        sendWhatsApp: notifSendWhatsApp,
+                        guestEmail: notifCustomEmail,
+                        guestPhone: notifCustomPhone,
+                        reason: notifReason,
+                        isSilent: notifSilentUpdate
+                    }, effectiveArr);
+                }
                 break;
             }
             case 'move': {
@@ -1140,45 +2126,135 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     return;
                 }
 
-                const avail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
-                    excludeReservationId: booking.reservationNumber || booking.id
-                });
-                const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(moveSelectedRoom));
-                if (rmStatus && !rmStatus.isAvailable && String(moveSelectedRoom) !== String(booking.roomNumber)) {
-                    const cr = rmStatus.conflictingReservation;
-                    toast.error(
-                        cr
-                            ? `Cannot move to Room ${moveSelectedRoom}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}!`
-                            : `Cannot move to Room ${moveSelectedRoom}: Room is ${rmStatus.reason || 'unavailable'}!`
-                    );
-                    return;
+                // If multi-segments configured (Split Stay Engine)
+                const segmentsToSave: MoveStaySegment[] = moveSegments.length > 0 ? moveSegments : [
+                    {
+                        id: `seg-0`,
+                        fromDate: moveFromDate,
+                        toDate: moveToDate,
+                        roomType: (moveRoomType !== 'All' ? moveRoomType : booking.roomType) || 'Deluxe Suite',
+                        roomNumber: moveSelectedRoom,
+                        nights: Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / (1000 * 60 * 60 * 24))),
+                        dailyRate: resolveReservationDailyBaseRate(booking, moveSelectedRoom)
+                    }
+                ];
+
+                // Validate each segment for availability & collisions
+                for (let i = 0; i < segmentsToSave.length; i++) {
+                    const seg = segmentsToSave[i];
+                    if (!seg.roomNumber) {
+                        toast.error(`Please select a room for Segment ${i + 1} (${seg.fromDate} to ${seg.toDate})`);
+                        return;
+                    }
+                    const avail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                        excludeReservationId: booking.reservationNumber || booking.id
+                    });
+                    const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(seg.roomNumber));
+                    if (rmStatus && !rmStatus.isAvailable && String(seg.roomNumber) !== String(booking.roomNumber)) {
+                        const cr = rmStatus.conflictingReservation;
+                        toast.error(
+                            cr
+                                ? `Cannot allocate Room ${seg.roomNumber} for Segment ${i + 1} (${seg.fromDate} to ${seg.toDate}): Already booked by ${cr.guestName} (${cr.reservationNumber})!`
+                                : `Cannot allocate Room ${seg.roomNumber} for Segment ${i + 1}: Room is ${rmStatus.reason || 'unavailable'}!`
+                        );
+                        return;
+                    }
                 }
 
-                const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
-                const resolvedTargetType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : booking.roomType);
+                const primarySegment = segmentsToSave[0];
+                const lastSegment = segmentsToSave[segmentsToSave.length - 1];
+                const targetRoomObj = validRooms.find(r => String(r.roomNumber) === String(primarySegment.roomNumber));
+                const resolvedTargetType = primarySegment.roomType || targetRoomObj?.type || booking.roomType;
 
                 const upgradeAdj = roomMoveAnalysis?.isUpgrade ? {
                     mode: upgradeBillingMode,
                     amount: upgradeBillingMode === 'charge' ? (roomMoveAnalysis.totalDiff || 0) : 0
                 } : undefined;
 
+                const notifConfig = !notifSilentUpdate ? {
+                    isSilent: false,
+                    sendEmail: notifSendEmail,
+                    sendSms: notifSendSms,
+                    sendWhatsApp: notifSendWhatsApp,
+                    guestEmail: notifCustomEmail,
+                    guestPhone: notifCustomPhone,
+                    customEmail: notifCustomEmail,
+                    customPhone: notifCustomPhone,
+                    oldRoomNumber: booking.roomNumber,
+                    newRoomNumber: primarySegment.roomNumber,
+                    oldRoomTypeName: booking.roomType,
+                    newRoomTypeName: resolvedTargetType,
+                    isUpgrade: roomMoveAnalysis?.isUpgrade,
+                    upgradeDailyDiff: roomMoveAnalysis?.dailyDiff,
+                    upgradeBillingMode: upgradeBillingMode,
+                    reason: notifReason || (segmentsToSave.length > 1 ? `Split Stay Multi-Segment Move (${segmentsToSave.length} segments)` : `Room Move to Room ${primarySegment.roomNumber}`),
+                    segments: segmentsToSave,
+                    overrideRoomRate: overrideRoomRate
+                } : { isSilent: true };
+
                 if (onSaveRoomMove) {
                     onSaveRoomMove(
                         booking.id,
-                        moveSelectedRoom,
-                        moveFromDate,
-                        moveToDate,
+                        primarySegment.roomNumber,
+                        primarySegment.fromDate,
+                        lastSegment.toDate,
                         resolvedTargetType,
                         moveRateType || booking.ratePlan,
-                        upgradeAdj
+                        upgradeAdj,
+                        notifConfig,
+                        segmentsToSave,
+                        overrideRoomRate
                     );
                 }
                 break;
             }
-            case 'payment':
-                if (onSavePayment) onSavePayment(booking.id, paymentMethod, paymentAmount, paymentRemarks);
+            case 'payment': {
+                if (paymentAmount <= 0) {
+                    toast.error('Please enter a valid payment amount greater than zero.');
+                    return;
+                }
+                if (onSavePayment) {
+                    const tenderMeta = [
+                        paymentRemarks ? paymentRemarks.trim() : '',
+                        paymentAcquiringBank ? `Bank: ${paymentAcquiringBank}` : '',
+                        paymentReferenceCode ? `Ref: ${paymentReferenceCode}` : '',
+                        paymentPosTerminalId ? `TID: ${paymentPosTerminalId}` : ''
+                    ].filter(Boolean).join(' | ');
+                    onSavePayment(booking.id, paymentMethod, paymentAmount, tenderMeta);
+                }
+                toast.success(`Payment of ${currencySymbol}${paymentAmount.toFixed(2)} via ${paymentMethod} posted successfully.`);
+                setMode('overview');
                 break;
+            }
             case 'split': {
+                // Multi-Segment Split Journey Mode
+                if (splitStaySegments.length > 1) {
+                    for (let i = 0; i < splitStaySegments.length; i++) {
+                        const seg = splitStaySegments[i];
+                        const avail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                            excludeReservationId: booking.reservationNumber || booking.id
+                        });
+                        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(seg.roomNumber));
+                        if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+                            const cr = rmStatus.conflictingReservation;
+                            toast.error(`Cannot save Split Stay Journey: Room ${seg.roomNumber} (Leg ${i + 1}/${splitStaySegments.length}) collides with ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}!`);
+                            return;
+                        }
+                    }
+
+                    if (onSaveRoomSplit) {
+                        onSaveRoomSplit(
+                            booking.id,
+                            splitStaySegments[0].roomNumber,
+                            splitStaySegments[0].fromDate,
+                            splitStaySegments[splitStaySegments.length - 1].toDate,
+                            splitStaySegments
+                        );
+                    }
+                    break;
+                }
+
+                // Standard 2-Room Split Fallback
                 const avail = getAvailableRoomsForStay(splitFromDate, splitToDate, undefined, {
                     excludeReservationId: booking.reservationNumber || booking.id
                 });
@@ -1282,18 +2358,38 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             case 'folio':
                 return { title: 'Folio Operations', buttonText: 'Close Folio', buttonIcon: <FileText size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'amend':
-                return { title: 'Amend Stay', buttonText: 'Save Changes', buttonIcon: <Edit3 size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
-            case 'move':
                 return {
-                    title: 'Room Move',
-                    buttonText: roomMoveAnalysis?.isUpgrade ? 'Save Room Move & Upgrade' : 'Save Room Move',
-                    buttonIcon: roomMoveAnalysis?.isUpgrade ? <Sparkles size={13} className="text-amber-300" /> : <Home size={13} />,
-                    buttonClass: roomMoveAnalysis?.isUpgrade ? 'bg-gradient-to-r from-amber-600 via-blue-600 to-emerald-600 hover:brightness-110 font-bold shadow-md' : 'bg-[#1a73e8] hover:bg-blue-600'
+                    title: (splitStaySegments.length > 1 || booking.isSplitStay)
+                        ? `Amend Split Stay (${splitStaySegments.length} Legs)`
+                        : 'Amend Stay',
+                    buttonText: (splitStaySegments.length > 1 || booking.isSplitStay)
+                        ? 'Save Revised Split Stay'
+                        : 'Save Changes',
+                    buttonIcon: <Edit3 size={13} />,
+                    buttonClass: 'bg-[#1a73e8] hover:bg-blue-600 font-bold'
                 };
+            case 'move': {
+                const isCurrentlyUnassigned = isRoomUnassigned(booking.roomNumber);
+                return {
+                    title: isCurrentlyUnassigned ? 'Assign Room' : 'Room Move',
+                    buttonText: isCurrentlyUnassigned ? 'Assign Room & Confirm' : 'Save Room Move',
+                    buttonIcon: isCurrentlyUnassigned ? <CheckCircle2 size={13} className="text-emerald-300" /> : <Home size={13} />,
+                    buttonClass: isCurrentlyUnassigned ? 'bg-emerald-600 hover:bg-emerald-700 font-bold' : 'bg-[#1a73e8] hover:bg-blue-600 font-bold shadow-md'
+                };
+            }
             case 'payment':
                 return { title: 'Add Payment', buttonText: 'Save Payment', buttonIcon: <CreditCard size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
             case 'split':
-                return { title: 'Room Split', buttonText: 'Save Room Split', buttonIcon: <GitFork size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+                return {
+                    title: (splitStaySegments.length > 1 || booking.isSplitStay)
+                        ? `Split Stay Journey Manager (${splitStaySegments.length} Rooms)`
+                        : 'Room Split',
+                    buttonText: (splitStaySegments.length > 1 || booking.isSplitStay)
+                        ? 'Save Split Journey'
+                        : 'Save Room Split',
+                    buttonIcon: <GitFork size={13} />,
+                    buttonClass: 'bg-[#1a73e8] hover:bg-blue-600 font-bold'
+                };
             case 'swap':
                 return { title: 'Swap Rooms (Atomic Transfer)', buttonText: isSwapping ? 'Swapping Rooms...' : 'Execute Atomic Swap', buttonIcon: <ArrowRightLeft size={13} />, buttonClass: 'bg-emerald-600 hover:bg-emerald-700 font-bold' };
             case 'stop_move':
@@ -1324,6 +2420,13 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 return { title: 'Ungroup Reservation', buttonText: isLinking ? 'Unlinking...' : 'Confirm Ungroup', buttonIcon: <RefreshCw size={13} />, buttonClass: 'bg-amber-600 hover:bg-amber-700' };
             case 'change_owner':
                 return { title: 'Change Group Owner', buttonText: 'Confirm Change', buttonIcon: <RefreshCw size={13} />, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
+            case 'send_confirmation':
+                return {
+                    title: 'Send Confirmation Voucher',
+                    buttonText: isSendingConfirmation ? 'Dispatching Voucher...' : 'Dispatch Voucher Now',
+                    buttonIcon: <Send size={13} />,
+                    buttonClass: 'bg-emerald-600 hover:bg-emerald-700 font-bold shadow-md'
+                };
             default:
                 return { title: 'Reservation Details', buttonText: 'Close', buttonIcon: null, buttonClass: 'bg-[#1a73e8] hover:bg-blue-600' };
         }
@@ -1397,6 +2500,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 className={`fixed top-0 bottom-0 right-0 ${
                     mode === 'folio'
                         ? 'w-full md:w-[90%] lg:w-[88%] min-w-[1000px] max-w-[1400px]'
+                        : mode === 'move'
+                        ? 'w-full md:w-[82%] lg:w-[80%] min-w-[960px] max-w-[1280px]'
                         : 'w-full md:w-[70%] lg:w-[68%] min-w-[860px] max-w-[1150px]'
                 } bg-[#0e3592] text-white shadow-2xl flex flex-col border-l border-blue-900 animate-in slide-in-from-right duration-200 z-[100000]`}
             >
@@ -1429,15 +2534,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         <span className="text-[11px] font-bold text-gray-900 tracking-wide uppercase truncate font-sans">
                             {activeGuestName}
                         </span>
-                        <button
-                            type="button"
-                            onClick={() => setIsScannerOpen(true)}
-                            className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Fast Scan Passport or National ID card to verify / attach guest profile"
-                        >
-                            <Camera size={9} className="text-emerald-700" />
-                            <span>Scan ID</span>
-                        </button>
                         {activeRegNo && (
                             <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono shadow-2xs ml-1 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold" title="Registration Number">
                                 {activeRegNo}
@@ -1455,15 +2551,42 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             }`}>
                             {activeStatus}
                         </span>
+                        {/* GuestFlow AI Origin Badge */}
+                        {(booking?.source === 'WHATSAPP' || booking?.channel === 'StayPulse AI' || booking?.channel?.includes('StayPulse') || (booking?.specialRequests && booking.specialRequests.includes('AI Inbound'))) && (
+                            <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1" title="Automated WhatsApp Reservation via GuestFlow AI Concierge">
+                                <MessageSquare size={10} className="text-emerald-400" />
+                                GuestFlow AI
+                            </span>
+                        )}
                         {isConnectingSuite && (
                             <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-indigo-50 text-indigo-800 border border-indigo-300 flex items-center gap-1" title="Interconnecting Suite Booking">
                                 Interconnecting Suite
+                            </span>
+                        )}
+                        {isSplitStay && (
+                            <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-purple-50 text-purple-800 border border-purple-300 flex items-center gap-1" title="Split Stay: Single guest moving between rooms across sequential dates">
+                                <GitFork size={10} className="text-purple-600 shrink-0" />
+                                <span>Split Stay ({resolvedGroupRooms.length} Segments)</span>
                             </span>
                         )}
                     </div>
 
                     {/* Right: Top Action Buttons (Folio + Edit + Dynamic Action Dropdown) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {(booking?.source === 'WHATSAPP' || booking?.channel === 'StayPulse AI' || booking?.channel?.includes('StayPulse') || (booking?.specialRequests && booking.specialRequests.includes('AI Inbound'))) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.location.href = `/guestflow?guestPhone=${encodeURIComponent(booking?.phone || '')}`;
+                                }}
+                                className="h-5 px-2 rounded text-[8px] flex items-center gap-1 shadow-2xs transition-colors bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
+                                title="Open guest conversation in GuestFlow Omnichannel Inbox"
+                            >
+                                <MessageCircle size={10} />
+                                <span>View Chat</span>
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => setIsScannerOpen(true)}
@@ -1589,6 +2712,14 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                                         setIsRegCardModalOpen(true);
                                                                         return;
                                                                     }
+                                                                    if (opt.key === 'keycard') {
+                                                                        setIsKeycardModalOpen(true);
+                                                                        return;
+                                                                    }
+                                                                    if (opt.key === 'minibar') {
+                                                                        setIsMinibarModalOpen(true);
+                                                                        return;
+                                                                    }
                                                                     setMode(opt.key);
                                                                 }}
                                                                 className={`w-full px-3 py-1.5 text-left text-[9px] font-medium flex items-center justify-between cursor-pointer transition-colors ${
@@ -1661,13 +2792,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         <DrawerFolioOperations
                             booking={booking}
                             resolvedGroupRooms={resolvedGroupRooms}
-                            onOpenAddPayment={() => setMode('payment')}
                             onOpenAmendStay={() => {
                                 setMode('amend');
                                 if (onEdit) onEdit(booking);
                             }}
                             onOpenRoomMove={() => setMode('move')}
-                            onOpenRoomSplit={() => setMode('split')}
                             onOpenCheckOut={() => onCheckOut && activeSubBookingNo && onCheckOut(activeSubBookingNo)}
                             isTaxExemptionOpen={isTaxExemptionModalOpen}
                             onToggleTaxExemption={setIsTaxExemptionModalOpen}
@@ -1676,340 +2805,589 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 ) : (
                     <div className="flex-1 min-h-0 grid grid-cols-12 bg-[#0e3592] overflow-hidden">
                     {/* LEFT COLUMN: Overview & Financial Cards (Independent Scroll) */}
-                    <div className="col-span-7 h-full overflow-y-auto p-3 space-y-2 border-r border-blue-800/40">
-                        {/* Row 1: Reservation # & Status & Registration # */}
-                        <div className={`grid ${activeRegNo ? 'grid-cols-3' : 'grid-cols-2'} gap-1`}>
-                            <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-blue-500/25 border border-blue-400/20 text-blue-200 flex items-center justify-center text-[8px] flex-shrink-0">
-                                    #
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase text-blue-200/80 tracking-wider">
-                                        Reservation #
-                                    </div>
-                                    <div className="text-[8px] text-white truncate font-mono font-bold">
-                                        {activeSubBookingNo}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {activeRegNo && (
-                                <div className="bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-400/30 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                    <div className="w-6 h-6 rounded-md bg-emerald-500/25 border border-emerald-400/30 text-emerald-300 flex items-center justify-center text-[8px] flex-shrink-0 font-bold">
-                                        REG
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="text-[8px] uppercase text-emerald-300/80 tracking-wider font-semibold">
-                                            Reg No (GRC)
+                    <div className={`${mode === 'move' ? 'col-span-6' : 'col-span-7'} h-full overflow-y-auto custom-scrollbar p-3 space-y-2 border-r border-blue-800/40`}>
+                        {/* Split Stay View Mode Selector (Master Journey Total vs Single Leg Inspection) */}
+                        {isSplitStay && (
+                            <div className="bg-purple-950/40 border border-purple-500/30 rounded-xl p-2 space-y-1.5 shadow-xs">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="w-5 h-5 rounded-md bg-purple-500/25 border border-purple-400/30 flex items-center justify-center text-purple-200 shrink-0">
+                                            <GitFork size={11} />
                                         </div>
-                                        <div className="text-[8px] text-emerald-200 truncate font-mono font-bold">
-                                            {activeRegNo}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-amber-500/25 border border-amber-400/20 text-amber-200 flex items-center justify-center flex-shrink-0">
-                                    <Layers size={12} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase text-blue-200/80 tracking-wider">
-                                        Status
-                                    </div>
-                                    <div>
-                                        <span className="bg-emerald-500/25 border border-emerald-400/30 text-emerald-200 font-extrabold text-[9px] px-2 py-0.5 rounded shadow-2xs uppercase">
-                                            {activeStatus}
+                                        <span className="text-[9px] font-bold text-white">Split Stay Route</span>
+                                        <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-purple-500/25 text-purple-200 border border-purple-400/30 font-semibold font-mono">
+                                            {resolvedGroupRooms.length} Rooms • {splitStayMeta.totalStayNights} Nts
                                         </span>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Row 2: Arrival, Nights, Departure */}
-                        <div className="grid grid-cols-12 gap-1">
-                            <div className="col-span-5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-emerald-500/25 border border-emerald-400/20 text-emerald-200 flex items-center justify-center flex-shrink-0">
-                                    <Calendar size={11} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase  text-blue-200/80">ARRIVAL</div>
-                                    <div className="text-[8px]  text-white truncate">{activeRoom.checkInDate || booking.arrivalDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono flex items-center gap-0.5"><Clock size={9} className="opacity-70" /><span>16:00:00</span></div>
-                                </div>
-                            </div>
-
-                            <div className="col-span-2 bg-white/[0.08] border border-white/10 rounded-xl p-1.5 flex flex-col items-center justify-center text-center shadow-xs">
-                                <div className="text-[8px] uppercase  text-blue-200/80">NIGHTS</div>
-                                <div className="text-[8px] font-black text-white font-mono leading-none">{activeRoom.nights || nights}</div>
-                            </div>
-
-                            <div className="col-span-5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-rose-500/25 border border-rose-400/20 text-rose-200 flex items-center justify-center flex-shrink-0">
-                                    <Calendar size={11} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase  text-blue-200/80">DEPARTURE</div>
-                                    <div className="text-[8px]  text-white truncate">{activeRoom.checkOutDate || departureDate}</div>
-                                    <div className="text-[8px] text-blue-200/70 font-mono flex items-center gap-0.5"><Clock size={9} className="opacity-70" /><span>12:00:00</span></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Row 3: Room Details & Rate Plan */}
-                        <div className="grid grid-cols-2 gap-1">
-                            <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-indigo-500/25 border border-indigo-400/20 text-indigo-200 flex items-center justify-center flex-shrink-0">
-                                    <Home size={12} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase text-blue-200/80 tracking-wider flex items-center gap-1">
-                                        <span>Room Details</span>
-                                        {isConnectingSuite && (
-                                            <span className="text-[7px] px-1 py-0.2 rounded bg-indigo-500/50 text-white font-bold border border-indigo-400/40">
-                                                Connected
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="text-[8px] font-bold text-white truncate">
-                                        {isConnectingSuite
-                                            ? `${resolvedGroupRooms.map((r: any) => r.roomNumber).join(' + ') || activeRoomNum} (${activeRoomType})`
-                                            : `${activeRoomNum} (${activeRoomType})`}
+                                    {/* View Mode Segmented Switch */}
+                                    <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-lg border border-white/10 shrink-0 text-[8px] font-bold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSplitViewMode('total')}
+                                            className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                                splitViewMode === 'total'
+                                                    ? 'bg-purple-600 text-white shadow-2xs'
+                                                    : 'text-purple-200/70 hover:text-white'
+                                            }`}
+                                            title="View cumulative total across all rooms"
+                                        >
+                                            Full Total
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSplitViewMode('segment')}
+                                            className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                                splitViewMode === 'segment'
+                                                    ? 'bg-blue-600 text-white shadow-2xs'
+                                                    : 'text-blue-200/70 hover:text-white'
+                                            }`}
+                                            title={`View details for current active room ${activeRoomNum}`}
+                                        >
+                                            Room {activeRoomNum}
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                <div className="w-6 h-6 rounded-md bg-amber-500/25 border border-amber-400/20 text-amber-200 flex items-center justify-center flex-shrink-0">
-                                    <Printer size={12} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[8px] uppercase  text-blue-200/80 tracking-wider">
-                                        Rate Plan
-                                    </div>
-                                    <div className="text-[8px]  text-white truncate">
-                                        {activeRatePlan}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                            {/* Row 4: Guests & Avg Daily Rate */}
-                            <div className="grid grid-cols-2 gap-1">
-                                <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex flex-col justify-between shadow-xs transition-colors">
-                                    <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-5 h-5 rounded-md bg-cyan-500/25 text-cyan-200 flex items-center justify-center flex-shrink-0">
-                                                <Users size={11} />
-                                            </div>
-                                            <div className="text-[8px] uppercase  text-blue-200/80 tracking-wider">
-                                                Occupancy (Pax)
-                                            </div>
-                                        </div>
-                                        <span className="text-[8px] font-mono text-cyan-200/90" title="Max Room Capacity">
-                                            Max {capacity.maxOccupancy}
-                                        </span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-1.5 mt-1.5">
-                                        {/* Adult Controls */}
-                                        <div className="bg-black/25 rounded-md px-1.5 py-1 border border-white/10 flex items-center justify-between">
-                                            <div>
-                                                <div className="text-[8px] text-blue-200/80 uppercase ">Adults</div>
-                                                <div className="text-[8px] font-black text-white">{amendAdults}</div>
-                                            </div>
-                                            <div className="flex flex-col gap-0.5">
+                                {/* Full-Width Sequence Route Stepper (Never Cuts Off) */}
+                                <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar pb-0.5">
+                                    {splitStayMeta.roomSequence.map((r, i) => {
+                                        const isCurrent = String(r.roomNumber) === String(activeRoomNum);
+                                        return (
+                                            <React.Fragment key={r.roomNumber + i}>
+                                                {i > 0 && <ArrowRight size={8.5} className="text-purple-400/60 shrink-0" />}
                                                 <button
                                                     type="button"
-                                                    disabled={amendAdults >= capacity.maxAdults}
-                                                    onClick={() => setAmendAdults(a => Math.min(capacity.maxAdults, a + 1))}
-                                                    className="w-4 h-3 bg-blue-500/40 hover:bg-blue-500/60 disabled:opacity-20 rounded text-[9px]  text-white flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                    title={`Max ${capacity.maxAdults} Adults`}
-                                                >+</button>
-                                                <button
-                                                    type="button"
-                                                    disabled={amendAdults <= 1}
-                                                    onClick={() => setAmendAdults(a => Math.max(1, a - 1))}
-                                                    className="w-4 h-3 bg-blue-500/40 hover:bg-blue-500/60 disabled:opacity-20 rounded text-[9px]  text-white flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                    title="Min 1 Adult"
-                                                >-</button>
-                                            </div>
-                                        </div>
-
-                                        {/* Children Controls */}
-                                        <div className="bg-black/25 rounded-md px-1.5 py-1 border border-white/10 flex items-center justify-between">
-                                            <div>
-                                                <div className="text-[8px] text-blue-200/80 uppercase ">Child</div>
-                                                <div className="text-[8px] font-black text-white">{amendChildren}</div>
-                                            </div>
-                                            <div className="flex flex-col gap-0.5">
-                                                <button
-                                                    type="button"
-                                                    disabled={amendChildren >= capacity.maxChildren}
-                                                    onClick={() => setAmendChildren(c => Math.min(capacity.maxChildren, c + 1))}
-                                                    className="w-4 h-3 bg-blue-500/40 hover:bg-blue-500/60 disabled:opacity-20 rounded text-[9px]  text-white flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                    title={`Max ${capacity.maxChildren} Children`}
-                                                >+</button>
-                                                <button
-                                                    type="button"
-                                                    disabled={amendChildren <= 0}
-                                                    onClick={() => setAmendChildren(c => Math.max(0, c - 1))}
-                                                    className="w-4 h-3 bg-blue-500/40 hover:bg-blue-500/60 disabled:opacity-20 rounded text-[9px]  text-white flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                    title="Min 0 Children"
-                                                >-</button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                                    onClick={() => {
+                                                        setActiveRoomNumber(String(r.roomNumber));
+                                                        setSplitViewMode('segment');
+                                                    }}
+                                                    className={`px-1.5 py-0.5 rounded-md border text-[8px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                                                        isCurrent
+                                                            ? 'bg-purple-600 text-white border-purple-300 ring-1 ring-purple-300/50 shadow-xs'
+                                                            : 'bg-white/5 hover:bg-white/10 text-purple-200 border-white/10'
+                                                    }`}
+                                                    title={`Switch to Room ${r.roomNumber} (${r.nights} Nights)`}
+                                                >
+                                                    <span>Rm {r.roomNumber}</span>
+                                                    <span className="text-[7px] opacity-75 font-sans">({r.nights}N)</span>
+                                                </button>
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2 flex items-center gap-1 shadow-xs transition-colors">
-                                    <div className="w-6 h-6 rounded-md bg-emerald-500/25 border border-emerald-400/20 text-emerald-200 flex items-center justify-center flex-shrink-0">
-                                        <DollarSign size={12} />
+                        {/* GuestFlow AI Courtesy Hold & Channel Origin Banner */}
+                        {(activeStatus === 'HOLD' || booking?.source === 'WHATSAPP' || booking?.channel === 'StayPulse AI' || booking?.channel?.includes('StayPulse') || (booking?.specialRequests && booking.specialRequests.includes('AI Inbound'))) && (
+                            <div className="bg-gradient-to-r from-emerald-950/75 via-blue-950/75 to-indigo-950/75 border border-emerald-400/40 rounded-xl p-2.5 flex items-center justify-between shadow-xs">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/25 border border-emerald-400/30 flex items-center justify-center text-emerald-300 flex-shrink-0">
+                                        <MessageSquare size={13} />
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-[8px] uppercase  text-blue-200/80 tracking-wider">
-                                            Avg Daily Rate
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-[9px] font-bold text-emerald-300 uppercase tracking-wider">
+                                                GuestFlow AI Concierge
+                                            </span>
+                                            <span className="text-[7.5px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 font-medium">
+                                                WhatsApp Business Line
+                                            </span>
+                                            {booking?.specialRequests && (
+                                                <span className="text-[7.5px] text-blue-200/80 truncate max-w-[200px]" title={booking.specialRequests}>
+                                                    • {booking.specialRequests}
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="text-[8px]  text-white font-mono">
-                                            {currencySymbol} {dailyRate.toFixed(2)}
+                                        <div className="text-[8.5px] text-blue-200/90 flex items-center gap-1.5 mt-0.5">
+                                            <span>Hold Validity:</span>
+                                            <span className="font-semibold text-amber-300 font-mono">
+                                                {booking?.holdUntil ? new Date(booking.holdUntil).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '24 Hours'}
+                                            </span>
+                                            {booking?.holdUntil && new Date(booking.holdUntil) > new Date() && (
+                                                <span className="text-[7.5px] px-1 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30 font-mono">
+                                                    {Math.max(1, Math.round((new Date(booking.holdUntil).getTime() - Date.now()) / (1000 * 60 * 60)))}h left
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            window.location.href = `/guestflow?guestPhone=${encodeURIComponent(booking?.phone || '')}`;
+                                        }}
+                                        className="h-6 px-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-400/40 rounded text-[8.5px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                        title="View live WhatsApp conversation in GuestFlow Inbox"
+                                    >
+                                        <MessageCircle size={10} />
+                                        <span>View Chat</span>
+                                    </button>
                                 </div>
                             </div>
+                        )}
 
-                            {/* Financial & Statutory Tax Overview Card */}
-                            <div className="bg-white/[0.08] border border-white/10 rounded-xl p-2.5 space-y-1.5 text-[8px] shadow-xs">
-                                <div className="flex items-center justify-between text-blue-100 text-[8px]">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-4.5 h-4.5 rounded bg-blue-500/25 flex items-center justify-center text-blue-200">
-                                            <Calculator size={10} />
-                                        </div>
-                                        <span>Base Tariff</span>
-                                    </div>
-                                    <span className="font-mono  text-white">{currencySymbol} {baseAmount.toFixed(2)}</span>
+                        {/* Section 1: Master Identity & Status Strip */}
+                        <div className="bg-white/[0.06] hover:bg-white/[0.08] backdrop-blur-md border border-white/10 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-xs transition-colors">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                {/* Reservation Number Badge */}
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/20 border border-blue-400/30">
+                                    <span className="text-[9px] font-bold text-blue-300">#</span>
+                                    <span className="text-[10px] font-mono font-bold text-white tracking-wide">{activeSubBookingNo}</span>
                                 </div>
 
-                                {/* Statutory Tax & VAT Breakdown */}
-                                {isTaxApplicable && totalTax > 0 ? (
-                                    <div className="bg-black/25 rounded-lg p-2 space-y-1 border border-white/10 text-[10.5px]">
-                                        <div className="flex items-center justify-between  text-blue-200 pb-0.5 border-b border-white/10 text-[8px]">
-                                            <span className="flex items-center gap-1">
-                                                <ShieldCheck size={11} className="text-emerald-400" />
-                                                <span>Taxes ({taxConfigCode})</span>
+                                {/* Booking Channel Pill */}
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-500/15 border border-indigo-400/25">
+                                    {isWhatsAppBooking ? (
+                                        <>
+                                            <MessageSquare size={11} className="text-emerald-400 shrink-0" />
+                                            <span className="text-[9.5px] font-medium text-emerald-200 flex items-center gap-1">
+                                                <span>{channelDisplayName}</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                             </span>
-                                            <span className="font-mono text-emerald-300 ">+{currencySymbol} {totalTax.toFixed(2)}</span>
-                                        </div>
-                                        {serviceCharge > 0 && (
-                                            <div className="flex justify-between text-blue-200/80 text-[8px]">
-                                                <span>Service Charge:</span>
-                                                <span className="font-mono text-white">+{currencySymbol} {serviceCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-                                        {vatAmount > 0 && (
-                                            <div className="flex justify-between text-blue-200/80 text-[8px]">
-                                                <span>VAT:</span>
-                                                <span className="font-mono text-white">+{currencySymbol} {vatAmount.toFixed(2)}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-between text-amber-200 text-[8px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/20">
-                                        <span>Tax Policy:</span>
-                                        <span className="">Tax Exempt</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Globe size={11} className="text-indigo-300 shrink-0" />
+                                            <span className="text-[9.5px] font-medium text-indigo-200">{channelDisplayName}</span>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Optional GRC Registration Badge */}
+                                {activeRegNo && (
+                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30">
+                                        <span className="text-[8px] uppercase tracking-wider text-emerald-300 font-bold">GRC</span>
+                                        <span className="text-[9.5px] font-mono font-bold text-emerald-200">{activeRegNo}</span>
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-between text-blue-100 text-[8px] pt-1 border-t border-white/10 ">
-                                    <span className="text-white">Grand Total (Payable)</span>
-                                    <span className="font-mono font-black text-white">{currencySymbol} {totalAmount.toFixed(2)}</span>
-                                </div>
-
-                                <div className="flex items-center justify-between text-blue-100 text-[8px]">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-4.5 h-4.5 rounded bg-emerald-500/25 flex items-center justify-center text-emerald-300">
-                                            <CreditCard size={10} />
-                                        </div>
-                                        <span>Advance Paid</span>
+                                {/* Optional VIP Loyalty Tier Badge */}
+                                {booking?.vip && (
+                                    <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-200 text-[9px] font-bold shadow-2xs">
+                                        <Crown size={10} className="text-amber-300 fill-amber-300" />
+                                        <span>{booking.vip === 'VIP' ? 'VIP Guest' : booking.vip}</span>
                                     </div>
-                                    <span className="font-mono  text-emerald-300">{currencySymbol} {paidAmount.toFixed(2)}</span>
-                                </div>
+                                )}
+
+                                {/* Quick Direct Phone Contact */}
+                                {Boolean(booking?.phone && String(booking.phone).trim() && String(booking.phone).trim() !== '-' && String(booking.phone).trim() !== 'null' && String(booking.phone).trim() !== 'undefined') && (
+                                    <a
+                                        href={`tel:${booking.phone}`}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-emerald-200 text-[9px] font-mono transition-colors"
+                                        title={`Call Guest (${booking.phone})`}
+                                    >
+                                        <Phone size={10} className="text-emerald-300" />
+                                        <span>{booking.phone}</span>
+                                    </a>
+                                )}
                             </div>
 
-                            {/* Room Net Balance Highlight Card */}
-                            <div className="bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 rounded-xl p-2.5 flex items-center justify-between  shadow-xs transition-colors">
-                                <div className="flex items-center gap-1 text-white">
-                                    <div className="w-6 h-6 rounded-md bg-emerald-500/25 border border-emerald-400/20 flex items-center justify-center text-emerald-400">
-                                        <Wallet size={12} />
-                                    </div>
-                                    <span className="text-[8px]">Net Balance Due</span>
-                                </div>
-                                <span className={`font-mono font-black text-[8px] ${dueAmount > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                                    {currencySymbol} {dueAmount.toFixed(2)}
+                            {/* Status Indicator */}
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <span className={`px-2.5 py-1 rounded-lg border text-[9.5px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-2xs ${statusBadgeConfig.bg}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusBadgeConfig.dot} animate-pulse`} />
+                                    <span>{activeStatus}</span>
                                 </span>
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: Reservation List Panel OR Active Action Mode Form */}
-                        <div className="col-span-5 h-full flex flex-col min-h-0 bg-[#0e3592]">
+                        {/* Section 2: Stay Timeline & Journey Card */}
+                        <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/60 to-blue-950/60 border border-white/10 rounded-xl p-2.5 shadow-xs">
+                            <div className="grid grid-cols-12 items-center gap-2">
+                                {/* Check-In Arrival */}
+                                <div className="col-span-5 flex items-center gap-2 min-w-0">
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 flex-shrink-0">
+                                        <LogIn size={13} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[8px] uppercase tracking-wider text-blue-200/80 font-bold flex items-center gap-1">
+                                            <span>Check-In</span>
+                                            {showSplitTotal && <span className="text-[7px] text-emerald-300 font-bold">(1st Leg)</span>}
+                                        </div>
+                                        <div className="text-[10px] font-mono font-bold text-white truncate">{displayArrival}</div>
+                                        <div className="text-[8px] text-emerald-200/80 font-mono flex items-center gap-0.5">
+                                            <Clock size={8.5} className="opacity-80" />
+                                            <span>16:00 Check-In</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Center Duration & Journey Connector */}
+                                <div className="col-span-2 flex flex-col items-center justify-center text-center">
+                                    <div className="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 flex items-center gap-1 shadow-2xs">
+                                        <Moon size={9} className="text-amber-300" />
+                                        <span className="text-[9px] font-black text-white font-mono">{displayNights}</span>
+                                        <span className="text-[7.5px] text-blue-200 uppercase font-medium">{displayNights === 1 ? 'Nt' : 'Nts'}</span>
+                                    </div>
+                                    <div className="flex items-center justify-center w-full mt-1 text-blue-300/60">
+                                        <div className="h-[1px] w-3 bg-blue-300/30" />
+                                        <ArrowRight size={10} className="mx-0.5 text-blue-300/80" />
+                                        <div className="h-[1px] w-3 bg-blue-300/30" />
+                                    </div>
+                                    {showSplitTotal && <span className="text-[6.5px] text-purple-200 uppercase font-bold mt-0.5">Total Stay</span>}
+                                </div>
+
+                                {/* Check-Out Departure */}
+                                <div className="col-span-5 flex items-center justify-end gap-2 min-w-0 text-right">
+                                    <div className="min-w-0">
+                                        <div className="text-[8px] uppercase tracking-wider text-blue-200/80 font-bold flex items-center justify-end gap-1">
+                                            {showSplitTotal && <span className="text-[7px] text-rose-300 font-bold">(Final)</span>}
+                                            <span>Check-Out</span>
+                                        </div>
+                                        <div className="text-[10px] font-mono font-bold text-white truncate">{displayDeparture}</div>
+                                        <div className="text-[8px] text-rose-200/80 font-mono flex items-center justify-end gap-0.5">
+                                            <Clock size={8.5} className="opacity-80" />
+                                            <span>12:00 Check-Out</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-300 flex-shrink-0">
+                                        <LogOut size={13} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section 3: Room, Rate Plan & Occupancy Specification Grid */}
+                        <div className="grid grid-cols-2 gap-2">
+                            {/* Column 1: Room & Occupancy */}
+                            <div className="bg-white/[0.06] hover:bg-white/[0.08] border border-white/10 rounded-xl p-2.5 flex flex-col justify-between shadow-xs transition-colors">
+                                <div>
+                                    <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="w-5 h-5 rounded-md bg-blue-500/20 text-blue-200 flex items-center justify-center shrink-0">
+                                                <BedDouble size={11} />
+                                            </div>
+                                            <span className="text-[8px] uppercase tracking-wider text-blue-200/80 font-bold">Room Allocation</span>
+                                        </div>
+                                        {isSplitStay ? (
+                                            <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30 font-bold">
+                                                {showSplitTotal ? `${resolvedGroupRooms.length} Rooms` : 'Split Leg'}
+                                            </span>
+                                        ) : isConnectingSuite ? (
+                                            <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold">
+                                                Connected
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="mt-1.5">
+                                        <div className="text-[10px] font-bold text-white truncate">
+                                            {showSplitTotal
+                                                ? `Sequential: ${splitStayMeta.roomSequence.map(r => r.roomNumber).join(' ➔ ')}`
+                                                : isConnectingSuite
+                                                    ? `${resolvedGroupRooms.map((r: any) => r.roomNumber).join(' + ') || activeRoomNum} (${activeRoomType})`
+                                                    : `Room ${activeRoomNum} • ${activeRoomType}`}
+                                        </div>
+                                        {/* Room Readiness & Floor Tag */}
+                                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                            <span className={`text-[7.5px] px-1.5 py-0.2 rounded font-bold border flex items-center gap-1 ${
+                                                housekeepingStatus.toUpperCase().includes('DIRTY')
+                                                    ? 'bg-amber-500/20 text-amber-200 border-amber-400/30'
+                                                    : housekeepingStatus.toUpperCase().includes('MAINT') || housekeepingStatus.toUpperCase().includes('OUT')
+                                                        ? 'bg-rose-500/20 text-rose-200 border-rose-400/30'
+                                                        : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'
+                                            }`}>
+                                                <Sparkles size={8.5} />
+                                                <span>{housekeepingStatus.toUpperCase().includes('DIRTY') ? 'Dirty (Cleaning)' : 'Clean & Inspected'}</span>
+                                            </span>
+                                            {roomFloorDisplay && (
+                                                <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-white/10 text-blue-200 border border-white/10 font-medium">
+                                                    {roomFloorDisplay}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Occupancy Specification Row */}
+                                <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <Users size={11} className="text-cyan-300 shrink-0" />
+                                        <span className="text-[8px] text-blue-200/80 uppercase font-semibold tracking-wider">
+                                            Occupancy
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-[9.5px] font-bold text-white font-mono">
+                                            {amendAdults} {amendAdults === 1 ? 'Adult' : 'Adults'}{amendChildren > 0 ? `, ${amendChildren} ${amendChildren === 1 ? 'Child' : 'Children'}` : ''}
+                                        </span>
+                                        <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-white/10 text-cyan-200 border border-white/15 font-mono">
+                                            Max {capacity.maxOccupancy}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Column 2: Rate Plan & Tariff */}
+                            <div className="bg-white/[0.06] hover:bg-white/[0.08] border border-white/10 rounded-xl p-2.5 flex flex-col justify-between shadow-xs transition-colors">
+                                <div>
+                                    <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-200 flex items-center justify-center shrink-0">
+                                                <Tag size={11} />
+                                            </div>
+                                            <span className="text-[8px] uppercase tracking-wider text-blue-200/80 font-bold">Rate Plan</span>
+                                        </div>
+                                        <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-bold">
+                                            BAR
+                                        </span>
+                                    </div>
+                                    <div className="mt-1.5">
+                                        <div className="text-[10px] font-bold text-white truncate" title={activeRatePlan}>
+                                            {activeRatePlan}
+                                        </div>
+                                        <div className="text-[7.5px] text-blue-200/70 truncate mt-0.5">
+                                            Buffet Breakfast & Wi-Fi Incl.
+                                        </div>
+                                        {/* Board Basis & Meal Plan Tag */}
+                                        <div className="mt-1 flex items-center gap-1">
+                                            <span className={`text-[7.5px] px-1.5 py-0.2 rounded border font-bold flex items-center gap-1 ${boardBasisCode.color}`}>
+                                                <span>{boardBasisCode.name}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ADR Section */}
+                                <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <DollarSign size={11} className="text-emerald-300" />
+                                        <span className="text-[8px] text-blue-200/80 uppercase font-semibold">
+                                            {showSplitTotal ? 'Blended ADR' : 'Daily Rate (ADR)'}
+                                        </span>
+                                    </div>
+                                    <div className="font-mono font-bold text-[9.5px] text-white">
+                                        {currencySymbol} {displayDailyRate.toFixed(2)} <span className="text-[7.5px] font-normal text-blue-200/70">/ nt</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Guest Special Request & Preferences Banner */}
+                        {booking?.specialRequests && (
+                            <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl px-2.5 py-2 flex items-center gap-2 shadow-xs">
+                                <div className="w-5 h-5 rounded-md bg-amber-500/25 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0">
+                                    <Bell size={11} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[7.5px] uppercase tracking-wider font-bold text-amber-300 flex items-center justify-between">
+                                        <span>Special Requests & Preferences</span>
+                                        <span className="text-[7px] px-1 rounded bg-amber-400/20 text-amber-200 font-mono">HIGH PRIORITY</span>
+                                    </div>
+                                    <div className="text-[8.5px] text-amber-100 font-medium truncate mt-0.5" title={booking.specialRequests}>
+                                        {booking.specialRequests}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Section 4: Executive Financial Folio Breakdown Card */}
+                        <div className="bg-white/[0.06] border border-white/10 rounded-xl p-2.5 space-y-2 text-[8px] shadow-xs">
+                            {/* Card Header */}
+                            <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center text-blue-200 shrink-0">
+                                        <Receipt size={11} />
+                                    </div>
+                                    <span className="text-[9px] font-bold text-white">
+                                        {showSplitTotal
+                                            ? 'Master Folio Financial Summary'
+                                            : (isSplitStay && resolvedGroupRooms.length > 1 ? 'Leg Tariff & Folio Breakdown' : 'Folio Tariff Breakdown')}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {isTaxApplicable ? (
+                                        <span className="text-[7px] px-1.5 py-0.2 rounded font-mono font-bold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                                            TAX: {taxConfigCode}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[7px] px-1.5 py-0.2 rounded font-bold bg-amber-500/20 text-amber-200 border border-amber-400/30">
+                                            TAX EXEMPT
+                                        </span>
+                                    )}
+                                    {showSplitTotal && resolvedGroupRooms.length > 1 && (
+                                        <span className="text-[7px] px-1.5 py-0.2 rounded font-mono font-bold bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                                            {resolvedGroupRooms.length} Rooms Total
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Line Items */}
+                            <div className="space-y-1.5">
+                                {/* Base Tariff */}
+                                <div className="flex items-center justify-between text-blue-100">
+                                    <span className="flex items-center gap-1">
+                                        <span>Base Accommodation</span>
+                                        <span className="text-blue-300/70 font-mono text-[7.5px]">({displayNights} {displayNights === 1 ? 'Night' : 'Nights'} × {currencySymbol}{displayDailyRate.toFixed(2)})</span>
+                                    </span>
+                                    <span className="font-mono text-white font-bold">{currencySymbol} {displayBase.toFixed(2)}</span>
+                                </div>
+
+                                {/* Taxes & Levies */}
+                                {isTaxApplicable && displayTax > 0 ? (
+                                    <div className="bg-black/25 rounded-lg p-2 border border-white/10 space-y-1.5">
+                                        <div className="flex items-center justify-between text-blue-200">
+                                            <span className="flex items-center gap-1 font-bold text-emerald-300 text-[8.5px]">
+                                                <ShieldCheck size={11} className="text-emerald-400" />
+                                                <span>Statutory Taxes &amp; Levies</span>
+                                            </span>
+                                            <span className="font-mono font-bold text-emerald-300 text-[9px]">+{currencySymbol} {displayTax.toFixed(2)}</span>
+                                        </div>
+                                        {displayTaxBreakdown && displayTaxBreakdown.length > 0 ? (
+                                            <div className="flex flex-wrap items-center gap-1.5 text-blue-200 text-[8px] border-t border-white/10 pt-1">
+                                                {displayTaxBreakdown.map((item: any, idx: number) => (
+                                                    <span key={idx} className="inline-flex items-center gap-1 bg-white/[0.08] px-1.5 py-0.5 rounded border border-white/10">
+                                                        <span className="text-blue-200 font-medium">{item.name || item.code} ({item.rate}%):</span>
+                                                        <strong className="text-white font-mono font-bold">+{currencySymbol}{Number(item.amount).toFixed(2)}</strong>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between text-blue-200/90 text-[8px] border-t border-white/10 pt-1">
+                                                {displayServiceCharge > 0 && (
+                                                    <span>Service Charge: <strong className="text-white font-mono">+{currencySymbol} {displayServiceCharge.toFixed(2)}</strong></span>
+                                                )}
+                                                {displayVat > 0 && (
+                                                    <span>VAT: <strong className="text-white font-mono">+{currencySymbol} {displayVat.toFixed(2)}</strong></span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between text-amber-200 text-[7.5px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/20">
+                                        <span>Tax Exemption Policy:</span>
+                                        <span className="font-semibold">0.00% Zero-Rated</span>
+                                    </div>
+                                )}
+
+                                {/* Grand Total & Advance Paid */}
+                                <div className="flex items-center justify-between text-white font-bold pt-1 border-t border-white/10">
+                                    <span className="text-[8.5px]">Grand Total (Gross Folio)</span>
+                                    <span className="font-mono text-[10px] text-white font-black">{currencySymbol} {displayGrandTotal.toFixed(2)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-blue-200/90">
+                                    <div className="flex items-center gap-1">
+                                        <CreditCard size={9.5} className="text-emerald-400" />
+                                        <span>Advance Deposits Paid</span>
+                                    </div>
+                                    <span className="font-mono text-emerald-300 font-bold">-{currencySymbol} {displayPaid.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            {/* High-Visibility Net Due Ribbon */}
+                            <div className={`p-2 rounded-xl flex items-center justify-between border transition-all ${
+                                displayDue > 0
+                                    ? 'bg-gradient-to-r from-amber-950/40 via-blue-950/50 to-amber-950/40 border-amber-400/40 shadow-xs'
+                                    : 'bg-gradient-to-r from-emerald-950/40 via-blue-950/50 to-emerald-950/40 border-emerald-400/40 shadow-xs'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                        displayDue > 0 ? 'bg-amber-500/25 text-amber-300' : 'bg-emerald-500/25 text-emerald-300'
+                                    }`}>
+                                        <Wallet size={12} />
+                                    </div>
+                                    <div>
+                                        <div className="text-[7.5px] uppercase tracking-wider text-blue-200/80 font-bold">
+                                            Net Balance Due
+                                        </div>
+                                        <div className="flex items-center gap-1 mt-0.2">
+                                            <span className={`text-[7px] px-1 py-0.2 rounded font-extrabold uppercase ${
+                                                displayDue > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                            }`}>
+                                                {displayDue > 0 ? 'Payment Pending' : 'Fully Settled'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className={`font-mono font-black text-[12px] tracking-tight ${
+                                        displayDue > 0 ? 'text-amber-300' : 'text-emerald-400'
+                                    }`}>
+                                        {currencySymbol} {displayDue.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: Reservation List Panel OR Active Action Mode Form */}
+                        <div className={`${mode === 'move' ? 'col-span-6' : 'col-span-5'} h-full flex flex-col min-h-0 bg-[#0e3592]`}>
                             {mode === 'overview' ? (
                                 /* RESERVATION LIST PANEL (matching media_1792966125811_cc345f83.png) */
                                 <div className="h-full flex flex-col min-h-0">
-                                    {/* Header: ${ratePlan} (${count}) + Action Buttons */}
-                                    <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-blue-400/20 flex-shrink-0 bg-[#0c2e7a]/50">
-                                        <div className="min-w-0">
-                                            <h2 className="text-[11px] font-bold text-white tracking-wide truncate flex items-center gap-1.5">
+                                    {/* Header: Rate Plan / Split Stay Title + Compact Actions */}
+                                    <div className="px-3 py-2 flex items-center justify-between border-b border-blue-400/20 flex-shrink-0 bg-[#0c2e7a]/50">
+                                        <div className="min-w-0 pr-1.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 {isConnectingSuite ? (
                                                     <>
-                                                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 text-[9px] font-extrabold flex items-center gap-1">
-                                                            Interconnecting Suite
+                                                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 text-[8.5px] font-extrabold flex items-center gap-1 shrink-0">
+                                                            Connected Suite
                                                         </span>
-                                                        <span>(1 Booking | Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
+                                                        <span className="text-[9.5px] font-bold text-white truncate">Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum}</span>
+                                                    </>
+                                                ) : isSplitStay ? (
+                                                    <>
+                                                        <span className="px-1.5 py-0.5 rounded bg-purple-500/40 border border-purple-400/40 text-purple-100 text-[8.5px] font-extrabold flex items-center gap-1 shrink-0">
+                                                            <GitFork size={10} className="text-purple-200" />
+                                                            <span>Split Stay</span>
+                                                        </span>
+                                                        <span className="text-[9.5px] font-bold text-white truncate">({resolvedGroupRooms.length} Segments)</span>
                                                     </>
                                                 ) : (
-                                                    `${activeRatePlan} (${resolvedGroupRooms.length})`
+                                                    <span className="text-[10px] font-bold text-white truncate">
+                                                        {(booking.source?.toUpperCase() === 'WHATSAPP' || booking.channel?.toUpperCase() === 'WHATSAPP') ? 'GUESTFLOW AI' : (booking.source?.toUpperCase() || 'DIRECT')} ({resolvedGroupRooms.length})
+                                                    </span>
                                                 )}
-                                            </h2>
-                                            {isConnectingSuite ? (
-                                                <div className="text-[8.5px] font-medium text-emerald-300 mt-0.5 flex items-center gap-1">
-                                                    <span>Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
+                                            </div>
+                                            {isSplitStay ? (
+                                                <div className="text-[7.5px] font-mono text-purple-200/80 mt-0.5 truncate">
+                                                    Res #{booking.reservationNumber} • Sequential Move
                                                 </div>
                                             ) : booking.groupCode ? (
-                                                <div className="text-[8.5px] font-mono text-blue-200/90 mt-0.5">
+                                                <div className="text-[7.5px] font-mono text-blue-200/90 mt-0.5 truncate">
                                                     Group Code: <span className="font-bold text-white">{booking.groupCode}</span>
                                                 </div>
                                             ) : null}
                                         </div>
                                         {!isConnectingSuite && (
-                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                 <button
                                                     type="button"
                                                     onClick={() => setMode('link_group')}
-                                                    className="h-6 px-2.5 bg-blue-500/25 hover:bg-blue-500/40 text-blue-100 border border-blue-400/30 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                    className="h-5.5 px-2 bg-blue-500/25 hover:bg-blue-500/40 text-blue-100 border border-blue-400/30 rounded text-[8.5px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                                     title="Link an existing reservation into this group without modifying its confirmation number"
                                                 >
-                                                    <LinkIcon size={10} />
-                                                    <span>Link Group</span>
+                                                    <LinkIcon size={9} />
+                                                    <span>Link</span>
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setMode('add_booking')}
-                                                    className="h-6 px-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                    className="h-5.5 px-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded text-[8.5px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                                     title="Add a new room booking"
                                                 >
-                                                    <Plus size={10} />
-                                                    <span>Add Room</span>
+                                                    <Plus size={9} />
+                                                    <span>+ Room</span>
                                                 </button>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Scrollable Room Cards List (matching media_1792966125811_cc345f83.png) */}
-                                    <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0">
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5 min-h-0">
                                         {resolvedGroupRooms.map((rm: any, idx: number) => {
                                             const isSelected = String(rm.roomNumber) === String(activeRoomNum);
                                             const rmStatus = (rm.status || 'CONFIRMED').toUpperCase();
                                             const isRoomInHouse = rmStatus === 'IN-HOUSE' || rmStatus === 'ARRIVED' || rmStatus === 'STAYOVER';
                                             const isRoomConfirmed = rmStatus === 'CONFIRMED' || rmStatus === 'ARRIVING';
-                                            const rmResNo = rm.reservationNumber || rm.subBookingNumber || (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber);
+                                            // Split Stay Rule: same guest moving rooms → same master reservation number
+                                            const isDrawerSplitStay = isSplitStay && resolvedGroupRooms.length > 1;
+                                            const rmResNo = rm.reservationNumber || rm.subBookingNumber || (isDrawerSplitStay ? booking.reservationNumber : (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber));
                                             const rmRegNo = rm.registrationNumber || (isRoomInHouse ? generateRegistrationNumber(rmResNo) : undefined);
                                             const hasExplicitPrimary = resolvedGroupRooms.some((r: any) => Boolean(r.isPrimary));
                                             const isPrimaryOwner = hasExplicitPrimary ? Boolean(rm.isPrimary) : idx === 0;
@@ -2018,24 +3396,34 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <div
                                                     key={`${rm.roomNumber}-${rmResNo}-${idx}`}
                                                     onClick={() => setActiveRoomNumber(String(rm.roomNumber))}
-                                                    className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer select-none relative overflow-hidden ${
                                                         isSelected
-                                                            ? 'bg-blue-600/35 border-blue-300 ring-2 ring-blue-400/70 shadow-lg'
-                                                            : 'bg-white/[0.07] hover:bg-white/[0.12] border-white/10'
+                                                            ? 'bg-blue-600/35 border-blue-300 ring-2 ring-blue-400/70 shadow-md'
+                                                            : 'bg-white/[0.06] hover:bg-white/[0.12] border-white/10'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
+                                                    {/* Active Selection Glow Accent */}
+                                                    {isSelected && (
+                                                        <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-blue-300 via-indigo-400 to-blue-500 rounded-l-xl" />
+                                                    )}
+
+                                                    <div className="flex items-center justify-between gap-1.5">
                                                         <div className="flex items-center gap-1.5 min-w-0">
-                                                            <span className="text-[11px] font-bold text-white truncate">
+                                                            <span className="text-[10.5px] font-bold text-white truncate">
                                                                 {rm.guestName || booking.guestName}
                                                             </span>
-                                                            {isPrimaryOwner && (
+                                                            {!isDrawerSplitStay && resolvedGroupRooms.length > 1 && isPrimaryOwner && (
                                                                 <span title="Primary Booker / Group Owner">
-                                                                    <Crown size={12} className="text-amber-300 fill-amber-300 shrink-0" />
+                                                                    <Crown size={11} className="text-amber-300 fill-amber-300 shrink-0" />
+                                                                </span>
+                                                            )}
+                                                            {isDrawerSplitStay && resolvedGroupRooms.length > 1 && (
+                                                                <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30 font-bold shrink-0">
+                                                                    Leg {idx + 1}/{resolvedGroupRooms.length}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <span className={`text-[8px] px-2 py-0.5 rounded uppercase font-semibold shadow-2xs ${
+                                                        <span className={`text-[7.5px] px-2 py-0.5 rounded uppercase font-black tracking-wider shadow-2xs shrink-0 ${
                                                             isRoomInHouse
                                                                 ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/30'
                                                                 : isRoomConfirmed
@@ -2046,26 +3434,52 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         </span>
                                                     </div>
 
-                                                    <div className="text-[9.5px] text-blue-200/90 font-mono mt-1">
-                                                        Reservation: <span className="text-white font-semibold">{rmResNo}</span>
+                                                    <div className="flex items-center justify-between text-[8.5px] text-blue-200/90 font-mono mt-1">
+                                                        <div className="flex items-center gap-1 truncate">
+                                                            <span className="text-blue-300/70 text-[7.5px] uppercase font-sans">Reservation:</span>
+                                                            <span className="text-white font-semibold">{rmResNo}</span>
+                                                        </div>
+                                                        {(() => {
+                                                            const segIn = rm.checkIn || rm.checkInDate || booking.arrivalDate;
+                                                            const segOut = rm.checkOut || rm.checkOutDate || booking.departureDate;
+                                                            const calcNights = segIn && segOut
+                                                                ? Math.max(1, Math.round((new Date(segOut).getTime() - new Date(segIn).getTime()) / (1000 * 3600 * 24)))
+                                                                : (rm.nights || 1);
+                                                            return segIn ? (
+                                                                <div className="text-[8.5px] text-blue-200 font-sans flex items-center gap-1 shrink-0">
+                                                                    <Calendar size={9} className="text-blue-400" />
+                                                                    <span>{segIn.slice(5)} → {(segOut || '').slice(5)}</span>
+                                                                    <span className="text-[7px] px-1 py-0.2 rounded bg-white/10 text-white font-bold font-mono">
+                                                                        {calcNights} {calcNights === 1 ? 'nt' : 'nts'}
+                                                                    </span>
+                                                                </div>
+                                                            ) : null;
+                                                        })()}
                                                     </div>
 
-                                                    <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[9px]">
+                                                    <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[8.5px]">
                                                         {rm.isConnecting ? (
                                                             <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40 font-bold flex items-center gap-1">
-                                                                Rooms {rm.roomNumber}
+                                                                <BedDouble size={10} className="text-indigo-300" />
+                                                                <span>Rooms {rm.roomNumber}</span>
                                                             </span>
                                                         ) : (
-                                                            <span className="px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-100 border border-blue-400/30 font-medium">
-                                                                Room {rm.roomNumber || 'Unassigned'}
+                                                            <span className={`px-2 py-0.5 rounded-md border font-semibold flex items-center gap-1 ${
+                                                                isSelected
+                                                                    ? 'bg-blue-500/30 text-white border-blue-400/50'
+                                                                    : 'bg-white/10 text-blue-100 border-white/15'
+                                                            }`}>
+                                                                <BedDouble size={10} className="text-blue-300" />
+                                                                <span>Room {rm.roomNumber || 'Unassigned'} ({rm.roomType || activeRoomType || 'Deluxe Suite'})</span>
                                                             </span>
                                                         )}
-                                                        <span className="px-2 py-0.5 rounded-md bg-white/10 text-blue-100 border border-white/10 font-medium">
-                                                            Pax {rm.adults ?? 2}, {rm.children ?? 0}
+                                                        <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-blue-200 border border-white/10 font-medium flex items-center gap-1">
+                                                            <Users size={9.5} className="text-cyan-300" />
+                                                            <span>Pax {rm.adults ?? 2}{rm.children ? `, ${rm.children}` : ''}</span>
                                                         </span>
                                                         {rmRegNo && (
-                                                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 font-mono font-bold">
-                                                                {rmRegNo}
+                                                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 font-mono font-bold">
+                                                                GRC: {rmRegNo}
                                                             </span>
                                                         )}
                                                     </div>
@@ -2075,10 +3489,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
 
                                     {/* Overview Footer */}
-                                    <div className="flex-shrink-0 px-3.5 py-2.5 bg-[#0c2e7a]/80 border-t border-blue-400/20 flex items-center justify-between gap-1.5 relative">
+                                    <div className="flex-shrink-0 px-2.5 py-2 bg-gradient-to-r from-[#0a235c] via-[#0d2f7d] to-[#0a235c] border-t border-blue-400/30 shadow-lg flex items-center justify-between gap-1.5 relative z-20 overflow-x-auto no-scrollbar">
                                         {/* Status-Aware Dynamic Print Action Button */}
-                                        <div className="relative">
-                                            <div className="inline-flex rounded-md shadow-xs">
+                                        <div className="relative shrink-0">
+                                            <div className="inline-flex rounded-md shadow-xs overflow-hidden border border-white/20">
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -2090,7 +3504,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             setActivePrintDoc('reg_card');
                                                         }
                                                     }}
-                                                    className="h-8 px-3 bg-white/10 hover:bg-white/20 text-white rounded-l-md text-[9.5px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border-r border-white/10"
+                                                    className="h-7 px-2 bg-white/10 hover:bg-white/20 text-white text-[8.5px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border-r border-white/15 shrink-0"
                                                     title={
                                                         isCurrentActiveInHouse
                                                             ? 'Print Running Folio & Bill'
@@ -2101,7 +3515,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             : 'Print Guest Registration Card (GRC) for Check-in signature'
                                                     }
                                                 >
-                                                    <Printer size={12} />
+                                                    <Printer size={11} />
                                                     <span>
                                                         {isCurrentActiveInHouse
                                                             ? 'Print Folio'
@@ -2115,10 +3529,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsPrintMenuOpen(prev => !prev)}
-                                                    className="h-8 px-1.5 bg-white/10 hover:bg-white/20 text-white rounded-r-md text-[9.5px] flex items-center justify-center transition-colors cursor-pointer"
+                                                    className="h-7 px-1.5 bg-white/10 hover:bg-white/20 text-white text-[8.5px] flex items-center justify-center transition-colors cursor-pointer shrink-0"
                                                     title="More print document options"
                                                 >
-                                                    <ChevronDown size={11} className={`transition-transform duration-150 ${isPrintMenuOpen ? 'rotate-180' : ''}`} />
+                                                    <ChevronDown size={10} className={`transition-transform duration-150 ${isPrintMenuOpen ? 'rotate-180' : ''}`} />
                                                 </button>
                                             </div>
 
@@ -2244,7 +3658,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             )}
                                         </div>
 
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-auto flex-nowrap">
                                             {(() => {
                                                 const arrivalDateVal = activeRoom.checkInDate || booking.arrivalDate || (booking as any)?.checkIn;
                                                 const isArrivalToday = arrivalDateVal === (systemDate || getOperatingSystemDate());
@@ -2259,16 +3673,16 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             }
                                                             onCheckIn(activeSubBookingNo || booking.reservationNumber);
                                                         }}
-                                                        className={`h-8 px-3.5 rounded-md text-[9.5px] font-semibold flex items-center gap-1 transition-colors shadow-xs ${
+                                                        className={`h-7 px-2.5 rounded-md text-[8.5px] font-bold flex items-center gap-1 transition-all shadow-xs cursor-pointer shrink-0 ${
                                                             isRoomUnassignedActive
                                                                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
-                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                                                : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                                                         }`}
                                                         title={isRoomUnassignedActive ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In active room'}
                                                     >
                                                         <DoorOpen size={11} />
                                                         <span>Check In</span>
-                                                        {isRoomUnassignedActive && <span className="text-[8px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Unassigned</span>}
+                                                        {isRoomUnassignedActive && <span className="text-[7.5px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Unassigned</span>}
                                                     </button>
                                                 ) : null;
                                             })()}
@@ -2283,7 +3697,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         }
                                                         onCheckOut(activeSubBookingNo || booking.reservationNumber);
                                                     }}
-                                                    className="h-8 px-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                                    className="h-7 px-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-md text-[8.5px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs active:scale-95 shrink-0"
                                                     title="Check Out active room"
                                                 >
                                                     <DoorClosed size={11} />
@@ -2295,7 +3709,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     type="button"
                                                     disabled={isIssuingKeycard}
                                                     onClick={handleIssueKeycard}
-                                                    className="h-8 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                                    className="h-7 px-2 bg-teal-600 hover:bg-teal-500 text-white rounded-md text-[8.5px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs active:scale-95 shrink-0"
                                                     title="Encode RFID Keycard"
                                                 >
                                                     <Key size={11} />
@@ -2304,10 +3718,20 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             )}
                                             <button
                                                 type="button"
-                                                onClick={onClose}
-                                                className="h-8 px-4 bg-white hover:bg-gray-100 text-[#0e3592] rounded-md text-[9.5px] font-bold transition-all cursor-pointer shadow-xs"
+                                                onClick={() => setMode('send_confirmation')}
+                                                className="h-7 px-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-md text-[8.5px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs active:scale-95 shrink-0"
+                                                title="Send Official Confirmation Voucher via WhatsApp & Email"
                                             >
-                                                Close
+                                                <Send size={10} />
+                                                <span>Send Voucher</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={onClose}
+                                                className="h-7 px-2.5 bg-white/15 hover:bg-white/25 text-white border border-white/25 rounded-md text-[8.5px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 shrink-0"
+                                            >
+                                                <X size={11} />
+                                                <span>Close</span>
                                             </button>
                                         </div>
                                     </div>
@@ -2329,64 +3753,345 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
 
                                     {/* Scrollable Form Body */}
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5 min-h-0">
                                 {/* MODE 1: AMEND STAY (media_1792541010797_b7d6f151.png) */}
                                 {mode === 'amend' && (
-                                    <div className="space-y-3">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between text-[8px] font-semibold text-white">
-                                                <span>Rooms</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setAmendSelectedRoom(!amendSelectedRoom)}
-                                                    className="text-[8px] px-2 py-0.5 border border-white/40 hover:bg-white/10 rounded font-medium text-white transition-colors cursor-pointer"
-                                                >
-                                                    {amendSelectedRoom ? 'Unselect All' : 'Select All'}
-                                                </button>
-                                            </div>
-                                            <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-lg p-2.5 flex items-center gap-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={amendSelectedRoom}
-                                                    onChange={e => setAmendSelectedRoom(e.target.checked)}
-                                                    className="w-3.5 h-3.5 rounded text-blue-600 bg-white cursor-pointer accent-blue-500"
-                                                />
-                                                <span className="text-[8px]  text-white font-mono truncate">
-                                                    {booking.roomNumber} - {booking.reservationNumber}
-                                                </span>
-                                            </div>
-                                        </div>
+                                    <div className="space-y-2">
+                                        {/* SPLIT STAY MULTI-SEGMENT ITINERARY EDITOR */}
+                                        {splitStaySegments.length > 1 ? (
+                                            <div className="space-y-2">
+                                                {/* Route Overview Header */}
+                                                <div className="bg-[#1b43aa]/90 border border-purple-400/30 rounded-lg p-2 space-y-1.5 shadow-sm">
+                                                    <div className="flex items-center justify-between text-[9px]">
+                                                        <span className="font-bold text-white flex items-center gap-1">
+                                                            <GitFork size={12} className="text-purple-300" />
+                                                            <span>Split Stay Itinerary ({splitStaySegments.length} Rooms • {splitStaySegments.reduce((sum, s) => sum + (s.nights || 1), 0)} Nights)</span>
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/40">
+                                                            Contiguous Ripple Active
+                                                        </span>
+                                                    </div>
 
-                                        <div className="grid grid-cols-2 gap-1 pt-1">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Arrival:</label>
-                                                <input
-                                                    type="date"
-                                                    value={booking.arrivalDate}
-                                                    disabled
-                                                    className="w-full h-8 px-2 border border-blue-400/30 rounded text-[8px] bg-[#122e75] text-gray-300 cursor-not-allowed outline-none font-medium"
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-white">Departure:</label>
-                                                <input
-                                                    type="date"
-                                                    value={departureDate}
-                                                    onChange={e => handleDepartureChange(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
-                                                />
-                                            </div>
-                                        </div>
+                                                    {/* Sequential Route Flow Pills */}
+                                                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                                                        {splitStaySegments.map((s, idx) => (
+                                                            <React.Fragment key={s.id || idx}>
+                                                                <div className="px-2 py-0.5 rounded bg-blue-900/80 border border-blue-400/40 text-white font-mono text-[8px] shrink-0 font-semibold flex items-center gap-1">
+                                                                    <span>Rm {s.roomNumber}</span>
+                                                                    <span className="text-purple-300">({s.nights || 1}N)</span>
+                                                                </div>
+                                                                {idx < splitStaySegments.length - 1 && (
+                                                                    <ArrowRight size={10} className="text-purple-300 shrink-0" />
+                                                                )}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </div>
 
-                                        <div className="flex flex-col gap-1 w-1/2">
-                                            <label className="text-[8px] font-semibold text-white">Nights:</label>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                value={nights}
-                                                onChange={e => handleNightsChange(Number(e.target.value))}
-                                                className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400"
-                                            />
+                                                {/* Interactive Leg-by-Leg Cards */}
+                                                <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-0.5">
+                                                    {splitStaySegments.map((seg, idx) => {
+                                                        const avail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                                                            excludeReservationId: booking.reservationNumber || booking.id
+                                                        });
+                                                        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(seg.roomNumber));
+                                                        const isAvail = rmStatus?.isAvailable ?? true;
+                                                        const isFirst = idx === 0;
+                                                        const isLast = idx === splitStaySegments.length - 1;
+
+                                                        return (
+                                                            <div key={seg.id || idx} className="bg-[#1b43aa]/90 border border-blue-400/30 rounded-lg p-2 space-y-1.5 shadow-xs">
+                                                                {/* Leg Header & Live Availability */}
+                                                                <div className="flex items-center justify-between gap-1">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/40 shrink-0 flex items-center gap-1">
+                                                                            <GitFork size={9} className="text-purple-300" />
+                                                                            <span>Leg {idx + 1} of {splitStaySegments.length}</span>
+                                                                        </span>
+                                                                        <span className="text-[9.5px] font-bold text-white font-mono truncate">
+                                                                            Room {seg.roomNumber}
+                                                                        </span>
+                                                                        <span className="text-[8px] text-blue-200 truncate">
+                                                                            ({seg.roomType})
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className={`px-1.5 py-0.5 rounded text-[7.5px] font-bold shrink-0 border ${
+                                                                        isAvail
+                                                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                                                                            : 'bg-rose-500/20 text-rose-300 border-rose-400/40'
+                                                                    }`}>
+                                                                        {isAvail ? 'Available ✓' : 'Collision ⚠️'}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* 3-Column Dates & Nights Stepper */}
+                                                                <div className="grid grid-cols-[1fr_1fr_84px] gap-1.5 items-end">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <label className="text-[7.5px] text-blue-200 font-semibold">
+                                                                            Check-In {isFirst && isBookingInHouse && <span className="text-amber-300">(Locked)</span>}:
+                                                                        </label>
+                                                                        {isFirst ? (
+                                                                            <input
+                                                                                type="date"
+                                                                                value={seg.fromDate}
+                                                                                disabled={isBookingInHouse}
+                                                                                onChange={e => handleUpdateSplitStayArrival(e.target.value)}
+                                                                                className={`w-full h-6 px-1.5 rounded text-[8.5px] font-bold outline-none border ${
+                                                                                    isBookingInHouse
+                                                                                        ? 'bg-[#122e75] text-gray-300 border-blue-400/30 cursor-not-allowed'
+                                                                                        : 'bg-white text-gray-900 border-blue-300 cursor-pointer'
+                                                                                }`}
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="h-6 px-1.5 rounded bg-blue-950/60 border border-blue-400/20 text-white font-mono text-[8.5px] flex items-center">
+                                                                                {seg.fromDate}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <label className="text-[7.5px] text-blue-200 font-semibold">Check-Out:</label>
+                                                                        <div className="h-6 px-1.5 rounded bg-blue-950/60 border border-blue-400/20 text-white font-mono text-[8.5px] flex items-center">
+                                                                            {seg.toDate}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <label className="text-[7.5px] text-blue-200 font-semibold text-center">Nights:</label>
+                                                                        <div className="flex items-center h-6 rounded border border-blue-300 bg-white overflow-hidden shadow-2xs">
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={(seg.nights || 1) <= 1}
+                                                                                onClick={() => handleUpdateSplitStaySegmentNights(idx, (seg.nights || 1) - 1)}
+                                                                                className="w-5 h-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                                            >
+                                                                                <Minus size={10} />
+                                                                            </button>
+                                                                            <span className="flex-1 text-center text-[9px] font-bold text-gray-900">
+                                                                                {seg.nights || 1}N
+                                                                            </span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleUpdateSplitStaySegmentNights(idx, (seg.nights || 1) + 1)}
+                                                                                className="w-5 h-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center cursor-pointer transition-colors"
+                                                                            >
+                                                                                <Plus size={10} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Contiguous Ripple Note */}
+                                                                {!isLast && (
+                                                                    <div className="text-[7.5px] text-purple-200/90 flex items-center gap-1 pt-0.5 border-t border-blue-400/10">
+                                                                        <span>⚡ Ripple: Next leg ({splitStaySegments[idx + 1]?.roomNumber}) automatically starts on {seg.toDate}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Master Stay Trip Summary Banner */}
+                                                <div className="bg-blue-950/70 border border-blue-400/30 rounded-lg p-2 text-[8.5px] flex items-center justify-between text-white font-medium">
+                                                    <div>
+                                                        <span className="text-blue-300">Total Stay: </span>
+                                                        <span className="font-bold text-white">{splitStaySegments[0]?.fromDate} → {splitStaySegments[splitStaySegments.length - 1]?.toDate} ({splitStaySegments.reduce((sum, s) => sum + (s.nights || 1), 0)} Nights)</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-blue-300">Folio Total: </span>
+                                                        <span className="font-bold text-emerald-300">{currencySymbol} {splitStaySegments.reduce((sum, s) => sum + ((s.dailyRate || 0) * (s.nights || 1)), 0).toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* STANDARD SINGLE ROOM AMEND VIEW */
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between text-[8px] font-semibold text-white">
+                                                    <span>Rooms</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAmendSelectedRoom(!amendSelectedRoom)}
+                                                        className="text-[8px] px-2 py-0.5 border border-white/40 hover:bg-white/10 rounded font-medium text-white transition-colors cursor-pointer"
+                                                    >
+                                                        {amendSelectedRoom ? 'Unselect All' : 'Select All'}
+                                                    </button>
+                                                </div>
+                                                <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-lg p-2 flex items-center justify-between gap-1.5">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={amendSelectedRoom}
+                                                            onChange={e => setAmendSelectedRoom(e.target.checked)}
+                                                            className="w-3.5 h-3.5 rounded text-blue-600 bg-white cursor-pointer accent-blue-500 shrink-0"
+                                                        />
+                                                        <span className="text-[8.5px] text-white font-mono truncate font-semibold">
+                                                            Room {booking.roomNumber} • {booking.reservationNumber}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* 1-Line Compact Stay Period: Arrival, Departure & Nights */}
+                                                <div className="grid grid-cols-[1fr_1fr_64px] gap-2 pt-0.5">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className={`text-[8.5px] font-semibold ${isBookingInHouse ? 'text-blue-100' : 'text-white'}`}>
+                                                            Arrival: {isBookingInHouse && <span className="text-[7.5px] text-amber-300 font-normal">(In-House Locked)</span>}
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={arrivalDate || booking.arrivalDate}
+                                                            disabled={isBookingInHouse}
+                                                            onChange={e => handleArrivalChange(e.target.value)}
+                                                            className={`w-full h-7 px-2 border rounded text-[9.5px] outline-none font-medium ${
+                                                                isBookingInHouse
+                                                                    ? 'border-blue-400/30 bg-[#122e75] text-gray-300 cursor-not-allowed'
+                                                                    : 'border-blue-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-400 cursor-pointer font-bold'
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[8.5px] font-semibold text-white">Departure:</label>
+                                                        <input
+                                                            type="date"
+                                                            value={departureDate}
+                                                            min={isBookingInHouse ? (getOperatingSystemDate() || booking.arrivalDate) : booking.arrivalDate}
+                                                            onChange={e => handleDepartureChange(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer font-medium"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[8.5px] font-semibold text-white text-center">Nights:</label>
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            value={nights}
+                                                            onChange={e => handleNightsChange(Number(e.target.value))}
+                                                            className="w-full h-7 px-1 text-center border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* ULTRA-COMPACT GUEST NOTIFICATION (EMAIL, SMS, WHATSAPP) */}
+                                        <div className="bg-[#1b43aa]/80 border border-blue-400/30 rounded-lg p-2 space-y-1.5 mt-1 shadow-inner">
+                                            {/* Header */}
+                                            <div className="flex items-center justify-between border-b border-blue-400/20 pb-1">
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-white">
+                                                    <Send size={11} className="text-emerald-400 shrink-0" />
+                                                    <span>Guest Notification</span>
+                                                </div>
+                                                <label className="flex items-center gap-1 text-[9px] text-amber-200 cursor-pointer hover:text-white transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifSilentUpdate}
+                                                        onChange={e => {
+                                                            const silent = e.target.checked;
+                                                            setNotifSilentUpdate(silent);
+                                                            if (silent) {
+                                                                setNotifSendEmail(false);
+                                                                setNotifSendSms(false);
+                                                                setNotifSendWhatsApp(false);
+                                                            } else {
+                                                                setNotifSendEmail(Boolean(notifCustomEmail));
+                                                                setNotifSendSms(Boolean(notifCustomPhone));
+                                                                setNotifSendWhatsApp(Boolean(notifCustomPhone));
+                                                            }
+                                                        }}
+                                                        className="w-3 h-3 rounded accent-amber-500 cursor-pointer"
+                                                    />
+                                                    <span className="font-semibold text-amber-200">Silent Mode</span>
+                                                </label>
+                                            </div>
+
+                                            {!notifSilentUpdate ? (
+                                                <div className="space-y-1.5">
+                                                    {/* Row 1: Email Voucher */}
+                                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all ${
+                                                        notifSendEmail ? 'bg-blue-900/90 border-emerald-400/50 text-white' : 'bg-blue-950/40 border-blue-400/10 text-blue-300'
+                                                    }`}>
+                                                        <label className="flex items-center gap-1 min-w-[65px] cursor-pointer font-bold text-[9.5px] shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={notifSendEmail}
+                                                                onChange={e => setNotifSendEmail(e.target.checked)}
+                                                                className="w-3 h-3 rounded accent-emerald-500 cursor-pointer"
+                                                            />
+                                                            <Mail size={11} className={notifSendEmail ? "text-emerald-400" : "text-blue-400"} />
+                                                            <span>Email</span>
+                                                        </label>
+                                                        <input
+                                                            type="email"
+                                                            value={notifCustomEmail}
+                                                            onChange={e => {
+                                                                setNotifCustomEmail(e.target.value);
+                                                                if (e.target.value && !notifSendEmail) setNotifSendEmail(true);
+                                                            }}
+                                                            placeholder="guest@example.com"
+                                                            className="flex-1 h-5.5 px-1.5 bg-black/40 border border-blue-400/30 rounded text-[9.5px] text-white outline-none focus:border-emerald-400 transition-colors"
+                                                        />
+                                                    </div>
+
+                                                    {/* Row 2: Mobile Channels (SMS & WhatsApp Shared Phone) */}
+                                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all ${
+                                                        (notifSendSms || notifSendWhatsApp) ? 'bg-blue-900/90 border-emerald-400/50 text-white' : 'bg-blue-950/40 border-blue-400/10 text-blue-300'
+                                                    }`}>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <label className="flex items-center gap-1 cursor-pointer font-bold text-[9.5px]">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={notifSendSms}
+                                                                    onChange={e => setNotifSendSms(e.target.checked)}
+                                                                    className="w-3 h-3 rounded accent-emerald-500 cursor-pointer"
+                                                                />
+                                                                <MessageSquare size={11} className={notifSendSms ? "text-emerald-400" : "text-blue-400"} />
+                                                                <span>SMS</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-1 cursor-pointer font-bold text-[9.5px]">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={notifSendWhatsApp}
+                                                                    onChange={e => setNotifSendWhatsApp(e.target.checked)}
+                                                                    className="w-3 h-3 rounded accent-emerald-500 cursor-pointer"
+                                                                />
+                                                                <MessageCircle size={11} className={notifSendWhatsApp ? "text-emerald-400" : "text-blue-400"} />
+                                                                <span>WhatsApp</span>
+                                                            </label>
+                                                        </div>
+                                                        <input
+                                                            type="tel"
+                                                            value={notifCustomPhone}
+                                                            onChange={e => {
+                                                                setNotifCustomPhone(e.target.value);
+                                                                if (e.target.value && !notifSendSms && !notifSendWhatsApp) setNotifSendSms(true);
+                                                            }}
+                                                            placeholder="+8801XXXXXXXXX"
+                                                            className="flex-1 h-5.5 px-1.5 bg-black/40 border border-blue-400/30 rounded text-[9.5px] text-white outline-none focus:border-emerald-400 font-mono transition-colors"
+                                                        />
+                                                    </div>
+
+                                                    {/* Row 3: Single-line Reason Dropdown */}
+                                                    <div className="flex items-center gap-1.5 pt-0.5">
+                                                        <span className="text-[8.5px] font-semibold text-blue-200 shrink-0">Reason:</span>
+                                                        <select
+                                                            value={notifReason}
+                                                            onChange={e => setNotifReason(e.target.value)}
+                                                            className="flex-1 h-6 px-1.5 bg-[#0f2458] border border-blue-400/40 rounded text-[9px] text-white outline-none focus:border-blue-300 cursor-pointer"
+                                                        >
+                                                            <option value="Guest Requested Extension">Guest Requested Extension</option>
+                                                            <option value="Early Departure / Shortened Stay">Early Departure / Shortened Stay</option>
+                                                            <option value="Flight / Travel Schedule Rescheduled">Flight / Travel Schedule Rescheduled</option>
+                                                            <option value="Operational Room Shift / Maintenance">Operational Room Shift / Maintenance</option>
+                                                            <option value="Administrative Date Correction">Administrative Date Correction</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="p-1.5 bg-amber-500/10 border border-amber-400/30 rounded text-[9px] text-amber-200 flex items-center gap-1.5">
+                                                    <Lock size={11} className="text-amber-400 shrink-0" />
+                                                    <span>Silent Mode Active: Saved to PMS without sending notifications.</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2419,367 +4124,535 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         )}
 
                                         {isBookingInHouse && (
-                                            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-lg p-2 text-emerald-200 text-[10px] flex items-center gap-1.5 font-medium shadow-xs">
+                                            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-lg p-2 text-emerald-200 text-[9.5px] flex items-center gap-1.5 font-medium shadow-xs">
                                                 <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
                                                 <span>In-House Guest: Room Move applies from current System Date ({operatingSystemDate}) for the remaining stay.</span>
                                             </div>
                                         )}
-
-                                        {/* Current Room & Guest Information Card */}
-                                        <div className="bg-slate-900/50 border border-blue-400/25 rounded-lg p-2.5 flex items-center justify-between text-[10px]">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center font-bold text-xs">
-                                                    {booking.roomNumber}
-                                                </div>
-                                                <div>
-                                                    <div className="text-white font-semibold flex items-center gap-1.5">
-                                                        <span>{booking.guestName}</span>
-                                                        <span className="text-[8.5px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-mono">
-                                                            {booking.reservationNumber}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-slate-300 text-[9px] mt-0.5">
-                                                        Current: Room <strong className="text-white">{booking.roomNumber}</strong> ({roomMoveAnalysis?.currentRoomType || booking.roomType}) | Rate: <span className="font-mono text-emerald-300">{currencySymbol} {(roomMoveAnalysis?.currentDailyRate || standardDaily).toFixed(2)}/nt</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Date Range Selection */}
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-[9px] font-semibold text-blue-100">From Date</label>
-                                                    {isBookingInHouse && (
-                                                        <span className="text-[7.5px] text-emerald-300 bg-emerald-500/20 px-1 rounded">Locked (In-House)</span>
-                                                    )}
-                                                </div>
-                                                <input
-                                                    type="date"
-                                                    value={moveFromDate}
-                                                    disabled={isBookingInHouse}
-                                                    min={isBookingInHouse ? operatingSystemDate : undefined}
-                                                    onChange={e => setMoveFromDate(e.target.value)}
-                                                    className={`w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] outline-none focus:ring-2 focus:ring-blue-400 ${
-                                                        isBookingInHouse
-                                                            ? 'bg-blue-900/60 text-blue-200 cursor-not-allowed opacity-90 border-blue-400/30'
-                                                            : 'bg-white text-gray-900 cursor-pointer'
-                                                    }`}
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-semibold text-blue-100">To Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={moveToDate}
-                                                    min={moveFromDate}
-                                                    onChange={e => setToDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Room Type Filter & Rate Plan / Package */}
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-semibold text-blue-100">Filter by Room Type</label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={moveRoomType}
-                                                        onChange={e => {
-                                                            const selectedType = e.target.value;
-                                                            setMoveRoomType(selectedType);
-                                                            if (selectedType !== 'All') {
-                                                                const moveAvail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
-                                                                    excludeReservationId: booking.reservationNumber || booking.id
-                                                                });
-                                                                const firstAvail = allRooms.find(r => 
-                                                                    r.type === selectedType && 
-                                                                    (moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber))?.isAvailable || String(r.roomNumber) === String(booking.roomNumber))
-                                                                );
-                                                                if (firstAvail) {
-                                                                    setMoveSelectedRoom(firstAvail.roomNumber);
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-medium"
-                                                    >
-                                                        <option value="All">All Room Types</option>
-                                                        {dynamicRoomTypes.map(t => (
-                                                            <option key={t} value={t}>{t}</option>
-                                                        ))}
-                                                    </select>
-                                                    <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-semibold text-blue-100">Rate Plan / Package</label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={moveRateType}
-                                                        onChange={e => setMoveRateType(e.target.value)}
-                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-medium"
-                                                    >
-                                                        {dynamicRatePlansAndPackages.map(p => (
-                                                            <option key={p.value} value={p.value}>{p.label}</option>
-                                                        ))}
-                                                    </select>
-                                                    <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Target Room Dropdown */}
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-[9px] font-semibold text-blue-100">Assign Target Room</label>
-                                                {roomMoveAnalysis?.targetRoomType && (
-                                                    <span className="text-[8px] bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 rounded font-medium">
-                                                        Category: {roomMoveAnalysis.targetRoomType}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="relative">
-                                                <select
-                                                    value={moveSelectedRoom}
-                                                    onChange={e => {
-                                                        const roomNo = e.target.value;
-                                                        setMoveSelectedRoom(roomNo);
-                                                        const rObj = allRooms.find(r => String(r.roomNumber) === String(roomNo));
-                                                        if (rObj?.type) {
-                                                            setMoveRoomType(rObj.type);
-                                                        }
-                                                    }}
-                                                    className="w-full h-8.5 px-2.5 border border-blue-300 rounded text-[9.5px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6 font-semibold"
-                                                >
-                                                    {(() => {
-                                                        const moveAvail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
-                                                            excludeReservationId: booking.reservationNumber || booking.id
-                                                        });
-                                                        const roomsToShow = moveRoomType === 'All' 
-                                                            ? allRooms 
-                                                            : allRooms.filter(r => r.type === moveRoomType);
-
-                                                        return roomsToShow.map(r => {
-                                                            const st = moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber));
-                                                            const isBooked = st ? !st.isAvailable : false;
-                                                            const guestNote = st?.conflictingReservation ? `Booked: ${st.conflictingReservation.guestName}` : (st?.reason || 'Occupied');
-                                                            const isCurrent = String(r.roomNumber) === String(booking.roomNumber);
-                                                            return (
-                                                                <option
-                                                                    key={r.id || r.roomNumber}
-                                                                    value={r.roomNumber}
-                                                                    disabled={isBooked && !isCurrent}
-                                                                >
-                                                                    Room {r.roomNumber} | {r.type} {isCurrent ? '(Current Room)' : isBooked ? `[${guestNote}]` : '[Available]'}
-                                                                </option>
-                                                            );
-                                                        });
-                                                    })()}
-                                                </select>
-                                                <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
-                                            </div>
-                                        </div>
-
-                                        {/* PROMINENT ROOM UPGRADE DETECTED CARD */}
-                                        {roomMoveAnalysis?.isUpgrade && (
-                                            <div className="bg-gradient-to-r from-amber-500/20 via-blue-900/50 to-emerald-500/20 border border-amber-400/60 rounded-xl p-3 shadow-md space-y-2.5 animate-in fade-in zoom-in-95">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-1.5 text-amber-300 font-bold text-[10.5px] tracking-wide uppercase">
-                                                        <Sparkles size={14} className="text-amber-400 animate-pulse shrink-0" />
-                                                        <span>Room Upgrade Detected</span>
-                                                    </div>
-                                                    <span className="text-[9px] bg-amber-400/25 text-amber-200 border border-amber-400/40 px-2 py-0.5 rounded-full font-mono font-bold">
-                                                        +{currencySymbol} {roomMoveAnalysis.dailyDiff.toFixed(2)} / night
-                                                    </span>
-                                                </div>
-
-                                                <div className="bg-slate-900/70 border border-white/10 rounded-lg p-2.5 flex items-center justify-between text-[9.5px]">
-                                                    <div>
-                                                        <span className="text-slate-400 block text-[7.5px] uppercase tracking-wider font-semibold">Current Category</span>
-                                                        <span className="text-white font-semibold">Room {booking.roomNumber}</span>
-                                                        <span className="text-blue-200 block text-[8.5px]">({roomMoveAnalysis.currentRoomType})</span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center px-2">
-                                                        <span className="text-[7.5px] text-amber-300 uppercase tracking-widest font-black">Upgrade</span>
-                                                        <ArrowRight size={16} className="text-amber-400 my-0.5 animate-pulse" />
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="text-emerald-400 block text-[7.5px] uppercase tracking-wider font-semibold">New Category</span>
-                                                        <span className="text-emerald-200 font-bold text-[11px]">Room {moveSelectedRoom}</span>
-                                                        <span className="text-emerald-300 block text-[8.5px] font-medium">({roomMoveAnalysis.targetRoomType})</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Upgrade Billing Selector */}
-                                                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[9.5px]">
-                                                    <span className="text-blue-100 font-medium">Upgrade Tariff Policy:</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setUpgradeBillingMode('complimentary')}
-                                                            className={`px-2.5 py-1 rounded text-[8.5px] transition-all flex items-center gap-1 cursor-pointer ${
-                                                                upgradeBillingMode === 'complimentary'
-                                                                    ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-300 font-bold'
-                                                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                                                            }`}
-                                                        >
-                                                            <span>Complimentary (Free)</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setUpgradeBillingMode('charge')}
-                                                            className={`px-2.5 py-1 rounded text-[8.5px] transition-all flex items-center gap-1 cursor-pointer ${
-                                                                upgradeBillingMode === 'charge'
-                                                                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm ring-1 ring-amber-300'
-                                                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                                                            }`}
-                                                        >
-                                                            <span>+ Charge Diff (+{currencySymbol} {roomMoveAnalysis.totalDiff.toFixed(2)})</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* DOWNGRADE WARNING CARD */}
-                                        {roomMoveAnalysis?.isDowngrade && (
-                                            <div className="bg-rose-500/15 border border-rose-400/40 rounded-xl p-2.5 text-[9.5px] text-rose-200 space-y-1">
-                                                <div className="flex items-center gap-1.5 font-bold text-rose-300">
-                                                    <Info size={13} />
-                                                    <span>Room Downgrade Warning</span>
-                                                </div>
-                                                <div className="text-slate-300 flex items-center justify-between">
-                                                    <span>{roomMoveAnalysis.currentRoomType} (Room {booking.roomNumber})</span>
-                                                    <ArrowRight size={12} className="text-rose-400 mx-1" />
-                                                    <span className="text-white font-semibold">{roomMoveAnalysis.targetRoomType} (Room {moveSelectedRoom})</span>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* SAME CATEGORY TRANSFER */}
-                                        {roomMoveAnalysis?.isSameCategory && (
-                                            <div className="bg-blue-500/15 border border-blue-400/30 rounded-xl p-2.5 text-[9.5px] text-blue-200 flex items-center justify-between">
-                                                <div className="flex items-center gap-1.5 font-medium">
-                                                    <RefreshCw size={12} className="text-blue-400" />
-                                                    <span>Lateral Transfer: Room {booking.roomNumber} -&gt; Room {moveSelectedRoom}</span>
-                                                </div>
-                                                <span className="text-[8px] bg-blue-400/20 text-blue-200 px-1.5 py-0.5 rounded font-medium">
-                                                    Same Type ({roomMoveAnalysis.currentRoomType})
+                                        {/* Current Room Context Bar (Sleek, 1-Line Status Pill) */}
+                                        <div className="bg-[#122e75]/90 border border-blue-400/30 rounded-lg px-3 py-1.5 flex items-center justify-between text-[10px] shadow-xs">
+                                            <div className="flex items-center gap-2 text-blue-200 min-w-0">
+                                                <Home size={12} className="text-blue-300 shrink-0" />
+                                                <span className="truncate">
+                                                    Current Room: <strong className="text-white font-mono font-bold">{isRoomUnassigned(booking.roomNumber) ? 'Unassigned' : `Room ${booking.roomNumber}`}</strong> ({booking.roomType})
                                                 </span>
                                             </div>
-                                        )}
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-[8px] bg-blue-500/30 border border-blue-400/30 text-blue-200 px-1.5 py-0.5 rounded font-mono font-bold uppercase">
+                                                    {booking.status}
+                                                </span>
+                                                <span className="text-emerald-300 font-mono font-bold text-[9.5px]">
+                                                    Current Rate: {currencySymbol}{Number(booking.avgDailyRate || dailyBaseRate || 3000).toFixed(2)}/nt
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Clean Tabular Room Move Grid (Exact Pixel-Perfect Match to Reference Image 6) */}
+                                        <div className="bg-[#102a6b]/95 border border-blue-400/30 rounded-xl p-3 space-y-2.5 shadow-xs">
+                                            {/* Table Column Headers */}
+                                            <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-blue-200 px-0.5 pb-1 border-b border-blue-400/20">
+                                                <div className="col-span-3">From Date</div>
+                                                <div className="col-span-3">To Date</div>
+                                                <div className="col-span-3">Room Type</div>
+                                                <div className={moveSegments.length > 1 ? "col-span-2" : "col-span-3"}>Room</div>
+                                                {moveSegments.length > 1 && <div className="col-span-1 text-center"></div>}
+                                            </div>
+
+                                            {/* Table Rows (1 clean line per segment) */}
+                                            <div className="space-y-2">
+                                                {moveSegments.map((seg, idx) => (
+                                                    <div key={seg.id || idx} className="grid grid-cols-12 gap-2 items-center">
+                                                        {/* From Date */}
+                                                        <div className="col-span-3">
+                                                            <input
+                                                                type="date"
+                                                                value={seg.fromDate}
+                                                                disabled={idx === 0 && isBookingInHouse}
+                                                                min={idx === 0 && isBookingInHouse ? operatingSystemDate : undefined}
+                                                                onChange={e => handleUpdateSegment(idx, 'fromDate', e.target.value)}
+                                                                className={`w-full h-8 px-2 rounded text-[10px] font-medium outline-none focus:ring-1 focus:ring-blue-400 border border-blue-300 ${
+                                                                    idx === 0 && isBookingInHouse
+                                                                        ? 'bg-blue-950/60 text-blue-200 cursor-not-allowed opacity-90 border-blue-400/30'
+                                                                        : 'bg-white text-gray-900 cursor-pointer shadow-2xs'
+                                                                }`}
+                                                            />
+                                                        </div>
+
+                                                        {/* To Date */}
+                                                        <div className="col-span-3">
+                                                            <input
+                                                                type="date"
+                                                                value={seg.toDate}
+                                                                min={seg.fromDate}
+                                                                onChange={e => handleUpdateSegment(idx, 'toDate', e.target.value)}
+                                                                className="w-full h-8 px-2 bg-white text-gray-900 border border-blue-300 rounded text-[10px] font-medium outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer shadow-2xs"
+                                                            />
+                                                        </div>
+
+                                                        {/* Room Type */}
+                                                        <div className="col-span-3 relative">
+                                                            <select
+                                                                value={seg.roomType || 'Deluxe Suite'}
+                                                                onChange={e => handleUpdateSegment(idx, 'roomType', e.target.value)}
+                                                                className="w-full h-8 px-2 bg-white text-gray-900 border border-blue-300 rounded text-[10px] font-semibold outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer appearance-none pr-5 truncate shadow-2xs"
+                                                            >
+                                                                {dynamicRoomTypes.map(t => (
+                                                                    <option key={t} value={t}>{t}</option>
+                                                                ))}
+                                                            </select>
+                                                            <ChevronDown size={11} className="absolute right-1.5 top-2.5 text-gray-600 pointer-events-none" />
+                                                        </div>
+
+                                                        {/* Target Room */}
+                                                        <div className={`${moveSegments.length > 1 ? 'col-span-2' : 'col-span-3'} relative`}>
+                                                            <select
+                                                                value={seg.roomNumber}
+                                                                onChange={e => handleUpdateSegment(idx, 'roomNumber', e.target.value)}
+                                                                className="w-full h-8 px-2 bg-white text-gray-900 border border-blue-300 rounded text-[10px] font-bold outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer appearance-none pr-5 shadow-2xs"
+                                                            >
+                                                                {(() => {
+                                                                    const segAvail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                                                                        excludeReservationId: booking.reservationNumber || booking.id
+                                                                    });
+                                                                    const roomsToShow = seg.roomType && seg.roomType !== 'All'
+                                                                        ? validRooms.filter(r => r.type === seg.roomType)
+                                                                        : validRooms;
+
+                                                                    return roomsToShow.map(r => {
+                                                                        const st = segAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber));
+                                                                        const isBooked = st ? !st.isAvailable : false;
+                                                                        const isCurrent = String(r.roomNumber) === String(booking.roomNumber);
+                                                                        return (
+                                                                            <option
+                                                                                key={r.id || r.roomNumber}
+                                                                                value={r.roomNumber}
+                                                                                disabled={isBooked && !isCurrent}
+                                                                            >
+                                                                                Room {r.roomNumber} {isCurrent ? '(Current)' : isBooked ? '[Occupied]' : '[Available]'}
+                                                                            </option>
+                                                                        );
+                                                                    });
+                                                                })()}
+                                                            </select>
+                                                            <ChevronDown size={11} className="absolute right-1.5 top-2.5 text-gray-600 pointer-events-none" />
+                                                        </div>
+
+                                                        {/* Delete X icon for split segment (Item 4 in Image 6) */}
+                                                        {moveSegments.length > 1 && (
+                                                             <div className="col-span-1 flex items-center justify-center">
+                                                                 {idx > 0 && (
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => handleRemoveRoomSegment(idx)}
+                                                                         title="Remove this split segment"
+                                                                         className="w-6 h-6 rounded hover:bg-rose-500/30 text-rose-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                                                     >
+                                                                         <X size={13} />
+                                                                     </button>
+                                                                 )}
+                                                             </div>
+                                                         )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Controls below rows: [ Add Room ] (Item 3 in Image 6) and [ ] Override Room Rate */}
+                                            <div className="flex items-center justify-between pt-2 border-t border-blue-400/20">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddRoomSegment}
+                                                    className="h-7 px-3 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-xs active:scale-95"
+                                                >
+                                                    <Plus size={11} className="text-emerald-400" />
+                                                    <span>Add Room</span>
+                                                </button>
+
+                                                <label className="flex items-center gap-1.5 text-[10px] text-blue-100 cursor-pointer select-none hover:text-white transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={overrideRoomRate}
+                                                        onChange={e => setOverrideRoomRate(e.target.checked)}
+                                                        className="w-3.5 h-3.5 rounded bg-white text-blue-600 accent-blue-500 cursor-pointer"
+                                                    />
+                                                    <span className="font-semibold">Override Room Rate</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* ULTRA-COMPACT GUEST NOTIFICATION FOR ROOM MOVE */}
+                                        <div className="bg-[#102a6b]/95 border border-blue-400/30 rounded-xl p-2.5 space-y-1.5 shadow-xs">
+                                            <div className="flex items-center justify-between border-b border-blue-400/20 pb-1">
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-white">
+                                                    <Send size={11} className="text-emerald-400 shrink-0" />
+                                                    <span>Guest Notification</span>
+                                                </div>
+                                                <label className="flex items-center gap-1 text-[9px] text-blue-200 cursor-pointer hover:text-white transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifSilentUpdate}
+                                                        onChange={e => {
+                                                            const silent = e.target.checked;
+                                                            setNotifSilentUpdate(silent);
+                                                            if (silent) {
+                                                                setNotifSendEmail(false);
+                                                                setNotifSendSms(false);
+                                                                setNotifSendWhatsApp(false);
+                                                            } else {
+                                                                setNotifSendEmail(Boolean(notifCustomEmail));
+                                                                setNotifSendSms(Boolean(notifCustomPhone));
+                                                                setNotifSendWhatsApp(Boolean(notifCustomPhone));
+                                                            }
+                                                        }}
+                                                        className="w-3 h-3 rounded accent-amber-500 cursor-pointer"
+                                                    />
+                                                    <span className="font-semibold text-amber-200">Silent Mode</span>
+                                                </label>
+                                            </div>
+
+                                            {!notifSilentUpdate && (
+                                                <div className="space-y-1.5 pt-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="flex items-center gap-1 cursor-pointer font-bold text-[9px] text-blue-100 min-w-[55px] shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={notifSendEmail}
+                                                                onChange={e => setNotifSendEmail(e.target.checked)}
+                                                                className="w-3 h-3 rounded accent-emerald-500 cursor-pointer"
+                                                            />
+                                                            <Mail size={11} className={notifSendEmail ? "text-emerald-400" : "text-blue-400"} />
+                                                            <span>Email</span>
+                                                        </label>
+                                                        <input
+                                                            type="email"
+                                                            value={notifCustomEmail}
+                                                            onChange={e => {
+                                                                setNotifCustomEmail(e.target.value);
+                                                                if (e.target.value && !notifSendEmail) setNotifSendEmail(true);
+                                                            }}
+                                                            placeholder="guest@example.com"
+                                                            className="flex-1 h-6 px-2 bg-white text-gray-900 border border-blue-300 rounded text-[9.5px] font-medium outline-none focus:ring-1 focus:ring-blue-400 shadow-2xs"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="flex items-center gap-1 cursor-pointer font-bold text-[9px] text-blue-100 min-w-[55px] shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={notifSendSms}
+                                                                onChange={e => setNotifSendSms(e.target.checked)}
+                                                                className="w-3 h-3 rounded accent-emerald-500 cursor-pointer"
+                                                            />
+                                                            <MessageSquare size={11} className={notifSendSms ? "text-emerald-400" : "text-blue-400"} />
+                                                            <span>SMS</span>
+                                                        </label>
+                                                        <input
+                                                            type="tel"
+                                                            value={notifCustomPhone}
+                                                            onChange={e => {
+                                                                setNotifCustomPhone(e.target.value);
+                                                                if (e.target.value && !notifSendSms && !notifSendWhatsApp) setNotifSendSms(true);
+                                                            }}
+                                                            placeholder="+8801XXXXXXXXX"
+                                                            className="flex-1 h-6 px-2 bg-white text-gray-900 border border-blue-300 rounded text-[9.5px] font-mono outline-none focus:ring-1 focus:ring-blue-400 shadow-2xs"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
-                                {/* MODE 3: ADD PAYMENT (01-add-payment-modal.png) */}
+                                {/* MODE 3: ADD PAYMENT (Full Dynamic Payment Tender Architecture) */}
                                 {mode === 'payment' && (
                                     <div className="space-y-3">
+                                        {/* Folio Selector */}
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[10.5px]  text-white">Select Folio *</label>
+                                            <label className="text-[10px] font-bold text-white flex items-center justify-between">
+                                                <span>Select Folio *</span>
+                                                <span className="text-[8px] font-mono text-emerald-300 font-normal">Active Room: {activeRoomNum}</span>
+                                            </label>
                                             <div className="relative">
                                                 <select
                                                     value={paymentFolio}
                                                     onChange={e => setPaymentFolio(e.target.value)}
-                                                    className="w-full h-8 px-2.5 border border-blue-300/40 rounded text-[8px] bg-white text-gray-900  outline-none cursor-pointer appearance-none pr-6"
+                                                    className="w-full h-8 px-2.5 border border-blue-300/40 rounded-lg text-[9px] bg-white text-gray-900 font-semibold outline-none cursor-pointer appearance-none pr-7 shadow-xs"
                                                 >
-                                                    <option value={`${booking.guestName} - FN~012607004`}>
-                                                        {booking.guestName} - FN~012607004
-                                                    </option>
+                                                    {resolvedGroupRooms && resolvedGroupRooms.length > 1 ? (
+                                                        resolvedGroupRooms.map((rm: any, idx: number) => {
+                                                            const fNum = rm.folioNumber || (booking.folioNumber ? `${booking.folioNumber}-${idx + 1}` : `FOL-${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`);
+                                                            const rmNum = rm.roomNumber || `Rm ${idx + 1}`;
+                                                            return (
+                                                                <option key={fNum + idx} value={`${booking.guestName} - ${fNum}`}>
+                                                                    Room {rmNum} — {fNum} (Due: {currencySymbol}{displayDue.toFixed(2)})
+                                                                </option>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <option value={`${booking.guestName} - ${booking.folioNumber || `FOL-${booking.reservationNumber}`}`}>
+                                                            Room {activeRoomNum} — {booking.folioNumber || `FOL-${booking.reservationNumber}`} (Due: {currencySymbol}{displayDue.toFixed(2)})
+                                                        </option>
+                                                    )}
                                                 </select>
-                                                <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-gray-600 pointer-events-none" />
+                                                <ChevronDown size={13} className="absolute right-2.5 top-2.5 text-gray-600 pointer-events-none" />
                                             </div>
                                         </div>
 
-                                        <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-2.5">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[8px]  text-white">Payment Method</span>
-                                                <button
-                                                    type="button"
-                                                    className="h-6 px-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded text-[10.5px]  text-white flex items-center gap-1 cursor-pointer transition-colors"
-                                                >
-                                                    <Plus size={11} />
-                                                    <span>Add</span>
-                                                </button>
+                                        {/* Tender & Amount Box */}
+                                        <div className="bg-[#1b43aa]/90 border border-blue-400/30 rounded-xl p-3 space-y-2.5 shadow-sm">
+                                            <div className="flex items-center justify-between border-b border-blue-400/20 pb-1.5">
+                                                <span className="text-[9px] font-bold text-white flex items-center gap-1.5">
+                                                    <Wallet size={12} className="text-emerald-300" />
+                                                    <span>Payment Tender &amp; Amount</span>
+                                                </span>
+                                                <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30 font-bold uppercase">
+                                                    Front Office Outlet
+                                                </span>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-1 pt-1">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-[8px] font-semibold text-blue-100">Method</label>
+                                                    <label className="text-[8.5px] font-bold text-blue-100 flex items-center justify-between">
+                                                        <span>Payment Method *</span>
+                                                        <span className="text-[7.5px] text-blue-300 font-mono">[{activePaymentCategory}]</span>
+                                                    </label>
                                                     <div className="relative">
                                                         <select
                                                             value={paymentMethod}
-                                                            onChange={e => setPaymentMethod(e.target.value)}
-                                                            className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none cursor-pointer appearance-none pr-6"
+                                                            onChange={e => {
+                                                                const newMethod = e.target.value;
+                                                                setPaymentMethod(newMethod);
+                                                                const matched = frontOfficePaymentMethods.find(m => m.displayName === newMethod || m.subType === newMethod);
+                                                                if (matched?.acquiringBanks && matched.acquiringBanks.length > 0) {
+                                                                    setPaymentAcquiringBank(matched.acquiringBanks[0].bankName);
+                                                                }
+                                                            }}
+                                                            className="w-full h-8 px-2.5 border border-blue-300 rounded-lg text-[9px] bg-white text-gray-900 font-bold outline-none cursor-pointer appearance-none pr-7 shadow-xs"
                                                         >
-                                                            <option value="Cash">Cash</option>
-                                                            <option value="Credit Card">Credit Card</option>
-                                                            <option value="Debit Card">Debit Card</option>
-                                                            <option value="bKash">bKash</option>
-                                                            <option value="Nagad">Nagad</option>
-                                                            <option value="Bank Transfer">Bank Transfer</option>
+                                                            {/* Physical Cash */}
+                                                            <optgroup label="💵 Physical Cash (Counter Till)">
+                                                                {frontOfficePaymentMethods.filter(m => m.category === 'CASH').map(m => (
+                                                                    <option key={m.id} value={m.displayName}>{m.displayName}</option>
+                                                                ))}
+                                                                {frontOfficePaymentMethods.filter(m => m.category === 'CASH').length === 0 && (
+                                                                    <option value="Cash">Cash (Counter Till)</option>
+                                                                )}
+                                                            </optgroup>
+
+                                                            {/* Card Schemes */}
+                                                            <optgroup label="💳 Credit &amp; Debit Card Schemes">
+                                                                {frontOfficePaymentMethods.filter(m => m.category === 'CARD').map(m => (
+                                                                    <option key={m.id} value={m.displayName}>
+                                                                        {m.displayName} {m.defaultCommissionRate ? `(${m.defaultCommissionRate}% MDR)` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+
+                                                            {/* Mobile Financial Services */}
+                                                            <optgroup label="📱 Mobile Banking (MFS)">
+                                                                {frontOfficePaymentMethods.filter(m => m.category === 'MOBILE_BANKING').map(m => (
+                                                                    <option key={m.id} value={m.displayName}>
+                                                                        {m.displayName} {m.walletNumber ? `[${m.walletNumber}]` : ''} {m.defaultCommissionRate ? `(${m.defaultCommissionRate}%)` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+
+                                                            {/* Direct Bank Wire */}
+                                                            <optgroup label="🏦 Direct Bank Wire &amp; Cheque">
+                                                                {frontOfficePaymentMethods.filter(m => m.category === 'BANK_TRANSFER').map(m => (
+                                                                    <option key={m.id} value={m.displayName}>{m.displayName}</option>
+                                                                ))}
+                                                            </optgroup>
+
+                                                            {/* Corporate Billing */}
+                                                            {frontOfficePaymentMethods.filter(m => m.category === 'COMPANY_ACCOUNT').length > 0 && (
+                                                                <optgroup label="🏢 Corporate Direct Billing">
+                                                                    {frontOfficePaymentMethods.filter(m => m.category === 'COMPANY_ACCOUNT').map(m => (
+                                                                        <option key={m.id} value={m.displayName}>{m.displayName}</option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            )}
                                                         </select>
-                                                        <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
+                                                        <ChevronDown size={13} className="absolute right-2.5 top-2.5 text-gray-600 pointer-events-none" />
                                                     </div>
                                                 </div>
 
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-[8px] font-semibold text-blue-100">Amount</label>
-                                                    <input
-                                                        type="number"
-                                                        value={paymentAmount}
-                                                        onChange={e => setPaymentAmount(Number(e.target.value))}
-                                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none focus:ring-2 focus:ring-blue-400 font-mono"
-                                                    />
+                                                    <label className="text-[8.5px] font-bold text-blue-100 flex items-center justify-between">
+                                                        <span>Amount Received *</span>
+                                                        <span className="text-[7.5px] font-mono text-emerald-300">Due: {currencySymbol}{dueAmount.toFixed(0)}</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-2 text-gray-400 font-bold text-[9px]">{currencySymbol}</span>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={paymentAmount}
+                                                            onChange={e => setPaymentAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                            className="w-full h-8 pl-6 pr-2 border border-blue-300 rounded-lg text-[9px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 font-mono font-bold shadow-xs"
+                                                        />
+                                                    </div>
                                                 </div>
+                                            </div>
+
+                                            {/* Conditional Card Options: Acquiring Bank + POS Terminal + MDR */}
+                                            {activePaymentCategory === 'CARD' && (
+                                                <div className="p-2.5 rounded-lg bg-indigo-950/60 border border-indigo-400/40 space-y-2 text-[8px] animate-in fade-in duration-150">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="font-bold text-indigo-200 flex items-center gap-1">
+                                                                <Landmark size={10} className="text-indigo-300" />
+                                                                <span>Settlement Bank:</span>
+                                                            </label>
+                                                            <select
+                                                                value={paymentAcquiringBank}
+                                                                onChange={e => setPaymentAcquiringBank(e.target.value)}
+                                                                className="w-full h-7 px-2 bg-white text-indigo-950 font-bold rounded border border-indigo-300 outline-none cursor-pointer text-[8px]"
+                                                            >
+                                                                {attachedAcquiringBanks.map(b => (
+                                                                    <option key={b.id} value={b.bankName}>
+                                                                        {b.bankName} {b.commissionRule?.commissionRatePercent ? `(${b.commissionRule.commissionRatePercent}% MDR)` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="font-bold text-indigo-200 flex items-center gap-1">
+                                                                <CreditCard size={10} className="text-indigo-300" />
+                                                                <span>POS EDC Terminal:</span>
+                                                            </label>
+                                                            <select
+                                                                value={paymentPosTerminalId}
+                                                                onChange={e => setPaymentPosTerminalId(e.target.value)}
+                                                                className="w-full h-7 px-2 bg-white text-indigo-950 font-bold rounded border border-indigo-300 outline-none cursor-pointer text-[8px]"
+                                                            >
+                                                                <option value="">Counter EDC (Auto-Detect)</option>
+                                                                {availablePosTerminals.map(t => (
+                                                                    <option key={t.id} value={t.id}>
+                                                                        {t.terminalName} (TID: {t.tid})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    {drawerMdrCalc && drawerMdrCalc.totalFee > 0 && (
+                                                        <div className="flex items-center justify-between pt-1 border-t border-indigo-400/30 font-mono text-[8px]">
+                                                            <span className="text-indigo-200 font-semibold flex items-center gap-1">
+                                                                <Percent size={9} />
+                                                                <span>Bank MDR Fee: -{currencySymbol}{drawerMdrCalc.totalFee.toFixed(2)} ({drawerMdrCalc.commissionRatePercent}%)</span>
+                                                            </span>
+                                                            <span className="text-emerald-300 font-bold flex items-center gap-1">
+                                                                <CheckCircle2 size={9} className="text-emerald-400" />
+                                                                <span>Net Settlement: {currencySymbol}{drawerMdrCalc.netSettlement.toFixed(2)}</span>
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Conditional MFS Options: Wallet details + TrxID */}
+                                            {activePaymentCategory === 'MOBILE_BANKING' && (
+                                                <div className="p-2.5 rounded-lg bg-pink-950/60 border border-pink-400/40 space-y-1.5 text-[8px] animate-in fade-in duration-150">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-pink-200 flex items-center gap-1">
+                                                            <Smartphone size={11} className="text-pink-400" />
+                                                            <span>Merchant Wallet:</span>
+                                                        </span>
+                                                        <span className="font-mono font-bold text-white bg-pink-900/60 border border-pink-400/30 px-2 py-0.5 rounded">
+                                                            {matchedPaymentMethod?.walletNumber || '01712-000000'} ({matchedPaymentMethod?.accountType || 'MERCHANT'})
+                                                        </span>
+                                                    </div>
+                                                    {drawerMdrCalc && drawerMdrCalc.totalFee > 0 && (
+                                                        <div className="flex items-center justify-between pt-1 border-t border-pink-400/30 font-mono text-[8px]">
+                                                            <span className="text-pink-200">MFS Charge: -{currencySymbol}{drawerMdrCalc.totalFee.toFixed(2)} ({drawerMdrCalc.commissionRatePercent}%)</span>
+                                                            <span className="text-emerald-300 font-bold">Net: {currencySymbol}{drawerMdrCalc.netSettlement.toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Reference / Transaction / Approval Code */}
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[8px] font-bold text-blue-100 uppercase tracking-wide">
+                                                    {activePaymentCategory === 'CARD' ? 'Card Last 4 & Authorization Code' :
+                                                     activePaymentCategory === 'MOBILE_BANKING' ? 'MFS TrxID / Transaction Code' :
+                                                     activePaymentCategory === 'BANK_TRANSFER' ? 'BEFTN Ref / Cheque Number' :
+                                                     'Payment Reference / Receipt Memo'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={paymentReferenceCode}
+                                                    onChange={e => setPaymentReferenceCode(e.target.value)}
+                                                    placeholder={
+                                                        activePaymentCategory === 'CARD' ? 'e.g. 4242 / Auth: 991823' :
+                                                        activePaymentCategory === 'MOBILE_BANKING' ? 'e.g. TrxID 9B82AX12' :
+                                                        activePaymentCategory === 'BANK_TRANSFER' ? 'e.g. BEFTN-991823 / Cheque #109283' :
+                                                        'e.g. Desk Receipt / Cash Till Memo'
+                                                    }
+                                                    className="w-full h-7 px-2.5 border border-blue-300 rounded-lg text-[8.5px] bg-white text-gray-900 outline-none focus:ring-1 focus:ring-blue-400 font-mono shadow-xs"
+                                                />
                                             </div>
                                         </div>
 
+                                        {/* Settlement & Tax Summary Card */}
                                         <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-1.5 text-[8px] shadow-2xs">
-                                            <div className="flex items-center justify-between text-[8px]  text-white pb-1 border-b border-blue-400/20">
-                                                <span>Settlement &amp; Tax Summary</span>
+                                            <div className="flex items-center justify-between text-[8px] text-white pb-1 border-b border-blue-400/20">
+                                                <span className="font-bold">Settlement &amp; Tax Summary</span>
                                                 <span className="text-[8px] text-blue-200 font-mono">[{taxConfigCode}]</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px] pt-0.5">
                                                 <span>Base Room Tariff</span>
-                                                <span className="font-mono  text-white">{currencySymbol} {baseAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-white font-bold">{currencySymbol} {baseAmount.toFixed(2)}</span>
                                             </div>
                                             {isTaxApplicable && totalTax > 0 && (
-                                                <div className="flex justify-between text-emerald-300 text-[8px]">
-                                                    <span>Statutory Taxes &amp; VAT</span>
-                                                    <span className="font-mono ">+{currencySymbol} {totalTax.toFixed(2)}</span>
+                                                <div className="space-y-1.5 bg-black/25 rounded-lg p-2 border border-white/10">
+                                                    <div className="flex justify-between text-emerald-300 text-[8.5px] font-bold">
+                                                        <span className="flex items-center gap-1">
+                                                            <ShieldCheck size={10} />
+                                                            <span>Statutory Taxes &amp; Levies</span>
+                                                        </span>
+                                                        <span className="font-mono font-bold">+{currencySymbol} {totalTax.toFixed(2)}</span>
+                                                    </div>
+                                                    {displayTaxBreakdown && displayTaxBreakdown.length > 0 && (
+                                                        <div className="flex flex-wrap items-center gap-1.5 text-blue-200 text-[8px] pt-1 border-t border-white/10">
+                                                            {displayTaxBreakdown.map((item: any, idx: number) => (
+                                                                <span key={idx} className="inline-flex items-center gap-1 bg-white/[0.08] px-1.5 py-0.5 rounded border border-white/10">
+                                                                    <span className="text-blue-200 font-medium">{item.name || item.code} ({item.rate}%):</span>
+                                                                    <strong className="text-white font-mono font-bold">+{currencySymbol}{Number(item.amount).toFixed(2)}</strong>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                             <div className="flex justify-between text-blue-100 text-[8px] pt-0.5 border-t border-blue-400/20">
                                                 <span>Total Payable</span>
-                                                <span className="font-mono  text-white">{currencySymbol} {totalAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-white font-bold">{currencySymbol} {totalAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[8px]">
                                                 <span>Total Paid</span>
-                                                <span className="font-mono  text-emerald-300">{currencySymbol} {paidAmount.toFixed(2)}</span>
+                                                <span className="font-mono text-emerald-300 font-bold">{currencySymbol} {paidAmount.toFixed(2)}</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-100 text-[8px] ">
-                                                <span className="text-white">Current Balance Due</span>
-                                                <span className="font-mono text-rose-300 ">{currencySymbol} {dueAmount.toFixed(2)}</span>
+                                            <div className="flex justify-between text-blue-100 text-[8px] pt-0.5 border-t border-blue-400/20">
+                                                <span className="text-white font-bold">Current Balance Due</span>
+                                                <span className="font-mono font-black text-rose-300 text-[9px]">{currencySymbol} {dueAmount.toFixed(2)}</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-100 text-[8px] pt-1 border-t border-blue-400/20 ">
-                                                <span className="text-white">Payment Amount</span>
-                                                <span className="font-mono text-emerald-300 text-[8px]">{currencySymbol} {paymentAmount.toFixed(2)}</span>
-                                            </div>
+
                                             {/* Quick Pay Buttons */}
                                             {dueAmount > 0 && (
-                                                <div className="pt-1 flex items-center gap-1.5">
+                                                <div className="pt-1.5 flex items-center gap-1.5">
                                                     <button
                                                         type="button"
                                                         onClick={() => setPaymentAmount(dueAmount)}
-                                                        className="flex-1 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded text-[8px]  text-emerald-200 transition-colors cursor-pointer text-center"
+                                                        className="flex-1 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/40 rounded-lg text-[8px] font-bold text-emerald-200 transition-colors cursor-pointer text-center active:scale-95 shadow-xs"
                                                     >
                                                         Pay Full Due ({currencySymbol}{dueAmount.toFixed(0)})
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setPaymentAmount(Math.round(dueAmount / 2))}
-                                                        className="py-1 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 rounded text-[8px]  text-blue-200 transition-colors cursor-pointer text-center"
+                                                        className="py-1.5 px-3 bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/40 rounded-lg text-[8px] font-bold text-blue-200 transition-colors cursor-pointer text-center active:scale-95 shadow-xs"
                                                     >
                                                         50% ({currencySymbol}{Math.round(dueAmount / 2)})
                                                     </button>
@@ -2787,91 +4660,238 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             )}
                                         </div>
 
+                                        {/* Remarks */}
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[8px]  text-white">Payment Remarks</label>
+                                            <label className="text-[8px] font-bold text-white uppercase tracking-wide">Payment Remarks</label>
                                             <textarea
                                                 value={paymentRemarks}
                                                 onChange={e => setPaymentRemarks(e.target.value)}
                                                 rows={2}
-                                                placeholder="Add any notes or transaction details here..."
-                                                className="w-full p-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400"
+                                                placeholder="Add any internal audit notes or transaction details here..."
+                                                className="w-full p-2 border border-blue-300 rounded-lg text-[8.5px] bg-white text-gray-900 outline-none focus:ring-1 focus:ring-blue-400 shadow-xs"
                                             />
                                         </div>
                                     </div>
                                 )}
 
-                                {/* MODE 4: ROOM SPLIT (02-room-split-modal.png) */}
+                                {/* MODE 4: ROOM SPLIT & SPLIT STAY JOURNEY MANAGER */}
                                 {mode === 'split' && (
-                                    <div className="space-y-3">
-                                        <div className="text-[8px]  text-white">New Room Assignment:</div>
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Select Room</label>
-                                                <input
-                                                    type="text"
-                                                    value={booking.roomNumber}
-                                                    disabled
-                                                    className="w-full h-8 px-2 border border-blue-300/40 rounded text-[8px] bg-white text-gray-900 "
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">Select Guest</label>
-                                                <input
-                                                    type="text"
-                                                    value={booking.guestName}
-                                                    disabled
-                                                    className="w-full h-8 px-2 border border-blue-300/40 rounded text-[8px] bg-white text-gray-900 "
-                                                />
-                                            </div>
-                                        </div>
+                                    <div className="space-y-2.5">
+                                        {splitStaySegments.length > 1 ? (
+                                            <div className="space-y-2">
+                                                {/* Header route overview */}
+                                                <div className="bg-[#1b43aa]/90 border border-purple-400/30 rounded-lg p-2 space-y-1.5 shadow-sm">
+                                                    <div className="flex items-center justify-between text-[9px]">
+                                                        <span className="font-bold text-white flex items-center gap-1">
+                                                            <GitFork size={12} className="text-purple-300" />
+                                                            <span>Split Stay Journey Manager ({splitStaySegments.length} Rooms)</span>
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/40">
+                                                            Sequential Stay
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[8px] text-blue-200/90 leading-tight">
+                                                        Re-assign rooms for any leg, sub-split nights into additional rooms, or merge consecutive legs.
+                                                    </p>
+                                                </div>
 
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">From Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={splitFromDate}
-                                                    onChange={e => setSplitFromDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none"
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[8px] font-semibold text-blue-100">To Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={splitToDate}
-                                                    onChange={e => setSplitToDate(e.target.value)}
-                                                    className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none"
-                                                />
-                                            </div>
-                                        </div>
+                                                {/* List of Journey Legs */}
+                                                <div className="space-y-1.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-0.5">
+                                                    {splitStaySegments.map((seg, idx) => {
+                                                        const avail = getAvailableRoomsForStay(seg.fromDate, seg.toDate, undefined, {
+                                                            excludeReservationId: booking.reservationNumber || booking.id
+                                                        });
+                                                        const isAvail = avail.allRoomsStatus.find(s => String(s.room.number) === String(seg.roomNumber))?.isAvailable ?? true;
 
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-[8px] font-semibold text-blue-100">Target Split Room</label>
-                                            <select
-                                                value={splitRoom}
-                                                onChange={e => setSplitRoom(e.target.value)}
-                                                className="w-full h-8 px-2 border border-blue-300 rounded text-[8px] bg-white text-gray-900  outline-none"
-                                            >
-                                                {allRooms.map(r => (
-                                                    <option key={r.id || r.roomNumber} value={r.roomNumber}>
-                                                        Room {r.roomNumber} ({r.type})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                                        return (
+                                                            <div key={seg.id || idx} className="bg-[#1b43aa]/90 border border-blue-400/30 rounded-lg p-2 space-y-2 shadow-xs">
+                                                                {/* Leg Title & Date Badge */}
+                                                                <div className="flex items-center justify-between gap-1 border-b border-blue-400/20 pb-1">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/40 shrink-0">
+                                                                            Leg {idx + 1} of {splitStaySegments.length}
+                                                                        </span>
+                                                                        <span className="text-[9px] font-bold text-white truncate font-mono">
+                                                                            {seg.fromDate} → {seg.toDate}
+                                                                        </span>
+                                                                        <span className="text-[8px] px-1 py-0.2 rounded bg-blue-900 text-blue-200 font-bold shrink-0">
+                                                                            {seg.nights || 1}N
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className={`px-1.5 py-0.5 rounded text-[7.5px] font-bold shrink-0 border ${
+                                                                        isAvail
+                                                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                                                                            : 'bg-rose-500/20 text-rose-300 border-rose-400/40'
+                                                                    }`}>
+                                                                        {isAvail ? 'Available ✓' : 'Collision ⚠️'}
+                                                                    </span>
+                                                                </div>
 
-                                        <button
-                                            type="button"
-                                            className="h-7 px-3 border border-blue-300/60 hover:bg-white/10 rounded text-[8px]  text-white flex items-center gap-1.5 cursor-pointer transition-colors"
-                                        >
-                                            <Plus size={13} />
-                                            <span>Add Room</span>
-                                        </button>
+                                                                {/* Room Selection for this Leg */}
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <label className="text-[7.5px] font-semibold text-blue-200">
+                                                                        Assigned Room for Leg {idx + 1}:
+                                                                    </label>
+                                                                    <select
+                                                                        value={seg.roomNumber}
+                                                                        onChange={e => handleUpdateSplitStaySegmentRoom(idx, e.target.value)}
+                                                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[9px] bg-white text-gray-900 font-bold outline-none cursor-pointer focus:ring-1 focus:ring-blue-400 shadow-2xs"
+                                                                    >
+                                                                        {validRooms.map(r => {
+                                                                            const rAvail = avail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber))?.isAvailable ?? true;
+                                                                            return (
+                                                                                <option key={r.id || r.roomNumber} value={r.roomNumber}>
+                                                                                    Room {r.roomNumber} ({r.type}) {rAvail ? '' : '— [⚠️ Occupied]'}
+                                                                                </option>
+                                                                            );
+                                                                        })}
+                                                                    </select>
+                                                                </div>
+
+                                                                {/* Actions on Leg: Sub-Split & Merge */}
+                                                                <div className="flex items-center gap-1.5 pt-0.5">
+                                                                    {(seg.nights || 1) >= 2 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleSubSplitLeg(idx)}
+                                                                            className="px-2 py-1 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/40 text-[8px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                                                            title="Divide this leg into two consecutive room moves"
+                                                                        >
+                                                                            <Scissors size={10} className="text-purple-300" />
+                                                                            <span>Split This Leg ({Math.floor((seg.nights || 1) / 2)}N + {(seg.nights || 1) - Math.floor((seg.nights || 1) / 2)}N)</span>
+                                                                        </button>
+                                                                    )}
+
+                                                                    {idx > 0 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleMergeLegWithPrevious(idx)}
+                                                                            className="px-2 py-1 rounded bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-400/40 text-[8px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                                                            title="Merge this leg back into the previous room"
+                                                                        >
+                                                                            <GitMerge size={10} className="text-amber-300" />
+                                                                            <span>Merge into Room {splitStaySegments[idx - 1]?.roomNumber}</span>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* + Add Another Room Move */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddSplitStayMove}
+                                                    className="w-full h-7 border border-dashed border-blue-400/60 hover:bg-white/10 rounded text-[9px] font-semibold text-white flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                                                >
+                                                    <Plus size={12} className="text-blue-300" />
+                                                    <span>+ Add Room Move (Leg {splitStaySegments.length + 1})</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            /* SINGLE ROOM SPLIT INITIAL FORM */
+                                            <div className="space-y-3">
+                                                <div className="text-[8px] text-white font-semibold">New Room Assignment:</div>
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[7.5px] font-semibold text-blue-100">Current Room</label>
+                                                        <input
+                                                            type="text"
+                                                            value={booking.roomNumber}
+                                                            disabled
+                                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-[8.5px] bg-white text-gray-900 font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[7.5px] font-semibold text-blue-100">Guest Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={booking.guestName}
+                                                            disabled
+                                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-[8.5px] bg-white text-gray-900 font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[7.5px] font-semibold text-blue-100">From Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={splitFromDate}
+                                                            onChange={e => setSplitFromDate(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[8.5px] bg-white text-gray-900 outline-none font-medium"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[7.5px] font-semibold text-blue-100">To Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={splitToDate}
+                                                            onChange={e => setSplitToDate(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[8.5px] bg-white text-gray-900 outline-none font-medium"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[7.5px] font-semibold text-blue-100">Target Split Room</label>
+                                                    <select
+                                                        value={splitRoom}
+                                                        onChange={e => setSplitRoom(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[8.5px] bg-white text-gray-900 font-bold outline-none"
+                                                    >
+                                                        {validRooms.map(r => (
+                                                            <option key={r.id || r.roomNumber} value={r.roomNumber}>
+                                                                Room {r.roomNumber} ({r.type})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const totalNts = Math.max(2, nights || 2);
+                                                        const half = Math.floor(totalNts / 2);
+                                                        const d1 = new Date(arrivalDate || booking.arrivalDate);
+                                                        d1.setDate(d1.getDate() + half);
+                                                        const midStr = d1.toISOString().split('T')[0];
+                                                        const nextRm = validRooms.find(r => String(r.roomNumber) !== String(booking.roomNumber)) || validRooms[0];
+
+                                                        setSplitStaySegments([
+                                                            {
+                                                                id: `seg-1`,
+                                                                fromDate: arrivalDate || booking.arrivalDate,
+                                                                toDate: midStr,
+                                                                roomNumber: String(booking.roomNumber),
+                                                                roomType: booking.roomType || 'Superior King Room',
+                                                                nights: half,
+                                                                dailyRate: resolveReservationDailyBaseRate(booking, booking.roomNumber)
+                                                            },
+                                                            {
+                                                                id: `seg-2`,
+                                                                fromDate: midStr,
+                                                                toDate: departureDate || booking.departureDate,
+                                                                roomNumber: nextRm ? String(nextRm.roomNumber) : '101',
+                                                                roomType: nextRm?.type || booking.roomType || 'Deluxe Suite',
+                                                                nights: totalNts - half,
+                                                                dailyRate: getStandardDailyRateForRoom(nextRm ? String(nextRm.roomNumber) : '101', nextRm?.type || booking.roomType)
+                                                            }
+                                                        ]);
+                                                    }}
+                                                    className="h-7 px-3 border border-blue-300/60 hover:bg-white/10 rounded text-[8.5px] font-semibold text-white flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                                                >
+                                                    <Plus size={13} />
+                                                    <span>+ Add Room</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
-                                {/* MODE 5: STOP ROOM MOVE (03-stop-room-move-modal.png & Yanolja PMS) */}
+                                {/* MODE 5: STOP ROOM MOVE (Lock & Guard) */}
                                 {mode === 'stop_move' && (
                                     <div className="space-y-4">
                                         {/* Status indicator banner */}
@@ -2951,7 +4971,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* MODE: ATOMIC ROOM SWAP (Yanolja PMS) */}
+                                {/* MODE: ATOMIC ROOM SWAP */}
                                 {mode === 'swap' && (
                                     <div className="space-y-3">
                                         {/* Source Room Box */}
@@ -3010,7 +5030,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* MODE: DIGITAL REG CARD (Yanolja PMS e-Reg Card) */}
+                                {/* MODE: DIGITAL REG CARD (Digital e-Reg Card) */}
                                 {mode === 'reg_card' && (
                                     <div className="p-4 bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl text-center space-y-3">
                                         <FileText size={36} className="text-indigo-300 mx-auto" />
@@ -3695,6 +5715,246 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
                                     </div>
                                 )}
+
+                                {/* MODE 18: SEND CONFIRMATION VOUCHER */}
+                                {mode === 'send_confirmation' && (() => {
+                                    const hasPhone = Boolean(confirmSendPhone && confirmSendPhone.trim());
+                                    const hasEmail = Boolean(confirmSendEmail && confirmSendEmail.trim());
+                                    const hasAnyContact = hasPhone || hasEmail;
+
+                                    return (
+                                        <div className="space-y-2.5">
+                                            {/* Compact Luxury Header */}
+                                            <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900/80 to-blue-950/80 border border-emerald-500/30 rounded-xl px-3 py-2 text-emerald-100 shadow-xs flex items-center justify-between">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+                                                        <Send size={13} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] font-bold text-white tracking-wide truncate">
+                                                                Send Confirmation Voucher
+                                                            </span>
+                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                                Fast-Pass KYC
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[9px] text-emerald-200/80 truncate">
+                                                            Instant dispatch for <strong className="text-white">{booking.guestName}</strong>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {lastDispatchedInfo && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-mono shrink-0">
+                                                        SENT {lastDispatchedInfo.time}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Dispatched feedback if sent in this session */}
+                                            {lastDispatchedInfo && (
+                                                <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 flex items-center justify-between text-[9px] animate-in fade-in duration-150">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                                                        <span>Voucher successfully sent via <strong className="text-white">{lastDispatchedInfo.channels}</strong></span>
+                                                    </div>
+                                                    <span className="text-[7.5px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.2 rounded font-mono font-bold">DELIVERED</span>
+                                                </div>
+                                            )}
+
+                                            {/* Delivery Channels & Contact Info */}
+                                            {!hasAnyContact && !showManualContactEntry ? (
+                                                /* Clean empty notice when guest has no phone and no email */
+                                                <div className="bg-[#102a6b]/80 border border-amber-500/30 rounded-xl p-3 text-center space-y-2">
+                                                    <div className="flex items-center justify-center gap-1.5 text-amber-300 text-[10.5px] font-bold">
+                                                        <AlertTriangle size={13} />
+                                                        <span>No Phone or Email on Guest Profile</span>
+                                                    </div>
+                                                    <p className="text-[9px] text-blue-200/80 leading-snug">
+                                                        This reservation has no registered mobile number or email address on file.
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowManualContactEntry(true);
+                                                            setShowAddPhoneInput(true);
+                                                            setShowAddEmailInput(true);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
+                                                    >
+                                                        <Plus size={11} />
+                                                        <span>Add Contact Number / Email</span>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {/* WhatsApp Channel Card - Rendered ONLY if guest has phone, or user opted to add */}
+                                                    {(hasPhone || showManualContactEntry || showAddPhoneInput) && (
+                                                        <div className={`p-2.5 rounded-xl border transition-all ${
+                                                            confirmChannelWhatsApp ? 'bg-[#0f2c73]/90 border-emerald-500/40 shadow-xs' : 'bg-[#0f2c73]/40 border-white/10 opacity-70'
+                                                        }`}>
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={confirmChannelWhatsApp}
+                                                                        onChange={e => setConfirmChannelWhatsApp(e.target.checked)}
+                                                                        className="accent-emerald-500 w-3.5 h-3.5 rounded cursor-pointer"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-white flex items-center gap-1.5">
+                                                                        <MessageSquare size={12} className="text-emerald-400" />
+                                                                        <span>WhatsApp Cloud API</span>
+                                                                    </span>
+                                                                </label>
+                                                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                                    Instant Delivery
+                                                                </span>
+                                                            </div>
+                                                            {confirmChannelWhatsApp && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="relative flex-1">
+                                                                        <Phone size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400/70" />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={confirmSendPhone}
+                                                                            onChange={e => setConfirmSendPhone(e.target.value)}
+                                                                            placeholder="WhatsApp mobile number (+880...)"
+                                                                            className="w-full h-7 pl-7 pr-2.5 rounded-lg bg-black/40 border border-emerald-500/30 text-white font-mono text-[10px] outline-none focus:border-emerald-400 transition-colors"
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[8px] text-emerald-300/80 font-mono shrink-0 hidden sm:inline">
+                                                                        Voucher & Map
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Email Channel Card - Rendered ONLY if guest has email, or user opted to add */}
+                                                    {(hasEmail || showManualContactEntry || showAddEmailInput) && (
+                                                        <div className={`p-2.5 rounded-xl border transition-all ${
+                                                            confirmChannelEmail ? 'bg-[#0f2c73]/90 border-blue-400/40 shadow-xs' : 'bg-[#0f2c73]/40 border-white/10 opacity-70'
+                                                        }`}>
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={confirmChannelEmail}
+                                                                        onChange={e => setConfirmChannelEmail(e.target.checked)}
+                                                                        className="accent-blue-500 w-3.5 h-3.5 rounded cursor-pointer"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-white flex items-center gap-1.5">
+                                                                        <Mail size={12} className="text-blue-300" />
+                                                                        <span>Official Email</span>
+                                                                    </span>
+                                                                </label>
+                                                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                                                                    HTML Voucher
+                                                                </span>
+                                                            </div>
+                                                            {confirmChannelEmail && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="relative flex-1">
+                                                                        <Mail size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-300/70" />
+                                                                        <input
+                                                                            type="email"
+                                                                            value={confirmSendEmail}
+                                                                            onChange={e => setConfirmSendEmail(e.target.value)}
+                                                                            placeholder="guest@example.com"
+                                                                            className="w-full h-7 pl-7 pr-2.5 rounded-lg bg-black/40 border border-blue-400/30 text-white font-mono text-[10px] outline-none focus:border-blue-400 transition-colors"
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[8px] text-blue-200/80 font-mono shrink-0 hidden sm:inline">
+                                                                        PDF & Receipt
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Subtle optional add buttons for whichever channel is missing on profile */}
+                                                    {hasPhone && !hasEmail && !showAddEmailInput && (
+                                                        <div className="flex justify-end pt-0.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setShowAddEmailInput(true);
+                                                                    setConfirmChannelEmail(true);
+                                                                }}
+                                                                className="text-[8.5px] text-blue-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                                                            >
+                                                                <Plus size={10} />
+                                                                <span>Add Email address to voucher</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {hasEmail && !hasPhone && !showAddPhoneInput && (
+                                                        <div className="flex justify-end pt-0.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setShowAddPhoneInput(true);
+                                                                    setConfirmChannelWhatsApp(true);
+                                                                }}
+                                                                className="text-[8.5px] text-emerald-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                                                            >
+                                                                <Plus size={10} />
+                                                                <span>Add WhatsApp mobile to voucher</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Voucher Summary Preview */}
+                                            <div className="bg-[#102a6b]/90 border border-blue-400/30 rounded-xl p-2.5 space-y-2 text-[9.5px] shadow-xs">
+                                                <div className="flex items-center justify-between border-b border-blue-400/20 pb-1.5">
+                                                    <span className="font-bold text-blue-200 uppercase tracking-wider text-[8.5px]">Live Voucher Details</span>
+                                                    <span className="font-mono font-bold text-amber-300 text-[10px]">{booking.reservationNumber}</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-slate-200">
+                                                    <div>
+                                                        <span className="text-slate-400 text-[8px] block uppercase font-medium">Guest</span>
+                                                        <strong className="text-white text-[9.5px] truncate block">{booking.guestName}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 text-[8px] block uppercase font-medium">Room & Category</span>
+                                                        <strong className="text-white text-[9.5px] truncate block">Room {booking.roomNumber} ({booking.roomType || 'Standard'})</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 text-[8px] block uppercase font-medium">Stay Journey</span>
+                                                        <strong className="text-emerald-300 text-[9.5px] font-mono block">{booking.arrivalDate} ➔ {booking.departureDate} ({booking.nights || 1}N)</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 text-[8px] block uppercase font-medium">Timings</span>
+                                                        <strong className="text-slate-300 text-[9px] block">Check-in 2:00 PM • Check-out 12:00 PM</strong>
+                                                    </div>
+                                                </div>
+                                                <div className="border-t border-blue-400/20 pt-1.5 grid grid-cols-3 gap-1 text-center bg-black/20 rounded-lg p-1.5">
+                                                    <div>
+                                                        <span className="text-slate-400 text-[7.5px] uppercase block">Grand Total</span>
+                                                        <span className="font-bold text-white text-[10px] font-mono">{currencySymbol} {Number(totalAmount).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="border-x border-white/10">
+                                                        <span className="text-slate-400 text-[7.5px] uppercase block">Deposit / Paid</span>
+                                                        <span className="font-bold text-emerald-400 text-[10px] font-mono">{currencySymbol} {Number(paidAmount).toFixed(2)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400 text-[7.5px] uppercase block">Balance Due</span>
+                                                        <span className={`font-bold text-[10px] font-mono ${dueAmount > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+                                                            {currencySymbol} {Number(dueAmount).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-1 border-t border-blue-400/20 text-[8px] text-slate-300 flex items-center justify-between">
+                                                    <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-200 font-bold shrink-0">Fast-Pass Link</span>
+                                                    <span className="truncate text-slate-300 font-mono text-[8px] ml-1.5">Encrypted Fast-Pass URL ({booking.reservationNumber})</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* FIXED PINNED BOTTOM ACTION FOOTER */}
@@ -3706,11 +5966,16 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 >
                                     Cancel
                                 </button>
-                                {!booking?.isPast && (
+                                {(!booking?.isPast || mode === 'send_confirmation') && (
                                     <button
                                         type="button"
                                         onClick={handlePrimaryAction}
-                                        className={`h-8 px-4 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98] ${modeMeta.buttonClass}`}
+                                        disabled={mode === 'send_confirmation' && (!confirmChannelWhatsApp && !confirmChannelEmail)}
+                                        className={`h-8 px-4 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98] ${
+                                            mode === 'send_confirmation' && (!confirmChannelWhatsApp && !confirmChannelEmail)
+                                                ? 'bg-slate-600/60 opacity-50 cursor-not-allowed text-slate-300'
+                                                : modeMeta.buttonClass
+                                        }`}
                                     >
                                         {modeMeta.buttonIcon}
                                         <span>{modeMeta.buttonText}</span>
@@ -3997,7 +6262,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                         {booking.arrivalDate || bookingAny.checkIn} to {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
                                                     </td>
                                                     <td className="p-2.5 text-right font-mono font-bold">
-                                                        {currencySymbol} {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
+                                                        {currencySymbol} {Number(resolveReservationDailyBaseRate(booking, activeRoomNum)).toLocaleString()}
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -4006,16 +6271,34 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <div className="flex justify-end">
                                             <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                 <div className="flex justify-between">
-                                                    <span className="text-slate-600">Total Billed:</span>
-                                                    <span className="font-mono font-bold">{currencySymbol} {Number(booking.totalAmount || 0).toLocaleString()}</span>
+                                                    <span className="text-slate-600">{isMultiRoomGroup ? `Room ${activeRoomNum} Billed:` : 'Total Billed:'}</span>
+                                                    <span className="font-mono font-bold">
+                                                        {currencySymbol} {Number(
+                                                            isMultiRoomGroup && groupFinancials.totalRooms > 1
+                                                                ? Math.round((booking.totalAmount || groupFinancials.grandTotal) / groupFinancials.totalRooms)
+                                                                : (booking.totalAmount || 0)
+                                                        ).toLocaleString()}
+                                                    </span>
                                                 </div>
                                                 <div className="flex justify-between text-emerald-700 font-semibold">
                                                     <span>Advance Deposited:</span>
-                                                    <span className="font-mono">{currencySymbol} {Number(booking.paidAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono">
+                                                        {currencySymbol} {Number(
+                                                            isMultiRoomGroup && groupFinancials.totalRooms > 1
+                                                                ? Math.round(paidAmount / groupFinancials.totalRooms)
+                                                                : paidAmount
+                                                        ).toLocaleString()}
+                                                    </span>
                                                 </div>
                                                 <div className="flex justify-between text-rose-700 font-bold border-t border-slate-200 pt-1">
                                                     <span>Payable at Check-In:</span>
-                                                    <span className="font-mono">{currencySymbol} {Number(booking.dueAmount || 0).toLocaleString()}</span>
+                                                    <span className="font-mono">
+                                                        {currencySymbol} {Number(
+                                                            isMultiRoomGroup && groupFinancials.totalRooms > 1
+                                                                ? Math.max(0, Math.round((booking.totalAmount || groupFinancials.grandTotal) / groupFinancials.totalRooms) - Math.round(paidAmount / groupFinancials.totalRooms))
+                                                                : dueAmount
+                                                        ).toLocaleString()}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -4456,7 +6739,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         {groupFinancials.rooms.map((rm: any, rIdx: number) => {
                                             const rmNum = rm.roomNumber || `Unassigned (${rIdx + 1})`;
                                             const rmGuest = rm.guestName || booking.guestName;
-                                            const rmRes = rm.displayResNo || `${booking.reservationNumber}-${String(rIdx + 1).padStart(2, '0')}`;
+                                            const rmRes = rm.displayResNo || (booking.isGroup || booking.groupCode ? `${booking.reservationNumber}-${String(rIdx + 1).padStart(2, '0')}` : booking.reservationNumber);
                                             return (
                                                 <div key={rIdx} className="space-y-4">
                                                     <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
@@ -4535,7 +6818,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     </div>
                 </div>
             )}
-            {/* Digital e-Registration Card Modal (Yanolja PMS) */}
+            {/* Digital e-Registration Card Modal (HotelManagementOS) */}
             <DigitalRegCardModal
                 isOpen={isRegCardModalOpen}
                 onClose={() => setIsRegCardModalOpen(false)}
@@ -4555,6 +6838,33 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 reservationId={booking?.id}
                 onProfileResolved={(guest, isNew) => {
                     handlePassportProfileResolved(guest, isNew);
+                }}
+            />
+
+            {/* Keycard Encoder & Hardware Smart Lock Bridge Modal */}
+            <KeycardEncoderModal
+                isOpen={isKeycardModalOpen}
+                onClose={() => setIsKeycardModalOpen(false)}
+                propertyId={getActivePropertyId()}
+                roomNumber={String(booking?.roomNumber || '')}
+                guestName={booking?.guestName || ''}
+                reservationNumber={booking?.reservationNumber}
+                checkInDate={booking?.arrivalDate}
+                checkOutDate={booking?.departureDate}
+                onKeycardIssued={(data) => {
+                    toast.success(`Keycard issued for Room ${booking?.roomNumber}! UID: ${data.cardUid || 'SUCCESS'}`);
+                }}
+            />
+
+            {/* Dynamic In-Room Minibar Billing Modal */}
+            <MinibarAuditModal
+                isOpen={isMinibarModalOpen}
+                onClose={() => setIsMinibarModalOpen(false)}
+                propertyId={getActivePropertyId()}
+                roomNumber={String(booking?.roomNumber || '')}
+                guestName={booking?.guestName || ''}
+                onChargePosted={(data) => {
+                    toast.success(`Minibar charge of ৳${data.totalAmount} posted to Room ${booking?.roomNumber}!`);
                 }}
             />
         </div>

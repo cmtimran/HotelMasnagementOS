@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useState, useEffect, useCallback } from 'react';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import { Calendar, Users, MapPin, Phone, Mail, Download, CheckCircle, ArrowUpDown, Edit3 } from 'lucide-react';
 import GuestProfile360 from './GuestProfile360';
 import { useNavigation } from '../context/NavigationContext';
@@ -12,7 +12,9 @@ import {
     isRoomUnassigned,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
+import { areDatesSequential } from '../utils/reservationNumbering';
 import { toast } from '../context/ToastContext';
+import { getStatusColorStyle } from '../utils/statusColorEngine';
 
 interface Reservation {
     id: number | string;
@@ -37,7 +39,7 @@ interface Reservation {
 }
 
 const ReservationList = () => {
-    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol } = useActiveCurrency();
     const { setActivePage } = useNavigation();
     const [activeTab, setActiveTab] = useState<'arrivals' | 'in-house' | 'departures' | 'all'>('arrivals');
     const [searchTerm, setSearchTerm] = useState('');
@@ -76,7 +78,9 @@ const ReservationList = () => {
                     } else if (st === 'confirmed' || st === 'arriving' || st === 'assigned') {
                         st = rIn === operatingDate ? 'arriving' : 'confirmed';
                     }
-                    const subNum = rm.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}` : undefined);
+                    // Split Stay Rule: non-group multi-room segments keep the master reservation number
+                    const isListSplitStay = Boolean((r as any).isSplitStay) || (!r.isGroup && !r.groupCode && areDatesSequential(rooms));
+                    const subNum = rm.subBookingNumber || (r.reservationNumber ? (isListSplitStay ? `${r.reservationNumber}-L${subIdx + 1}` : `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`) : undefined);
                     const regNo = rm.registrationNumber || r.registrationNumber || (st === 'in-house' || st === 'departing' ? `REG-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}` : undefined);
                     const folioNo = rm.folioNumber || r.folioNumber || `FOL-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}`;
                     const rTariff = Number(rm.totalAmount || rm.amount || (Number(r.totalAmount) / rooms.length)) || 0;
@@ -119,7 +123,7 @@ const ReservationList = () => {
                 ? roomNumbers.join(' + ')
                 : String(r.roomNumber || (r.allocatedRooms && r.allocatedRooms[0]) || (rooms && rooms[0]?.roomNumber) || 'Unassigned');
 
-            const subNum = isConnectingSuite ? undefined : (r.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-01` : undefined));
+            const subNum = isConnectingSuite ? undefined : (r.subBookingNumber || r.reservationNumber);
             const regNo = r.registrationNumber || (st === 'in-house' || st === 'departing' ? `REG-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}` : undefined);
             const folioNo = r.folioNumber || `FOL-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}`;
 
@@ -211,27 +215,17 @@ const ReservationList = () => {
             toast.success(`Guest ${res.guestName} checked in to Room ${res.roomNumber}!`);
             loadData();
         } else if (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived') {
-            await updateReservationStatusInDB(targetId, 'COMPLETED');
-            toast.success(`Guest ${res.guestName} checked out of Room ${res.roomNumber}!`);
-            loadData();
+            const ok = await updateReservationStatusInDB(targetId, 'COMPLETED');
+            if (ok) {
+                toast.success(`Guest ${res.guestName} checked out of Room ${res.roomNumber}!`);
+                loadData();
+            }
         } else {
             setShowGuestProfile(true);
         }
     };
 
-    const getStatusColor = (status: Reservation['status']) => {
-        switch (status) {
-            case 'confirmed': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'arriving': return 'bg-sky-100 text-sky-700 border-sky-200';
-            case 'in-house':
-            case 'arrived': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'departing': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'checked-out': return 'bg-slate-100 text-slate-700 border-slate-200';
-            case 'hold': return 'bg-purple-100 text-purple-700 border-purple-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
-    };
-
+    
     const getStatusLabel = (status: Reservation['status']) => {
         switch (status) {
             case 'confirmed': return 'Confirmed';
@@ -438,7 +432,7 @@ const ReservationList = () => {
                                         <p className="text-xs text-gray-500">{res.source}</p>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusColor(res.status)}`}>
+                                        <span className='px-3 py-1.5 rounded-full text-xs font-semibold border shadow-2xs inline-block' style={getStatusColorStyle(res.status)}>
                                             {getStatusLabel(res.status)}
                                         </span>
                                     </td>

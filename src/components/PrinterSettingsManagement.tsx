@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
+import { useActiveCurrency } from '../utils/currencyUtils';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -152,6 +153,7 @@ const INITIAL_PRINTERS: HardwarePrinter[] = [
 ];
 
 export default function PrinterSettingsManagement() {
+    const { currencySymbol } = useActiveCurrency();
     const [activeTab, setActiveTab] = useState<'layout' | 'kot' | 'printers'>('layout');
 
     // Persistence State
@@ -436,9 +438,9 @@ export default function PrinterSettingsManagement() {
             {/* TAB 1: GUEST RECEIPT LAYOUT & PHOTOREALISTIC PREVIEW          */}
             {/* ============================================================== */}
             {activeTab === 'layout' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                     {/* Controls Form (7 Cols) */}
-                    <div className="lg:col-span-7 space-y-4">
+                    <div className="xl:col-span-7 space-y-4">
                         <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
@@ -606,7 +608,7 @@ export default function PrinterSettingsManagement() {
                     </div>
 
                     {/* Photorealistic Thermal Receipt Preview (5 Cols) */}
-                    <div className="lg:col-span-5 flex flex-col items-center">
+                    <div className="xl:col-span-5 flex flex-col items-center">
                         <div className="w-full flex items-center justify-between mb-2 px-1">
                             <span className="text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 <Receipt className="size-3.5 text-indigo-600" />
@@ -676,15 +678,15 @@ export default function PrinterSettingsManagement() {
                                 </div>
                                 <div className="flex justify-between">
                                     <span>2x Deluxe Ocean View (2N)</span>
-                                    <span>$560.00</span>
+                                    <span>{currencySymbol} 560.00</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span>1x Executive Club Dinner</span>
-                                    <span>$95.00</span>
+                                    <span>{currencySymbol} 95.00</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span>1x Airport Chauffeur Transfer</span>
-                                    <span>$45.00</span>
+                                    <span>{currencySymbol} 45.00</span>
                                 </div>
                             </div>
 
@@ -692,31 +694,31 @@ export default function PrinterSettingsManagement() {
                             <div className="space-y-1 text-[11px] border-b border-dashed border-gray-400 pb-2">
                                 <div className="flex justify-between">
                                     <span>SUBTOTAL:</span>
-                                    <span>$700.00</span>
+                                    <span>{currencySymbol} 700.00</span>
                                 </div>
                                 {config.showTaxBreakdown && (
                                     <>
                                         <div className="flex justify-between text-gray-700">
                                             <span>SERVICE CHARGE (10%):</span>
-                                            <span>+$70.00</span>
+                                            <span>+{currencySymbol} 70.00</span>
                                         </div>
                                         <div className="flex justify-between text-gray-700">
-                                            <span>VAT (15% on $770):</span>
-                                            <span>+$115.50</span>
+                                            <span>VAT (15% on {currencySymbol}770):</span>
+                                            <span>+{currencySymbol} 115.50</span>
                                         </div>
                                         <div className="flex justify-between text-gray-700">
                                             <span>CITY TOURISM LEVY (2%):</span>
-                                            <span>+$14.00</span>
+                                            <span>+{currencySymbol} 14.00</span>
                                         </div>
                                     </>
                                 )}
                                 <div className="flex justify-between font-extrabold text-sm pt-1 border-t border-gray-400">
                                     <span>TOTAL BILL:</span>
-                                    <span>$899.50</span>
+                                    <span>{currencySymbol} 899.50</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] text-gray-600">
                                     <span>PAID BY VISA (**** 4412):</span>
-                                    <span>$899.50</span>
+                                    <span>{currencySymbol} 899.50</span>
                                 </div>
                             </div>
 
@@ -771,9 +773,9 @@ export default function PrinterSettingsManagement() {
             {/* TAB 2: KOT KITCHEN TICKET LAYOUT & PREVIEW                     */}
             {/* ============================================================== */}
             {activeTab === 'kot' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                     {/* Controls (7 Cols) */}
-                    <div className="lg:col-span-7 space-y-4">
+                    <div className="xl:col-span-7 space-y-4">
                         <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
@@ -877,7 +879,7 @@ export default function PrinterSettingsManagement() {
                     </div>
 
                     {/* KOT Visual Kitchen Slip (5 Cols) */}
-                    <div className="lg:col-span-5 flex flex-col items-center">
+                    <div className="xl:col-span-5 flex flex-col items-center">
                         <div className="w-full flex items-center justify-between mb-2 px-1">
                             <span className="text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 <Utensils className="size-3.5 text-rose-600" />

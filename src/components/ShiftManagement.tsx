@@ -18,6 +18,8 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 
 export interface WorkShift {
     id: number;
@@ -172,14 +174,22 @@ export const ShiftManagement: React.FC = () => {
 
     const handleDelete = async (id: number) => {
         const item = shifts.find(s => s.id === id);
-        if (window.confirm(`Are you sure you want to delete work shift "${item?.name}"?`)) {
-            try {
-                await fetch(`${getApiBaseUrl()}/api/hrm/shifts/${id}`, { method: 'DELETE' });
-                showToast('Work Shift removed.');
-                await loadShifts();
-            } catch (err) {
-                console.error('Failed to delete shift:', err);
-            }
+        const name = item?.name || 'this work shift';
+        const confirmed = await confirmModal({
+            title: `Delete Work Shift?`,
+            message: `Are you sure you want to delete work shift "${name}"? Employees scheduled on this shift will need reassignment.`,
+            confirmText: 'Delete Shift',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+            await fetch(`${getApiBaseUrl()}/api/hrm/shifts/${id}`, { method: 'DELETE' });
+            toast.success(`Work Shift "${name}" removed.`);
+            await loadShifts();
+        } catch (err) {
+            console.error('Failed to delete shift:', err);
+            toast.error('Failed to delete shift');
         }
     };
 

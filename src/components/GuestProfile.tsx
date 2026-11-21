@@ -24,8 +24,11 @@ export { normalizePhone, isSamePhoneNumber } from '../utils/phoneUtils';
 import {
     COUNTRIES_DATABASE,
     getCitiesForCountry,
-    getNationalityForCountry
+    getNationalityForCountry,
+    getAllCountries
 } from '../utils/geoData';
+import { SearchableSelect } from './common/SearchableSelect';
+import { PhoneInputWithCountry } from './common/PhoneInputWithCountry';
 
 export interface GuestRecord {
     id: number;
@@ -116,7 +119,7 @@ const calculateAge = (dobString: string): number => {
     return Math.max(0, age);
 };
 
-export const parseTitleAndName = (fullName: string): { title: GuestRecord['title']; cleanName: string } => {
+const parseTitleAndName = (fullName: string): { title: GuestRecord['title']; cleanName: string } => {
     if (!fullName) return { title: 'Mr.', cleanName: 'Guest' };
     const raw = fullName.trim();
     const titleMatch = raw.match(/^(Mr|Mrs|Ms|Miss|Dr|Prof|Engr)\.?\s+/i);
@@ -135,6 +138,21 @@ export const parseTitleAndName = (fullName: string): { title: GuestRecord['title
     // Clean any accidental duplicate title prefixes (e.g. "Mr. Mr Imran" or "Mr Imran")
     const cleanName = afterFirstTitle.replace(/^(Mr|Mrs|Ms|Miss|Dr|Prof|Engr)\.?\s+/i, '').trim();
     return { title, cleanName: cleanName || raw };
+};
+
+/**
+ * Universal Canonical Name Key:
+ * Normalizes religious prefixes (Md., Mohammad, Muhammad), honorifics, and whitespace
+ * e.g. "Mr. MD. IMRAN HOSSAIN", "Mr Imran Hossain", "MD. IMRAN HOSSAIN" -> "imranhossain"
+ */
+const canonicalNameKey = (name: string): string => {
+    if (!name) return '';
+    return name
+        .toLowerCase()
+        .replace(/^(mr|mrs|ms|miss|dr|prof|engr)\.?\s+/i, '')
+        .replace(/^(md|mohammed|mohammad|muhammad|mst|mosammat)\.?\s+/i, '')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
 };
 
 const getSavedGuestProfiles = (): GuestRecord[] => {
@@ -173,9 +191,14 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
         const rawPhone = r.phone || r.guestPhone || '';
         const cleanE = (r.email || r.guestEmail || '').trim().toLowerCase();
 
-        // Check if an existing guest in map matches by normalized phone, email, or clean name
+        // Check if an existing guest in map matches by canonical name, normalized phone, or clean email
+        const cKey = canonicalNameKey(cleanName);
         let matchedKey: string | undefined;
         for (const [k, g] of map.entries()) {
+            if (cKey && canonicalNameKey(g.name) === cKey) {
+                matchedKey = k;
+                break;
+            }
             if (rawPhone && isSamePhoneNumber(rawPhone, g.phone)) {
                 matchedKey = k;
                 break;
@@ -336,120 +359,91 @@ export const GuestProfile: React.FC = () => {
 
             if (dbRes?.success && Array.isArray(dbRes.data) && dbRes.data.length > 0) {
                 const mergedMap = new Map<number | string, GuestRecord>();
-                derived.forEach(d => mergedMap.set(d.id, d));
+                // Authoritative PostgreSQL profiles
                 dbRes.data.forEach((dg: any) => {
-                    const existing = Array.from(mergedMap.values()).find(m =>
-                        m.id === dg.id ||
-                        (dg.phone && isSamePhoneNumber(dg.phone, m.phone)) ||
-                        (dg.email && m.email && m.email.toLowerCase() === dg.email.toLowerCase() && !dg.email.includes('hospitality.com'))
-                    );
                     const dbSpend = Number(dg.totalSpend || 0);
                     const dbStays = Number(dg.totalStays || 0);
                     const dbNights = Number(dg.totalNights || dg.totalStays || 0);
-                    const dbPoints = Number(dg.loyaltyPoints ?? Math.round(dbSpend / 20));
 
-                    if (existing) {
-                        const finalSpend = Math.max(Number(existing.lifetimeSpendBDT || 0), dbSpend);
-                        const finalStays = Math.max(Number(existing.totalStays || 0), dbStays);
-                        const finalNights = Math.max(Number(existing.totalNights || 0), dbNights);
-                        const finalPoints = Math.round(finalSpend / 20);
-                        const finalLastStay = (dg.lastStayDate && dg.lastStayDate > (existing.lastStayDate || ''))
-                            ? dg.lastStayDate
-                            : (existing.lastStayDate || dg.lastStayDate || '-');
+                    const dgCanonical = canonicalNameKey(`${dg.firstName || ''} ${dg.lastName || ''}`);
+                    const matchingDerived = derived.find(d =>
+                        d.id === dg.id ||
+                        (dg.idNumber && d.idNumber && dg.idNumber.replace(/[\s\-_]/g, '').toLowerCase() === d.idNumber.replace(/[\s\-_]/g, '').toLowerCase()) ||
+                        (dgCanonical && canonicalNameKey(d.name) === dgCanonical) ||
+                        (dg.phone && isSamePhoneNumber(dg.phone, d.phone)) ||
+                        (dg.email && d.email && d.email.toLowerCase() === dg.email.toLowerCase() && !dg.email.includes('hospitality.com'))
+                    );
 
-                        if (existing.id !== dg.id) {
-                            mergedMap.delete(existing.id);
-                        }
+                    const finalSpend = Math.max(Number(matchingDerived?.lifetimeSpendBDT || 0), dbSpend);
+                    const finalStays = Math.max(Number(matchingDerived?.totalStays || 0), dbStays);
+                    const finalNights = Math.max(Number(matchingDerived?.totalNights || 0), dbNights);
+                    const finalPoints = Math.round(finalSpend / 20);
+                    const finalLastStay = (dg.lastStayDate && dg.lastStayDate > (matchingDerived?.lastStayDate || ''))
+                        ? dg.lastStayDate
+                        : (matchingDerived?.lastStayDate || dg.lastStayDate || '-');
 
-                        mergedMap.set(dg.id, {
-                            ...existing,
-                            id: dg.id,
-                            title: (dg.salutation ? `${dg.salutation}.` : existing.title) as GuestRecord['title'],
-                            name: `${dg.firstName} ${dg.lastName}`.trim() || existing.name,
-                            phone: dg.phone || existing.phone,
-                            email: dg.email || existing.email,
-                            idType: dg.idType || existing.idType,
-                            idNumber: dg.idNumber || existing.idNumber,
-                            vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : existing.vipTier,
-                            totalStays: finalStays,
-                            totalNights: finalNights,
-                            lifetimeSpendBDT: finalSpend,
-                            loyaltyPoints: finalPoints,
-                            lastStayDate: finalLastStay,
-                            isBlacklisted: Boolean(dg.isBlacklisted),
-                            blacklistReason: dg.blacklistReason || existing.blacklistReason,
-                            blacklistedBy: dg.blacklistedBy || existing.blacklistedBy,
-                            blacklistedAt: dg.blacklistedAt || existing.blacklistedAt,
-                            dob: dg.dob || existing.dob || '1990-01-01',
-                            gender: dg.gender || existing.gender || 'Male',
-                            idIssueDate: dg.idIssueDate || existing.idIssueDate,
-                            idExpiryDate: dg.idExpiryDate || existing.idExpiryDate,
-                            idIssueCountry: dg.idIssueCountry || existing.idIssueCountry,
-                            idIssuePlace: dg.idIssuePlace || existing.idIssuePlace,
-                            passportVisaNumber: dg.passportVisaNumber || existing.passportVisaNumber,
-                            passportVisaType: dg.passportVisaType || existing.passportVisaType,
-                            passportVisaExpiry: dg.passportVisaExpiry || existing.passportVisaExpiry,
-                            passportEntryPort: dg.passportEntryPort || existing.passportEntryPort,
-                            drivingVehicleClass: dg.drivingVehicleClass || existing.drivingVehicleClass,
-                            tags: dg.tags || existing.tags || [],
-                            preferences: existing.preferences || {
-                                roomType: 'Deluxe Double',
-                                floorPreference: 'High Floor',
-                                pillowType: 'Feather / Down',
-                                smoking: 'Non-Smoking',
-                                dietary: 'Standard Halal',
-                                newspaper: 'The Daily Star',
-                                specialNotes: 'Loaded from Hotel Database.'
-                            }
-                        });
-                    } else {
-                        mergedMap.set(dg.id, {
-                            id: dg.id,
-                            title: (dg.salutation ? `${dg.salutation}.` : 'Mr.') as GuestRecord['title'],
-                            name: `${dg.firstName} ${dg.lastName}`.trim(),
-                            phone: dg.phone || '',
-                            email: dg.email || '',
-                            vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : 'Regular',
-                            nationality: dg.nationality || 'Bangladesh',
-                            idType: dg.idType || 'National ID (NID)',
-                            idNumber: dg.idNumber || '',
-                            dob: dg.dob || '1990-01-01',
-                            gender: dg.gender || 'Male',
-                            homeCity: dg.city || 'Dhaka',
-                            homeCountry: dg.country || 'Bangladesh',
-                            address: dg.address || '',
-                            totalStays: dbStays,
-                            totalNights: dbNights,
-                            lifetimeSpendBDT: dbSpend,
-                            lastStayDate: dg.lastStayDate || '-',
-                            loyaltyPoints: dbPoints,
-                            isBlacklisted: Boolean(dg.isBlacklisted),
-                            blacklistReason: dg.blacklistReason,
-                            blacklistedBy: dg.blacklistedBy,
-                            blacklistedAt: dg.blacklistedAt,
-                            idIssueDate: dg.idIssueDate,
-                            idExpiryDate: dg.idExpiryDate,
-                            idIssueCountry: dg.idIssueCountry,
-                            idIssuePlace: dg.idIssuePlace,
-                            passportVisaNumber: dg.passportVisaNumber,
-                            passportVisaType: dg.passportVisaType,
-                            passportVisaExpiry: dg.passportVisaExpiry,
-                            passportEntryPort: dg.passportEntryPort,
-                            drivingVehicleClass: dg.drivingVehicleClass,
-                            tags: dg.tags || [],
-                            preferences: {
-                                roomType: 'Deluxe Double',
-                                floorPreference: 'High Floor',
-                                pillowType: 'Feather / Down',
-                                smoking: 'Non-Smoking',
-                                dietary: 'Standard Halal',
-                                newspaper: 'The Daily Star',
-                                specialNotes: 'Loaded from Hotel Database.'
-                            },
-                            stayHistory: []
-                        });
+                    mergedMap.set(dg.id, {
+                        id: dg.id,
+                        title: (dg.salutation ? `${dg.salutation}.` : matchingDerived?.title || 'Mr.') as GuestRecord['title'],
+                        name: `${dg.firstName} ${dg.lastName}`.trim(),
+                        phone: dg.phone || matchingDerived?.phone || '',
+                        email: dg.email || matchingDerived?.email || '',
+                        vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : matchingDerived?.vipTier || 'Regular',
+                        nationality: dg.nationality || matchingDerived?.nationality || 'Bangladesh',
+                        idType: dg.idType || matchingDerived?.idType || 'National ID (NID)',
+                        idNumber: dg.idNumber || matchingDerived?.idNumber || '',
+                        dob: dg.dob || matchingDerived?.dob || '1990-01-01',
+                        gender: dg.gender || matchingDerived?.gender || 'Male',
+                        homeCity: dg.city || matchingDerived?.homeCity || 'Dhaka',
+                        homeCountry: dg.country || matchingDerived?.homeCountry || 'Bangladesh',
+                        address: dg.address || matchingDerived?.address || '',
+                        totalStays: finalStays,
+                        totalNights: finalNights,
+                        lifetimeSpendBDT: finalSpend,
+                        lastStayDate: finalLastStay,
+                        loyaltyPoints: finalPoints,
+                        isBlacklisted: Boolean(dg.isBlacklisted),
+                        blacklistReason: dg.blacklistReason || matchingDerived?.blacklistReason,
+                        blacklistedBy: dg.blacklistedBy || matchingDerived?.blacklistedBy,
+                        blacklistedAt: dg.blacklistedAt || matchingDerived?.blacklistedAt,
+                        idIssueDate: dg.idIssueDate || matchingDerived?.idIssueDate,
+                        idExpiryDate: dg.idExpiryDate || matchingDerived?.idExpiryDate,
+                        idIssueCountry: dg.idIssueCountry || matchingDerived?.idIssueCountry,
+                        idIssuePlace: dg.idIssuePlace || matchingDerived?.idIssuePlace,
+                        passportVisaNumber: dg.passportVisaNumber || matchingDerived?.passportVisaNumber,
+                        passportVisaType: dg.passportVisaType || matchingDerived?.passportVisaType,
+                        passportVisaExpiry: dg.passportVisaExpiry || matchingDerived?.passportVisaExpiry,
+                        passportEntryPort: dg.passportEntryPort || matchingDerived?.passportEntryPort,
+                        drivingVehicleClass: dg.drivingVehicleClass || matchingDerived?.drivingVehicleClass,
+                        tags: dg.tags || matchingDerived?.tags || [],
+                        preferences: matchingDerived?.preferences || {
+                            roomType: 'Deluxe Double',
+                            floorPreference: 'High Floor',
+                            pillowType: 'Feather / Down',
+                            smoking: 'Non-Smoking',
+                            dietary: 'Standard Halal',
+                            newspaper: 'The Daily Star',
+                            specialNotes: 'Loaded from Hotel Database.'
+                        },
+                        stayHistory: matchingDerived?.stayHistory || []
+                    });
+                });
+
+                // Only add derived guests that have ZERO overlap with PostgreSQL guests
+                derived.forEach(d => {
+                    const dCanonical = canonicalNameKey(d.name);
+                    const alreadyPresent = Array.from(mergedMap.values()).some(g =>
+                        g.id === d.id ||
+                        (d.idNumber && g.idNumber && d.idNumber.replace(/[\s\-_]/g, '').toLowerCase() === g.idNumber.replace(/[\s\-_]/g, '').toLowerCase()) ||
+                        (dCanonical && canonicalNameKey(g.name) === dCanonical) ||
+                        (d.phone && isSamePhoneNumber(d.phone, g.phone)) ||
+                        (d.email && g.email && d.email.toLowerCase() === g.email.toLowerCase() && !d.email.includes('guest.com'))
+                    );
+                    if (!alreadyPresent) {
+                        mergedMap.set(d.id, d);
                     }
                 });
+
                 const finalGuests = Array.from(mergedMap.values());
                 setGuests(finalGuests);
                 localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(finalGuests));
@@ -549,6 +543,22 @@ export const GuestProfile: React.FC = () => {
     };
 
     const [newGuestForm, setNewGuestForm] = useState(initialGuestForm);
+
+    const allCountryOptions = useMemo(() => {
+        return getAllCountries().map(c => ({
+            value: c.name,
+            label: c.name,
+            subLabel: `Dial: ${c.dialCode} • Code: ${c.code}`,
+            badge: c.code
+        }));
+    }, []);
+
+    const guestCityOptions = useMemo(() => {
+        return getCitiesForCountry(newGuestForm.homeCountry).map(ct => ({
+            value: ct,
+            label: ct
+        }));
+    }, [newGuestForm.homeCountry]);
 
     const handleOpenCreateModal = () => {
         setModalMode('create');
@@ -2831,12 +2841,11 @@ export const GuestProfile: React.FC = () => {
                                                 <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
                                                     Primary Mobile Phone <span className="text-rose-500">*</span>
                                                 </label>
-                                                <input
-                                                    type="tel"
-                                                    placeholder="+880 1711-XXXXXX"
+                                                <PhoneInputWithCountry
                                                     value={newGuestForm.phone}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, phone: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                    onChange={val => setNewGuestForm({ ...newGuestForm, phone: val })}
+                                                    defaultCountryCode="BD"
+                                                    placeholder="1711-000000"
                                                     required
                                                 />
                                             </div>
@@ -2844,12 +2853,11 @@ export const GuestProfile: React.FC = () => {
                                                 <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
                                                     WhatsApp / Alt Mobile Phone
                                                 </label>
-                                                <input
-                                                    type="tel"
-                                                    placeholder="+880 1819-XXXXXX"
+                                                <PhoneInputWithCountry
                                                     value={newGuestForm.altPhone}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, altPhone: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                    onChange={val => setNewGuestForm({ ...newGuestForm, altPhone: val })}
+                                                    defaultCountryCode="BD"
+                                                    placeholder="1819-000000"
                                                 />
                                             </div>
                                         </div>
@@ -2885,10 +2893,9 @@ export const GuestProfile: React.FC = () => {
                                                 <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
                                                     Country of Residence <span className="text-rose-500">*</span>
                                                 </label>
-                                                <select
+                                                <SearchableSelect
                                                     value={newGuestForm.homeCountry}
-                                                    onChange={e => {
-                                                        const selectedCountry = e.target.value;
+                                                    onChange={selectedCountry => {
                                                         const cities = getCitiesForCountry(selectedCountry);
                                                         const nat = getNationalityForCountry(selectedCountry);
                                                         setNewGuestForm({
@@ -2898,46 +2905,26 @@ export const GuestProfile: React.FC = () => {
                                                             homeCity: cities[0] || 'Dhaka'
                                                         });
                                                     }}
-                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
-                                                >
-                                                    {COUNTRIES_DATABASE.map(c => (
-                                                        <option key={c.code} value={c.name}>
-                                                            {c.name} ({c.dialCode})
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    options={allCountryOptions}
+                                                    placeholder="Select Country..."
+                                                    searchPlaceholder="Search country..."
+                                                    allowCustom={true}
+                                                />
                                             </div>
                                             <div>
                                                 <div className="flex items-center justify-between mb-1">
                                                     <label className="text-[10.5px] font-semibold text-gray-700">City / District</label>
                                                     <span className="text-[9px] text-gray-400 font-normal">Dynamic by Country</span>
                                                 </div>
-                                                <select
-                                                    value={getCitiesForCountry(newGuestForm.homeCountry).includes(newGuestForm.homeCity) ? newGuestForm.homeCity : '__custom__'}
-                                                    onChange={e => {
-                                                        if (e.target.value === '__custom__') {
-                                                            setNewGuestForm({ ...newGuestForm, homeCity: '' });
-                                                        } else {
-                                                            setNewGuestForm({ ...newGuestForm, homeCity: e.target.value });
-                                                        }
-                                                    }}
-                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
-                                                >
-                                                    {getCitiesForCountry(newGuestForm.homeCountry).map(cty => (
-                                                        <option key={cty} value={cty}>{cty}</option>
-                                                    ))}
-                                                    <option value="__custom__">Other / Enter Manually...</option>
-                                                </select>
-                                                {!getCitiesForCountry(newGuestForm.homeCountry).includes(newGuestForm.homeCity) && (
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Type city name..."
-                                                        value={newGuestForm.homeCity}
-                                                        onChange={e => setNewGuestForm({ ...newGuestForm, homeCity: e.target.value })}
-                                                        className="w-full h-7 px-2 bg-white border border-blue-400 rounded text-xs outline-none focus:border-blue-600 mt-1"
-                                                        autoFocus
-                                                    />
-                                                )}
+                                                <SearchableSelect
+                                                    value={newGuestForm.homeCity}
+                                                    onChange={val => setNewGuestForm({ ...newGuestForm, homeCity: val })}
+                                                    options={guestCityOptions}
+                                                    placeholder="Select or enter city..."
+                                                    searchPlaceholder="Search or type city..."
+                                                    allowCustom={true}
+                                                    customPromptText="Use custom city:"
+                                                />
                                             </div>
                                             <div>
                                                 <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Postal / Zip Code</label>
@@ -2985,12 +2972,12 @@ export const GuestProfile: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-semibold text-rose-800 mb-0.5">Emergency Phone</label>
-                                                    <input
-                                                        type="tel"
-                                                        placeholder="+880 1712-XXXXXX"
+                                                    <PhoneInputWithCountry
+                                                        compact={true}
                                                         value={newGuestForm.emergencyPhone}
-                                                        onChange={e => setNewGuestForm({ ...newGuestForm, emergencyPhone: e.target.value })}
-                                                        className="w-full h-7 px-2 bg-white border border-rose-200 rounded text-xs font-mono outline-none focus:border-rose-500"
+                                                        onChange={val => setNewGuestForm({ ...newGuestForm, emergencyPhone: val })}
+                                                        defaultCountryCode="BD"
+                                                        placeholder="1712-000000"
                                                     />
                                                 </div>
                                             </div>

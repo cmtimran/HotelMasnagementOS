@@ -7,6 +7,7 @@ import { NavigationProvider } from './context/NavigationContext.tsx'
 import { ToastProvider } from './context/ToastContext.tsx'
 import { PropertyProvider } from './context/PropertyContext.tsx'
 import { PortalProvider } from './context/PortalContext.tsx'
+import { ConfirmModalProvider } from './context/ConfirmModalContext.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')!).render(
       <ToastProvider>
         <PropertyProvider>
           <PortalProvider>
-            <App />
+            <ConfirmModalProvider>
+              <App />
+            </ConfirmModalProvider>
           </PortalProvider>
         </PropertyProvider>
       </ToastProvider>

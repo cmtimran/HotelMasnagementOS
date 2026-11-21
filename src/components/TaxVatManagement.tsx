@@ -15,10 +15,23 @@ import {
     SlidersHorizontal,
     GripVertical,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Calendar,
+    Lock,
+    Mail,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { calculateReservationTaxes } from '../utils/taxCalculationEngine';
+import {
+    getAllStoredReservations,
+    saveStoredReservations,
+    broadcastPMSEvent,
+    getOperatingSystemDate
+} from '../utils/roomInventoryEngine';
+import { confirmModal } from '../context/ConfirmModalContext';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -360,6 +373,81 @@ export default function TaxVatManagement() {
     const [masterRemarks, setMasterRemarks] = useState('');
     const [masterCodeError, setMasterCodeError] = useState('');
 
+    // Tax Propagation States
+    const [isPropagationModalOpen, setIsPropagationModalOpen] = useState(false);
+    const [pendingConfig, setPendingConfig] = useState<TaxConfiguration | null>(null);
+    const [propagationMode, setPropagationMode] = useState<'UPCOMING_AND_INHOUSE' | 'UPCOMING_ONLY' | 'NEW_ONLY'>('UPCOMING_AND_INHOUSE');
+    const [effectiveDate, setEffectiveDate] = useState<string>('2026-07-01');
+    const [protectPrepaid, setProtectPrepaid] = useState<boolean>(true);
+    const [notifyGuests, setNotifyGuests] = useState<boolean>(true);
+    const [notificationChannel, setNotificationChannel] = useState<'EMAIL' | 'SILENT'>('EMAIL');
+    const [showNoticePreview, setShowNoticePreview] = useState<boolean>(false);
+
+    // Dynamic Live Impact Analysis for Tax Propagation
+    const propagationImpact = useMemo(() => {
+        if (!isPropagationModalOpen || !pendingConfig) {
+            return { upcomingCount: 0, inHouseCount: 0, protectedCount: 0, auditLockedCount: 0, emailCount: 0 };
+        }
+        const stored = getAllStoredReservations();
+        const effDate = effectiveDate || getOperatingSystemDate() || '2026-07-01';
+
+        let upcomingCount = 0;
+        let inHouseCount = 0;
+        let protectedCount = 0;
+        let auditLockedCount = 0;
+        let emailCount = 0;
+
+        stored.forEach(res => {
+            const isPast = res.status === 'CHECKED_OUT' || res.status === 'CHECKED-OUT' || res.status === 'CANCELLED' || res.status === 'VOIDED' || res.isPast;
+            if (isPast) {
+                auditLockedCount++;
+                return;
+            }
+
+            const checkInDate = res.checkInDate || res.checkIn || '';
+            const checkOutDate = res.departureDate || res.checkOut || '';
+
+            if (checkOutDate && checkOutDate <= effDate) {
+                auditLockedCount++;
+                return;
+            }
+
+            const isPrepaid = (Number(res.paidAmount || res.paid || 0) >= Number(res.totalAmount || res.total || 0) && Number(res.totalAmount || 0) > 0) ||
+                (res.source && String(res.source).toUpperCase().includes('OTA')) ||
+                (res.channel && String(res.channel).toUpperCase().includes('BOOKING'));
+
+            if (protectPrepaid && isPrepaid) {
+                protectedCount++;
+                return;
+            }
+
+            if (propagationMode === 'NEW_ONLY') {
+                protectedCount++;
+                return;
+            }
+
+            const isInHouse = res.status === 'IN-HOUSE' || res.status === 'ARRIVED' || res.status === 'STAYOVER';
+
+            if (isInHouse) {
+                if (propagationMode === 'UPCOMING_AND_INHOUSE') {
+                    inHouseCount++;
+                    if (notifyGuests && notificationChannel === 'EMAIL' && (res.guestEmail || res.email)) {
+                        emailCount++;
+                    }
+                } else {
+                    protectedCount++;
+                }
+            } else if (checkInDate >= effDate || checkOutDate > effDate) {
+                upcomingCount++;
+                if (notifyGuests && notificationChannel === 'EMAIL' && (res.guestEmail || res.email)) {
+                    emailCount++;
+                }
+            }
+        });
+
+        return { upcomingCount, inHouseCount, protectedCount, auditLockedCount, emailCount };
+    }, [isPropagationModalOpen, pendingConfig, propagationMode, effectiveDate, protectPrepaid, notifyGuests, notificationChannel]);
+
     // Load initial config into builder
     useEffect(() => {
         const found = configurations.find(c => c.id === activeConfigId) || configurations[0];
@@ -424,42 +512,142 @@ export default function TaxVatManagement() {
             executionOrder: idx + 1,
         }));
 
+        const targetId = (activeConfigId && activeConfigId !== 'NEW') ? activeConfigId : `tc-${Date.now()}`;
+        const targetCode = builderCode.trim().toUpperCase() || generateUniqueShortCode('TAX', configurations.map(c => c.code));
+
+        const targetCfg: TaxConfiguration = {
+            id: targetId,
+            code: targetCode,
+            name: builderConfigName.trim(),
+            module: builderModule,
+            startDate: builderStartDate,
+            endDate: builderEndDate,
+            status: builderStatus,
+            remarks: builderRemarks.trim(),
+            lines: linesWithOrder,
+        };
+
+        // If this is an Active configuration, open the Propagation Policy Dialog
+        if (builderStatus === 'Active') {
+            setPendingConfig(targetCfg);
+            setEffectiveDate(targetCfg.startDate || getOperatingSystemDate() || '2026-07-01');
+            setIsPropagationModalOpen(true);
+            return;
+        }
+
+        // Otherwise (Draft/Inactive), save directly
         if (activeConfigId && activeConfigId !== 'NEW') {
             setConfigurations(prev =>
-                prev.map(c =>
-                    c.id === activeConfigId
-                        ? {
-                              ...c,
-                              name: builderConfigName.trim(),
-                              code: builderCode.trim().toUpperCase(),
-                              module: builderModule,
-                              startDate: builderStartDate,
-                              endDate: builderEndDate,
-                              status: builderStatus,
-                              remarks: builderRemarks.trim(),
-                              lines: linesWithOrder,
-                          }
-                        : c
-                )
+                prev.map(c => c.id === activeConfigId ? targetCfg : c)
             );
             showToast('Tax configuration updated successfully!');
         } else {
-            const newId = `tc-${Date.now()}`;
-            const newCfg: TaxConfiguration = {
-                id: newId,
-                code: builderCode.trim().toUpperCase() || generateUniqueShortCode('TAX', configurations.map(c => c.code)),
-                name: builderConfigName.trim(),
-                module: builderModule,
-                startDate: builderStartDate,
-                endDate: builderEndDate,
-                status: builderStatus,
-                remarks: builderRemarks.trim(),
-                lines: linesWithOrder,
-            };
-            setConfigurations(prev => [newCfg, ...prev]);
-            setActiveConfigId(newId);
-            showToast('New tax configuration created successfully!');
+            setConfigurations(prev => [targetCfg, ...prev]);
+            setActiveConfigId(targetId);
+            showToast('New draft tax configuration created successfully!');
         }
+    };
+
+    // Confirm Propagation Handler
+    const handleConfirmPropagation = () => {
+        if (!pendingConfig) return;
+
+        // 1. Commit configuration to state
+        if (activeConfigId && activeConfigId !== 'NEW') {
+            setConfigurations(prev =>
+                prev.map(c => (c.id === activeConfigId ? pendingConfig : c))
+            );
+        } else {
+            setConfigurations(prev => [pendingConfig, ...prev]);
+            setActiveConfigId(pendingConfig.id);
+        }
+
+        // 2. If propagation to existing reservations is enabled
+        if (propagationMode !== 'NEW_ONLY') {
+            const effDate = effectiveDate || getOperatingSystemDate() || '2026-07-01';
+            const stored = getAllStoredReservations();
+            let upcomingCount = 0;
+            let inHouseCount = 0;
+            let protectedCount = 0;
+            let dispatchedEmailCount = 0;
+
+            const updatedStored = stored.map(res => {
+                const isPast = res.status === 'CHECKED_OUT' || res.status === 'CHECKED-OUT' || res.status === 'CANCELLED' || res.status === 'VOIDED' || res.isPast;
+                if (isPast) return res;
+
+                const checkOutDate = res.departureDate || res.checkOut || '';
+
+                // If stay finished on or before effective date, leave locked
+                if (checkOutDate && checkOutDate <= effDate) {
+                    return res;
+                }
+
+                // Check prepaid / OTA protection
+                const isPrepaid = (Number(res.paidAmount || res.paid || 0) >= Number(res.totalAmount || res.total || 0) && Number(res.totalAmount || 0) > 0) ||
+                    (res.source && String(res.source).toUpperCase().includes('OTA')) ||
+                    (res.channel && String(res.channel).toUpperCase().includes('BOOKING'));
+
+                if (protectPrepaid && isPrepaid) {
+                    protectedCount++;
+                    return res;
+                }
+
+                const isInHouse = res.status === 'IN-HOUSE' || res.status === 'ARRIVED' || res.status === 'STAYOVER';
+
+                if (isInHouse) {
+                    if (propagationMode !== 'UPCOMING_AND_INHOUSE') {
+                        return res;
+                    }
+                    inHouseCount++;
+                } else {
+                    upcomingCount++;
+                }
+
+                if (res.taxApplicable !== false) {
+                    const baseAmt = Number(res.baseAmount) || Number(res.totalAmount) || 0;
+                    if (baseAmt > 0) {
+                        const newTaxCalc = calculateReservationTaxes(baseAmt, true, pendingConfig.id);
+                        const guestEmail = res.guestEmail || res.email;
+                        const isEmailDispatched = Boolean(notifyGuests && notificationChannel === 'EMAIL' && guestEmail);
+                        if (isEmailDispatched) {
+                            dispatchedEmailCount++;
+                        }
+
+                        return {
+                            ...res,
+                            taxConfigId: pendingConfig.id,
+                            taxConfigCode: newTaxCalc.configCode,
+                            taxConfigName: newTaxCalc.configName,
+                            taxDetails: newTaxCalc,
+                            totalTaxAmount: newTaxCalc.totalTaxAmount,
+                            serviceChargeAmount: newTaxCalc.serviceChargeAmount,
+                            vatAmount: newTaxCalc.vatAmount,
+                            otherTaxesAmount: newTaxCalc.otherTaxesAmount,
+                            totalAmount: newTaxCalc.grandTotal,
+                            dueAmount: Math.max(0, newTaxCalc.grandTotal - Number(res.paidAmount || 0)),
+                            lastAuditRemark: `Statutory Tax Policy ${pendingConfig.code} applied (Effective: ${effDate}). ${isEmailDispatched ? `Notice email dispatched to ${guestEmail}` : 'Updated in silent audit mode'}`
+                        };
+                    }
+                }
+                return res;
+            });
+
+            saveStoredReservations(updatedStored);
+            if (updatedStored[0]) {
+                broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedStored[0] });
+            }
+
+            if (notifyGuests && notificationChannel === 'EMAIL') {
+                showToast(`Tax policy "${pendingConfig.name}" active! Updated ${upcomingCount} upcoming and ${inHouseCount} in-house reservations. Dispatched ${dispatchedEmailCount} revised tax notice emails to guests.`);
+            } else {
+                showToast(`Tax policy "${pendingConfig.name}" active! Updated ${upcomingCount} upcoming and ${inHouseCount} in-house reservations in silent audit mode (no guest emails sent).`);
+            }
+        } else {
+            showToast(`Tax policy "${pendingConfig.name}" active! Applied to new bookings only (existing reservations grandfathered).`);
+        }
+
+        setIsPropagationModalOpen(false);
+        setPendingConfig(null);
     };
 
     // Rule Builder Line management
@@ -569,18 +757,24 @@ export default function TaxVatManagement() {
     };
 
     // Delete Configuration
-    const handleDeleteConfig = (id: string, name: string) => {
+    const handleDeleteConfig = async (id: string, name: string) => {
         if (configurations.length <= 1) {
             showToast('You must keep at least one tax configuration', 'error');
             return;
         }
-        if (confirm(`Are you sure you want to delete "${name}"?`)) {
-            setConfigurations(prev => prev.filter(c => c.id !== id));
-            showToast('Tax configuration deleted');
-            if (activeConfigId === id) {
-                const remaining = configurations.filter(c => c.id !== id);
-                if (remaining.length > 0) selectConfigForBuilder(remaining[0]);
-            }
+        const confirmed = await confirmModal({
+            title: `Delete Tax Configuration?`,
+            message: `Are you sure you want to delete tax configuration "${name}"?`,
+            confirmText: 'Delete Configuration',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        setConfigurations(prev => prev.filter(c => c.id !== id));
+        showToast(`Tax configuration "${name}" deleted.`);
+        if (activeConfigId === id) {
+            const remaining = configurations.filter(c => c.id !== id);
+            if (remaining.length > 0) selectConfigForBuilder(remaining[0]);
         }
     };
 
@@ -665,12 +859,18 @@ export default function TaxVatManagement() {
         setShowMasterModal(false);
     };
 
-    const handleDeleteMaster = (id: string, name: string) => {
-        if (confirm(`Delete tax master "${name}"? It will be removed from all associated rules.`)) {
-            setMasters(prev => prev.filter(m => m.id !== id));
-            setBuilderLines(prev => prev.filter(l => l.taxMasterId !== id));
-            showToast('Tax master deleted');
-        }
+    const handleDeleteMaster = async (id: string, name: string) => {
+        const confirmed = await confirmModal({
+            title: `Delete Tax Master "${name}"?`,
+            message: `Are you sure you want to delete tax master "${name}"? It will be removed from all associated rules and calculation lines.`,
+            confirmText: 'Delete Tax Master',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        setMasters(prev => prev.filter(m => m.id !== id));
+        setBuilderLines(prev => prev.filter(l => l.taxMasterId !== id));
+        showToast(`Tax master "${name}" deleted.`);
     };
 
     // Save Channel Mapping
@@ -884,15 +1084,15 @@ export default function TaxVatManagement() {
             {activeTab === 'builder' && (
                 <div className="space-y-3">
                     {/* Builder Header Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-700 font-medium">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 flex-1 min-w-0">
+                            <span className="text-xs text-slate-700 font-bold whitespace-nowrap shrink-0">
                                 Active Rule Configuration:
                             </span>
                             <select
                                 value={activeConfigId}
                                 onChange={e => handleConfigDropdownChange(e.target.value)}
-                                className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none"
+                                className="flex-1 min-w-[200px] max-w-xl h-8.5 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400 truncate"
                             >
                                 {configurations.map(c => (
                                     <option key={c.id} value={c.id}>
@@ -903,18 +1103,18 @@ export default function TaxVatManagement() {
                             <button
                                 type="button"
                                 onClick={handleNewConfigBuilder}
-                                className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1 font-semibold transition"
+                                className="h-8.5 px-3 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1.5 font-semibold transition shrink-0 whitespace-nowrap cursor-pointer"
                             >
-                                <Plus className="size-3" />
+                                <Plus className="size-3.5" />
                                 <span>New Draft</span>
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             <button
                                 type="button"
                                 onClick={handleSaveBuilder}
-                                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition"
+                                className="h-8.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition whitespace-nowrap shrink-0 cursor-pointer"
                             >
                                 <Save className="size-3.5" />
                                 <span>Save Tax Rule</span>
@@ -922,10 +1122,10 @@ export default function TaxVatManagement() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
                         {/* Left Column: Rule Pipeline Builder (7 Cols) */}
-                        <div className="lg:col-span-7 space-y-3">
-                            <div className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs">
+                        <div className="xl:col-span-7 space-y-3">
+                            <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs">
                                 <div className="border-b border-slate-100 pb-2">
                                     <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                                         <SlidersHorizontal className="size-3.5 text-rose-600" />
@@ -937,8 +1137,8 @@ export default function TaxVatManagement() {
                                 </div>
 
                                 {/* Config Meta Inputs */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                    <div className="sm:col-span-8">
                                         <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                                             Rule Name *
                                         </label>
@@ -946,11 +1146,11 @@ export default function TaxVatManagement() {
                                             type="text"
                                             value={builderConfigName}
                                             onChange={e => setBuilderConfigName(e.target.value)}
-                                            placeholder="e.g. Standard 5-Star Rule"
-                                            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                                            placeholder="e.g. Standard 5-Star Rule (10% SC + 15% VAT + 2% City)"
+                                            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="sm:col-span-4">
                                         <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                                             Short Code *
                                         </label>
@@ -958,13 +1158,13 @@ export default function TaxVatManagement() {
                                             type="text"
                                             value={builderCode}
                                             onChange={e => setBuilderCode(e.target.value.toUpperCase())}
-                                            className="w-full px-3 py-1.5 text-xs font-mono uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                                            className="w-full px-3 py-1.5 text-xs font-mono uppercase font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400"
                                         />
                                     </div>
                                 </div>
 
                                 {/* Pipeline Steps with Drag & Drop */}
-                                <div className="space-y-2.5 pt-2">
+                                <div className="space-y-3 pt-1">
                                     {builderLines.length === 0 ? (
                                         <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
                                             No tax lines added yet. Click &quot;Add Tax Step to Pipeline&quot; below.
@@ -983,7 +1183,7 @@ export default function TaxVatManagement() {
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={e => handleDrop(e, idx)}
                                                     onDragEnd={handleDragEnd}
-                                                    className={`p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-3 group select-none ${
+                                                    className={`p-3 rounded-xl border transition-all duration-150 space-y-2.5 group select-none ${
                                                         isBeingDragged
                                                             ? 'opacity-40 scale-[0.98] border-dashed border-rose-400 bg-rose-50/40'
                                                             : isDragTarget
@@ -991,67 +1191,37 @@ export default function TaxVatManagement() {
                                                             : 'bg-slate-50/80 hover:bg-slate-100/70 border-slate-200/90 shadow-2xs hover:shadow-xs'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        {/* Drag Handle */}
-                                                        <div
-                                                            className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition shrink-0"
-                                                            title="Drag up or down to reorder calculation precedence"
-                                                        >
-                                                            <GripVertical className="size-4" />
-                                                        </div>
-
-                                                        {/* Execution Order Badge */}
-                                                        <div className="size-6 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 text-xs flex items-center justify-center shrink-0">
-                                                            {idx + 1}
-                                                        </div>
-
-                                                        {/* Tax Master Selector */}
-                                                        <div className="min-w-0">
-                                                            <select
-                                                                value={line.taxMasterId}
-                                                                onChange={e => updateLineMaster(idx, e.target.value)}
-                                                                className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400 truncate max-w-[200px] sm:max-w-none"
+                                                    {/* Card Header: Step #, Badges & Reorder/Delete Controls */}
+                                                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div
+                                                                className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition shrink-0"
+                                                                title="Drag up or down to reorder calculation precedence"
                                                             >
-                                                                {masters.map(m => (
-                                                                    <option key={m.id} value={m.id}>
-                                                                        {m.name} ({m.rate}%) - {m.category}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-                                                                {master?.section || master?.remarks || 'Statutory rate'}
+                                                                <GripVertical className="size-4" />
                                                             </div>
+                                                            <div className="size-6 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 text-xs font-bold flex items-center justify-center shrink-0">
+                                                                #{idx + 1}
+                                                            </div>
+                                                            <span className="font-bold text-xs text-slate-800 truncate">
+                                                                {master?.name || 'Tax Head'}
+                                                            </span>
+                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100/80 text-rose-700 border border-rose-200 shrink-0">
+                                                                {master?.rate}%
+                                                            </span>
+                                                            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-slate-200/60 text-slate-600 shrink-0">
+                                                                {master?.category}
+                                                            </span>
                                                         </div>
-                                                    </div>
 
-                                                    {/* Calculation Basis & Controls */}
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <select
-                                                            value={line.calculationBasis}
-                                                            onChange={e =>
-                                                                updateLineBasis(
-                                                                    idx,
-                                                                    e.target.value as
-                                                                        | 'ORIGINAL_GROSS'
-                                                                        | 'RUNNING_SUBTOTAL'
-                                                                )
-                                                            }
-                                                            className="px-2 py-1 text-[11px] font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
-                                                        >
-                                                            <option value="ORIGINAL_GROSS">Gross Basis (Flat)</option>
-                                                            <option value="RUNNING_SUBTOTAL">
-                                                                Running Subtotal (Compound)
-                                                            </option>
-                                                        </select>
-
-                                                        {/* Accessible Up / Down Buttons */}
-                                                        <div className="flex items-center gap-0.5">
+                                                        {/* Action Controls */}
+                                                        <div className="flex items-center gap-1 shrink-0">
                                                             <button
                                                                 type="button"
                                                                 disabled={idx === 0}
                                                                 onClick={() => moveTaxLine(idx, 'UP')}
-                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                                title="Move Up"
+                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed transition-colors"
+                                                                title="Move Up in Precedence"
                                                             >
                                                                 <ArrowUp className="size-3" />
                                                             </button>
@@ -1059,22 +1229,69 @@ export default function TaxVatManagement() {
                                                                 type="button"
                                                                 disabled={idx === builderLines.length - 1}
                                                                 onClick={() => moveTaxLine(idx, 'DOWN')}
-                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                                                                title="Move Down"
+                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed transition-colors"
+                                                                title="Move Down in Precedence"
                                                             >
                                                                 <ArrowDown className="size-3" />
                                                             </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeTaxLine(idx)}
+                                                                className="size-6 rounded hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                                                                title="Remove Tax Line"
+                                                            >
+                                                                <Trash2 className="size-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Card Body: Responsive 2-Field Selection */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                                                        <div className="sm:col-span-7 space-y-1">
+                                                            <label className="block text-[10px] font-semibold text-slate-500">
+                                                                Tax Master / Statutory Head
+                                                            </label>
+                                                            <select
+                                                                value={line.taxMasterId}
+                                                                onChange={e => updateLineMaster(idx, e.target.value)}
+                                                                className="w-full px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                                                            >
+                                                                {masters.map(m => (
+                                                                    <option key={m.id} value={m.id}>
+                                                                        {m.name} ({m.rate}%) — {m.category}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="text-[9.5px] text-slate-400 truncate">
+                                                                {master?.section || master?.remarks || 'Statutory rate'}
+                                                            </div>
                                                         </div>
 
-                                                        {/* Remove Step */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeTaxLine(idx)}
-                                                            className="size-6 rounded hover:bg-rose-100 text-rose-600 flex items-center justify-center transition cursor-pointer"
-                                                            title="Remove Tax Line"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                        </button>
+                                                        <div className="sm:col-span-5 space-y-1">
+                                                            <label className="block text-[10px] font-semibold text-slate-500">
+                                                                Calculation Basis
+                                                            </label>
+                                                            <select
+                                                                value={line.calculationBasis}
+                                                                onChange={e =>
+                                                                    updateLineBasis(
+                                                                        idx,
+                                                                        e.target.value as
+                                                                            | 'ORIGINAL_GROSS'
+                                                                            | 'RUNNING_SUBTOTAL'
+                                                                    )
+                                                                }
+                                                                className="w-full px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                                                            >
+                                                                <option value="ORIGINAL_GROSS">Gross Basis (Flat Tariff)</option>
+                                                                <option value="RUNNING_SUBTOTAL">
+                                                                    Running Subtotal (Compound)
+                                                                </option>
+                                                            </select>
+                                                            <div className="text-[9.5px] text-slate-400">
+                                                                {line.calculationBasis === 'RUNNING_SUBTOTAL' ? 'Computes on prior steps total' : 'Computes on base tariff only'}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
@@ -1094,7 +1311,7 @@ export default function TaxVatManagement() {
                         </div>
 
                         {/* Right Column: Interactive Live Simulator (5 Cols) - Light Theme */}
-                        <div className="lg:col-span-5 space-y-3">
+                        <div className="xl:col-span-5 space-y-3">
                             <div className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs hover:shadow-xs transition">
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                     <div className="flex items-center gap-2">
@@ -1251,7 +1468,7 @@ export default function TaxVatManagement() {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {configurations.map(cfg => (
                             <div
                                 key={cfg.id}
@@ -1355,7 +1572,8 @@ export default function TaxVatManagement() {
                     </div>
 
                     <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
-                        <table className="w-full text-left text-xs border-collapse">
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[650px] text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                                     <th className="py-2 px-3">Tax Name</th>
@@ -1422,6 +1640,7 @@ export default function TaxVatManagement() {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1540,7 +1759,7 @@ export default function TaxVatManagement() {
                         </div>
 
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
+                            <table className="w-full min-w-[650px] text-left text-xs border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                                         <th className="py-2 px-3">Property Name</th>
@@ -1726,6 +1945,386 @@ export default function TaxVatManagement() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Tax & VAT Policy Propagation Dialog */}
+            {isPropagationModalOpen && pendingConfig && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6">
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-600 shadow-2xs">
+                                    <ShieldCheck className="size-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold text-slate-900">
+                                            Tax & VAT Policy Propagation
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                            {pendingConfig.code}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        Configuring &ldquo;{pendingConfig.name}&rdquo;
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsPropagationModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto no-scrollbar">
+                            {/* Effective Date Bar */}
+                            <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Calendar className="size-4 text-rose-600 shrink-0" />
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                            <span>Statutory Effective Date</span>
+                                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 font-semibold">
+                                                Legal Cutoff
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500">
+                                            Recalculates stays and nights on or after this date
+                                        </p>
+                                    </div>
+                                </div>
+                                <input
+                                    type="date"
+                                    value={effectiveDate}
+                                    onChange={e => setEffectiveDate(e.target.value)}
+                                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 shadow-2xs shrink-0 cursor-pointer"
+                                />
+                            </div>
+
+                            <p className="text-xs text-slate-700 font-semibold pt-1">
+                                How should this updated statutory tax policy affect existing bookings in the system?
+                            </p>
+
+                            {/* Option 1: UPCOMING_AND_INHOUSE (Recommended) */}
+                            <label
+                                onClick={() => setPropagationMode('UPCOMING_AND_INHOUSE')}
+                                className={`block p-3.5 rounded-xl border transition-all cursor-pointer ${
+                                    propagationMode === 'UPCOMING_AND_INHOUSE'
+                                        ? 'border-rose-500 bg-rose-50/30 ring-1 ring-rose-400 shadow-xs'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        type="radio"
+                                        name="tax_propagation"
+                                        checked={propagationMode === 'UPCOMING_AND_INHOUSE'}
+                                        onChange={() => setPropagationMode('UPCOMING_AND_INHOUSE')}
+                                        className="mt-1 text-rose-600 focus:ring-rose-500"
+                                    />
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-900">
+                                                Update Upcoming & In-House Stays (Remaining Nights)
+                                            </span>
+                                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                Recommended • Full Statutory Compliance
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                                            Recalculates statutory VAT & taxes for all future confirmed bookings, plus future unposted nights for In-House guests starting from the Effective Date ({effectiveDate}). Previously audited & posted nights remain <strong>100% IMMUTABLE and audit-locked</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* Option 2: UPCOMING_ONLY */}
+                            <label
+                                onClick={() => setPropagationMode('UPCOMING_ONLY')}
+                                className={`block p-3.5 rounded-xl border transition-all cursor-pointer ${
+                                    propagationMode === 'UPCOMING_ONLY'
+                                        ? 'border-rose-500 bg-rose-50/30 ring-1 ring-rose-400 shadow-xs'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        type="radio"
+                                        name="tax_propagation"
+                                        checked={propagationMode === 'UPCOMING_ONLY'}
+                                        onChange={() => setPropagationMode('UPCOMING_ONLY')}
+                                        className="mt-1 text-rose-600 focus:ring-rose-500"
+                                    />
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-900">
+                                                Update Upcoming Unchecked-in Reservations Only
+                                            </span>
+                                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                                Unchecked-in Only
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                                            Applies updated taxes only to future un-arrived reservations. Currently in-house guests stay locked on their check-in rates throughout their remaining stay.
+                                        </p>
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* Option 3: NEW_ONLY */}
+                            <label
+                                onClick={() => setPropagationMode('NEW_ONLY')}
+                                className={`block p-3.5 rounded-xl border transition-all cursor-pointer ${
+                                    propagationMode === 'NEW_ONLY'
+                                        ? 'border-rose-500 bg-rose-50/30 ring-1 ring-rose-400 shadow-xs'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        type="radio"
+                                        name="tax_propagation"
+                                        checked={propagationMode === 'NEW_ONLY'}
+                                        onChange={() => setPropagationMode('NEW_ONLY')}
+                                        className="mt-1 text-rose-600 focus:ring-rose-500"
+                                    />
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-900">
+                                                Apply to New Bookings Only
+                                            </span>
+                                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                                Grandfather All Existing
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                                            All existing reservations keep their original contracted tax rates locked at booking time. Only reservations created in the future will inherit this updated policy.
+                                        </p>
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* Extra Guardrail: Prepaid / OTA Protection */}
+                            {propagationMode !== 'NEW_ONLY' && (
+                                <label
+                                    onClick={() => setProtectPrepaid(!protectPrepaid)}
+                                    className={`block p-3 rounded-xl border transition-all cursor-pointer ${
+                                        protectPrepaid
+                                            ? 'border-blue-300 bg-blue-50/40'
+                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            checked={protectPrepaid}
+                                            onChange={e => setProtectPrepaid(e.target.checked)}
+                                            className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <div className="space-y-0.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-bold text-slate-900">
+                                                    Protect Fully-Prepaid & Contracted OTA Bookings
+                                                </span>
+                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                                    Guaranteed Rates
+                                                </span>
+                                            </div>
+                                            <p className="text-[10.5px] text-slate-500 leading-normal">
+                                                Exempts reservations where payment status is 100% advance deposited or guaranteed contracted OTA rate plans to prevent front-desk guest disputes and rate parity conflicts.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </label>
+                            )}
+
+                            {/* Guest Communication & Notice Dispatch */}
+                            {propagationMode !== 'NEW_ONLY' && (
+                                <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/90 space-y-2.5 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Mail className="size-4 text-rose-600" />
+                                            <span className="text-xs font-bold text-slate-800">
+                                                Guest Notification on Tax Policy Revision
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNoticePreview(!showNoticePreview)}
+                                            className="text-[10px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                        >
+                                            {showNoticePreview ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                                            <span>{showNoticePreview ? 'Hide Notice Template' : 'Preview Email Template'}</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <label
+                                            onClick={() => { setNotifyGuests(true); setNotificationChannel('EMAIL'); }}
+                                            className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-start gap-2.5 ${
+                                                notifyGuests && notificationChannel === 'EMAIL'
+                                                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-400/40 shadow-xs'
+                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="guest_notification_channel"
+                                                checked={notifyGuests && notificationChannel === 'EMAIL'}
+                                                onChange={() => { setNotifyGuests(true); setNotificationChannel('EMAIL'); }}
+                                                className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                                            />
+                                            <div className="space-y-0.5 min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[11px] font-bold text-slate-900">
+                                                        Send Revised Notice Email
+                                                    </span>
+                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                        Recommended
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 leading-normal">
+                                                    Sends professional email notice with revised billing voucher and statutory legal clause.
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label
+                                            onClick={() => { setNotifyGuests(false); setNotificationChannel('SILENT'); }}
+                                            className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-start gap-2.5 ${
+                                                !notifyGuests || notificationChannel === 'SILENT'
+                                                    ? 'border-slate-400 bg-slate-100/60 ring-1 ring-slate-400/40 shadow-xs'
+                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="guest_notification_channel"
+                                                checked={!notifyGuests || notificationChannel === 'SILENT'}
+                                                onChange={() => { setNotifyGuests(false); setNotificationChannel('SILENT'); }}
+                                                className="mt-0.5 text-slate-600 focus:ring-slate-500"
+                                            />
+                                            <div className="space-y-0.5 min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[11px] font-bold text-slate-900">
+                                                        Silent Internal Update
+                                                    </span>
+                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] font-semibold bg-slate-200 text-slate-700">
+                                                        Audit Only
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 leading-normal">
+                                                    Updates folios and ledgers silently without notifying guests. Ideal for internal fee absorptions.
+                                                </p>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    {/* Collapsible Email Template Preview */}
+                                    {showNoticePreview && (
+                                        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1.5 text-[10.5px] animate-in fade-in duration-150">
+                                            <div className="flex items-center justify-between text-slate-500 border-b border-slate-100 pb-1 font-mono text-[9.5px]">
+                                                <span>Subject: Important Update: Statutory Tax Revision on Reservation [RES-XXXXXX]</span>
+                                                <span className="text-emerald-600 font-bold">HTML Template Active</span>
+                                            </div>
+                                            <div className="text-slate-700 space-y-1 pt-1 leading-relaxed">
+                                                <p>Dear <strong>[Guest Name]</strong>,</p>
+                                                <p>
+                                                    Please be advised that pursuant to the government statutory tax ordinance effective <strong>{effectiveDate}</strong>, the applicable VAT and statutory levies on your upcoming stay at <em>Grand Palace Hotel & Resort</em> have been revised in accordance with national tax authority compliance.
+                                                </p>
+                                                <p>
+                                                    Your room tariff breakdown has been recalculated. An updated confirmation voucher with the itemized statutory breakdown is attached to this email.
+                                                </p>
+                                                <p className="text-slate-500 italic">
+                                                    We look forward to welcoming you and ensuring an exceptional stay experience.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Live Impact Preview Banner */}
+                            <div className="p-3.5 rounded-xl bg-slate-900 text-white space-y-2 shadow-sm">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                    <span className="flex items-center gap-1.5 text-slate-200">
+                                        <span>📊 Live Impact Analysis</span>
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                        Effective from {effectiveDate}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                                    <div className="p-2 rounded-lg bg-white/5 border border-white/10 text-center">
+                                        <div className="text-[10px] text-slate-400">Upcoming to Update</div>
+                                        <div className="text-base font-bold text-rose-400 mt-0.5">
+                                            {propagationImpact.upcomingCount}
+                                        </div>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-white/5 border border-white/10 text-center">
+                                        <div className="text-[10px] text-slate-400">In-House Stays</div>
+                                        <div className="text-base font-bold text-amber-400 mt-0.5">
+                                            {propagationImpact.inHouseCount}
+                                        </div>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-white/5 border border-white/10 text-center">
+                                        <div className="text-[10px] text-slate-400">Notice Emails</div>
+                                        <div className="text-base font-bold text-blue-400 mt-0.5 flex items-center justify-center gap-1">
+                                            {notifyGuests && notificationChannel === 'EMAIL' ? (
+                                                <>
+                                                    <Mail className="size-3 text-blue-400" />
+                                                    <span>{propagationImpact.emailCount}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 font-semibold">Silent (0)</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-white/5 border border-white/10 text-center">
+                                        <div className="text-[10px] text-slate-400">Audit-Locked Past</div>
+                                        <div className="text-base font-bold text-emerald-400 mt-0.5 flex items-center justify-center gap-1">
+                                            <Lock className="size-3" />
+                                            <span>100%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Audit Compliance Disclaimer */}
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10.5px] text-slate-500 flex items-start gap-2">
+                                <span className="text-slate-400 font-bold shrink-0 mt-0.5">⚖️</span>
+                                <div>
+                                    <span className="font-semibold text-slate-700">Fiscal Audit Protection: </span>
+                                    Past settled folios and checked-out invoices are legally immutable under VAT Act regulations and cannot be retroactively adjusted.
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setIsPropagationModalOpen(false)}
+                                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmPropagation}
+                                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                                <CheckCircle2 className="size-4" />
+                                <span>Confirm & Apply Tax Policy</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

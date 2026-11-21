@@ -68,12 +68,21 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (data.success && Array.isArray(data.data)) {
                 setProperties(data.data);
                 if (data.data.length > 0) {
+                    const savedId = typeof window !== 'undefined' ? Number(localStorage.getItem('hotel_active_property_id')) : 0;
+                    const activeProp = data.data.find((p: Property) => p.id === savedId) || data.data[0];
+                    if (activeProp?.currency && typeof window !== 'undefined') {
+                        localStorage.setItem('hotel_active_property_currency', activeProp.currency);
+                        window.dispatchEvent(new CustomEvent('hotel_currency_changed', { detail: { currency: activeProp.currency } }));
+                    }
                     setActivePropertyIdState(prev => {
                         const exists = data.data.some((p: Property) => p.id === prev);
                         if (!exists || prev === 0) {
                             const newId = data.data[0].id;
                             if (typeof window !== 'undefined') {
                                 localStorage.setItem('hotel_active_property_id', String(newId));
+                                if (data.data[0]?.currency) {
+                                    localStorage.setItem('hotel_active_property_currency', data.data[0].currency);
+                                }
                             }
                             return newId;
                         }
@@ -123,6 +132,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
             if (targetProp?.currency) {
                 localStorage.setItem('hotel_active_property_currency', targetProp.currency);
+                window.dispatchEvent(new CustomEvent('hotel_currency_changed', { detail: { currency: targetProp.currency } }));
             }
             window.dispatchEvent(new CustomEvent('hotel_property_switched', { detail: { propertyId: id, tenantSlug } }));
         }
@@ -135,19 +145,19 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const activeProperty = properties.find(p => p.id === activePropertyId) || properties[0] || null;
 
+    const contextValue = React.useMemo(() => ({
+        properties,
+        activeProperty,
+        activePropertyId,
+        setActivePropertyId,
+        chainOverview,
+        loading,
+        error,
+        refreshProperties: loadProperties
+    }), [properties, activeProperty, activePropertyId, setActivePropertyId, chainOverview, loading, error, loadProperties]);
+
     return (
-        <PropertyContext.Provider
-            value={{
-                properties,
-                activeProperty,
-                activePropertyId,
-                setActivePropertyId,
-                chainOverview,
-                loading,
-                error,
-                refreshProperties: loadProperties
-            }}
-        >
+        <PropertyContext.Provider value={contextValue}>
             {children}
         </PropertyContext.Provider>
     );

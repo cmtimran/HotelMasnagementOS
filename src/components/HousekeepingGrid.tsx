@@ -16,9 +16,12 @@ import { getApiBaseUrl } from '../utils/apiUrl';
 import { getHousekeepingSettings, getHousekeepersList, isLinenChangeDue } from '../utils/housekeepingSettingsEngine';
 import PageHeader from './common/PageHeader';
 import OutOfOrderModal from './modals/OutOfOrderModal';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 import { createMaintenanceTask, type MaintenanceTask } from '../utils/maintenanceEngine';
 import {
-    getStoredDiscrepancies, flagRoomDiscrepancy, resolveRoomDiscrepancy,
+    getStoredDiscrepancies,
+    flagRoomDiscrepancyToDB, resolveRoomDiscrepancyInDB, fetchDiscrepanciesFromDB,
     type RoomDiscrepancy, type DiscrepancyType
 } from '../utils/housekeepingDiscrepancyEngine';
 import {
@@ -216,6 +219,24 @@ const HousekeepingGrid = () => {
             const titleCase = modalStatus === 'dirty' ? 'Dirty' : modalStatus === 'inspected' ? 'Inspected' : modalStatus === 'out-of-order' ? 'Dirty' : 'Clean';
             await updateRoomHousekeepingInDB(roomNumber, titleCase);
 
+            // Persist 8-Point SOP Inspection to PostgreSQL if saved from SOP tab
+            if (modalActiveTab === 'sop') {
+                const checkedCount = Object.values(sopChecks).filter(Boolean).length;
+                const score = (checkedCount / 8) * 100;
+                await fetch(`${API_BASE}/api/housekeeping/inspect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-property-id': '1' },
+                    body: JSON.stringify({
+                        roomId: selectedRoomForModal.id,
+                        supervisorName: modalAssignedTo || 'Floor Supervisor',
+                        passed: modalStatus === 'inspected' || score >= 85,
+                        scorePercentage: score,
+                        checklistData: sopChecks,
+                        defectNotes: modalNotes || 'SOP Checklist completed from Housekeeping Console.'
+                    })
+                }).catch(() => {});
+            }
+
             const broadcastPayload = {
                 type: 'ROOM_STATUS_CHANGED' as any,
                 roomNo: roomNumber,
@@ -294,7 +315,7 @@ const HousekeepingGrid = () => {
     };
 
     // ── Flag Room Discrepancy ─────────────────────────────────────────────────
-    const handleFlagDiscrepancy = () => {
+    const handleFlagDiscrepancy = async () => {
         if (!selectedRoomForModal) return;
         if (!discObservation.trim()) {
             showToast('Please enter observation notes describing physical room condition');
@@ -305,7 +326,8 @@ const HousekeepingGrid = () => {
             ? `Occupied (${selectedRoomForModal.guestName})` 
             : 'Vacant in PMS';
 
-        flagRoomDiscrepancy({
+        await flagRoomDiscrepancyToDB({
+            roomId: Number(selectedRoomForModal.id) || 1,
             roomNumber: selectedRoomForModal.roomNumber,
             discrepancyType: discType,
             frontDeskStatus: frontDeskDesc,
@@ -315,20 +337,22 @@ const HousekeepingGrid = () => {
             notes: `Discrepancy flagged during Housekeeping turnover inspection.`
         });
 
-        setDiscrepancies(getStoredDiscrepancies());
+        const latest = await fetchDiscrepanciesFromDB();
+        setDiscrepancies(latest);
         showToast(`Discrepancy flagged for Room ${selectedRoomForModal.roomNumber}. Front Desk notified.`);
         setDiscObservation('');
     };
 
     // ── Resolve Room Discrepancy ──────────────────────────────────────────────
-    const handleResolveDiscrepancy = () => {
+    const handleResolveDiscrepancy = async () => {
         if (!selectedDiscrepancyForResolve) return;
-        resolveRoomDiscrepancy(
+        await resolveRoomDiscrepancyInDB(
             selectedDiscrepancyForResolve.id,
             'Housekeeping Supervisor',
             discrepancyResolveNotes.trim() || 'Physical inspection reconciled with Front Desk registry.'
         );
-        setDiscrepancies(getStoredDiscrepancies());
+        const latest = await fetchDiscrepanciesFromDB();
+        setDiscrepancies(latest);
         showToast(`Discrepancy #${selectedDiscrepancyForResolve.id} resolved.`);
         setSelectedDiscrepancyForResolve(null);
         setDiscrepancyResolveNotes('');
@@ -435,28 +459,37 @@ const HousekeepingGrid = () => {
         };
 
         try {
-            const res = await fetch(`${API_BASE}/api/rooms`, { headers: { 'x-property-id': '1' } });
-            const json = await res.json();
+            const [roomsRes, tasksRes] = await Promise.all([
+                fetch(`${API_BASE}/api/rooms`, { headers: { 'x-property-id': '1' } }),
+                fetch(`${API_BASE}/api/housekeeping/tasks`, { headers: { 'x-property-id': '1' } }).catch(() => null)
+            ]);
+            const json = await roomsRes.json();
+            const tasksJson = tasksRes ? await tasksRes.json().catch(() => null) : null;
+            const dbTasks: any[] = (tasksJson?.success && Array.isArray(tasksJson.data)) ? tasksJson.data : [];
+
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
                 const mapped: HousekeepingRoom[] = json.data.map((r: any, idx: number) => {
                     const rNum = String(r.roomNo || r.room_number || r.number);
                     const info = getRoomReservationInfo(rNum);
                     const hkStatus = mapStatus(r.hkStatus);
+                    const matchingTask = dbTasks.find(t => String(t.room_number) === rNum);
+                    const assignedStaff = matchingTask?.assigned_employee_name || getDefaultHousekeeper(r.floor || 1, idx);
+
                     return {
                         id: r.id,
                         roomNumber: rNum,
                         floor: Number(r.floor) || 1,
                         roomType: r.roomType || 'Standard Room',
                         status: hkStatus,
-                        assignedTo: getDefaultHousekeeper(r.floor || 1, idx),
-                        priority: info?.isRush ? 'rush' : (hkStatus === 'dirty' ? 'high' : 'normal'),
-                        lastCleaned: r.hkStatus === 'clean' || r.hkStatus === 'Clean' ? '10:30 AM' : undefined,
-                        notes: info?.note || (r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : undefined),
-                        isRush: info?.isRush ?? false,
-                        isDND: info?.isDND ?? false,
-                        isLinenDue: info?.isLinenDue ?? false,
-                        specialRequest: info?.specialRequest,
-                        guestName: info?.guestName,
+                        assignedTo: assignedStaff,
+                        priority: matchingTask?.priority?.toLowerCase() === 'rush' ? 'rush' : info?.isRush ? 'rush' : (hkStatus === 'dirty' ? 'high' : 'normal'),
+                        lastCleaned: matchingTask?.completed_at ? new Date(matchingTask.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (r.hkStatus === 'clean' || r.hkStatus === 'Clean' ? '10:30 AM' : undefined),
+                        notes: matchingTask?.inspection_notes || info?.note || (r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : undefined),
+                        isRush: matchingTask?.priority === 'RUSH' || (info?.isRush ?? false),
+                        isDND: matchingTask?.is_dnd || (info?.isDND ?? false),
+                        isLinenDue: matchingTask?.is_linen_due || (info?.isLinenDue ?? false),
+                        specialRequest: matchingTask?.special_requests || info?.specialRequest,
+                        guestName: matchingTask?.guest_name || info?.guestName,
                         reservationStatus: info?.reservationStatus || 'vacant',
                         checkInDate: info?.checkInDate,
                         nightsInHouse: info?.nightsInHouse ?? 0,
@@ -569,14 +602,20 @@ const HousekeepingGrid = () => {
 
         // If room is Out of Order, prevent silent cycle and prompt official unlock
         if (target.status === 'out-of-order') {
-            if (window.confirm(`Room ${roomNumber} is currently Out of Order. Unlock and release to Housekeeping as Clean?`)) {
+            const confirmed = await confirmModal({
+                title: `Unlock Room ${roomNumber}?`,
+                message: `Room ${roomNumber} is currently Out of Order. Unlock and release to Housekeeping as Clean?`,
+                confirmText: 'Unlock Room',
+                variant: 'warning'
+            });
+            if (confirmed) {
                 setRooms(prev => prev.map(r => r.roomNumber === roomNumber ? { ...r, status: 'clean' } : r));
                 try {
                     await updateRoomHousekeepingInDB(roomNumber, 'Clean');
                     const payload = { type: 'ROOM_STATUS_CHANGED' as any, roomNo: roomNumber, hkStatus: 'clean' };
                     broadcastPMSEvent(payload);
                     dispatchPMSNetworkEvent(payload);
-                    showToast(`Room ${roomNumber} unlocked and restored to Clean.`);
+                    toast.success(`Room ${roomNumber} unlocked and restored to Clean.`);
                 } catch (err) {
                     console.warn(err);
                 }
@@ -607,14 +646,20 @@ const HousekeepingGrid = () => {
         }
     };
 
-    // ── Mark All Dirty as Clean (eZee / YCS PMS standard) ─────────────────────
+    // ── Mark All Dirty as Clean (Standard Batch Clean Operation) ─────────────────────
     const handleMarkAllDirtyAsClean = async () => {
         const dirtyRooms = rooms.filter(r => r.status === 'dirty');
         if (dirtyRooms.length === 0) {
-            showToast('All rooms are already clean or inspected!');
+            toast.info('All rooms are already clean or inspected!');
             return;
         }
-        if (!window.confirm(`Are you sure you want to set the housekeeping status to "Clean" for all ${dirtyRooms.length} dirty rooms?`)) {
+        const confirmed = await confirmModal({
+            title: 'Mark All Dirty Rooms as Clean?',
+            message: `Are you sure you want to set the housekeeping status to "Clean" for all ${dirtyRooms.length} dirty rooms?`,
+            confirmText: 'Mark All Clean',
+            variant: 'info'
+        });
+        if (!confirmed) {
             return;
         }
 
@@ -671,26 +716,27 @@ const HousekeepingGrid = () => {
     };
 
     // ── Auto-Assign ──────────────────────────────────────────────────────────
-    const handleAutoAssign = () => {
-        if (housekeeperNames.length === 0) {
-            showToast('No housekeepers configured. Add them in General Settings → Housekeeping.');
-            return;
+    const handleAutoAssign = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/housekeeping/tasks/auto-assign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-property-id': '1' },
+                body: JSON.stringify({ strategy: 'by-floor' })
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(json.message || 'Auto-assigned tasks successfully');
+                await fetchRooms();
+            } else {
+                showToast(json.error || 'Auto-assign failed');
+            }
+        } catch (err: any) {
+            console.warn('Auto-assign error:', err);
+            showToast('Failed to execute auto-assign via server');
+        } finally {
+            setIsSyncing(false);
         }
-        // Distribute dirty rooms by floor zone, round-robin over available housekeepers
-        let hkIdx = 0;
-        setRooms(prev => prev.map(r => {
-            if (r.status !== 'dirty') return r;
-            // Try floor-zone match first
-            const floorHk = housekeepers.find(h =>
-                h.assignedZone && (h.assignedZone.toLowerCase().includes(`floor ${r.floor}`) || h.assignedZone.includes(String(r.floor)))
-            );
-            if (floorHk) return { ...r, assignedTo: floorHk.name };
-            // Round-robin
-            const assigned = housekeeperNames[hkIdx % housekeeperNames.length];
-            hkIdx++;
-            return { ...r, assignedTo: assigned };
-        }));
-        showToast(`Auto-assigned ${stats.dirty} dirty rooms to ${housekeeperNames.length} housekeepers.`);
     };
 
     // ── Checkbox helpers ─────────────────────────────────────────────────────
@@ -765,7 +811,7 @@ const HousekeepingGrid = () => {
                             onClick={handleMarkAllDirtyAsClean}
                             disabled={stats.dirty === 0}
                             className="btn-secondary flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200 disabled:opacity-40 cursor-pointer"
-                            title="Set housekeeping status for all dirty rooms to Clean in 1 click (eZee PMS standard)"
+                            title="Set housekeeping status for all dirty rooms to Clean in 1 click (Batch Operation)"
                         >
                             <CheckCircle2 size={13} className="text-emerald-600" />
                             <span>Mark All Clean ({stats.dirty})</span>

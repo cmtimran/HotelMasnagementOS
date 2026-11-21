@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1293.6179999999995 628.684" width="1293.6179999999995" height="628.684" style="--bg:#FFFFFF;--fg:#1E293B;--line:#64748B;--muted:#475569;--surface:#F8FAFC;--border:#CBD5E1;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="Booking" data-to="Classify" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="586.7879999999998,76.9 586.7879999999998,124.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Classify" data-to="Single" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Single Room (1 Room, 1 Stay)" points="528.3227999999998,261.3188 528.3227999999998,331.7840000000001 146.18999999999994,331.7840000000001 146.18999999999994,431.23400000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Classify" data-to="Split" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Same Guest Moving Rooms Sequentially
+(Leg 1 Out = Leg 2 In)" points="567.2995999999998,300.29560000000004 567.2995999999998,355.784 439.1809999999998,355.784 439.1809999999998,431.23400000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Classify" data-to="Conn" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Interconnected Physical Rooms
+(Sold as 1 Suite Product)" points="606.2763999999997,300.29560000000004 606.2763999999997,355.784 734.3949999999998,355.784 734.3949999999998,431.23400000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Classify" data-to="Group" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Multiple Rooms Booked Together Concurrently
+(Same / Overlapping Dates)" points="645.2531999999998,261.3188 645.2531999999998,331.78400000000005 1062.2129999999995,331.78400000000005 1062.2129999999995,431.23400000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="Classify" data-to="Single" data-label="Single Room (1 Room, 1 Stay)">
+  <rect x="74.68999999999994" y="338.7840000000001" width="142.98399999999998" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="146.18199999999993" y="353.9340000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Single Room (1 Room, 1 Stay)</text>
+</g>
+<g class="edge-label" data-from="Classify" data-to="Split" data-label="Same Guest Moving Rooms Sequentially
+(Leg 1 Out = Leg 2 In)">
+  <rect x="337.1809999999998" y="362.784" width="203.572" height="44.6" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="438.9669999999998" y="385.084" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)"><tspan x="438.9669999999998" dy="-3.3000000000000007">Same Guest Moving Rooms Sequentially</tspan><tspan x="438.9669999999998" dy="14.3">(Leg 1 Out = Leg 2 In)</tspan></text>
+</g>
+<g class="edge-label" data-from="Classify" data-to="Conn" data-label="Interconnected Physical Rooms
+(Sold as 1 Suite Product)">
+  <rect x="650.8949999999998" y="362.784" width="166.14999999999998" height="44.6" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="733.9699999999998" y="385.084" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)"><tspan x="733.9699999999998" dy="-3.3000000000000007">Interconnected Physical Rooms</tspan><tspan x="733.9699999999998" dy="14.3">(Sold as 1 Suite Product)</tspan></text>
+</g>
+<g class="edge-label" data-from="Classify" data-to="Group" data-label="Multiple Rooms Booked Together Concurrently
+(Same / Overlapping Dates)">
+  <rect x="943.7129999999994" y="338.78400000000005" width="236.83599999999998" height="44.6" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1062.1309999999994" y="361.08400000000006" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)"><tspan x="1062.1309999999994" dy="-3.3000000000000007">Multiple Rooms Booked Together Concurrently</tspan><tspan x="1062.1309999999994" dy="14.3">(Same / Overlapping Dates)</tspan></text>
+</g>
+<g class="node" data-id="Booking" data-label="Booking Engine / Front Desk Input" data-shape="rectangle">
+  <rect x="467.2599999999998" y="40" width="239.05599999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="586.7879999999998" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Booking Engine / Front Desk Input</text>
+</g>
+<g class="node" data-id="Classify" data-label="Stay Classifier Engine" data-shape="diamond">
+  <polygon points="586.7879999999998,124.89999999999999 684.2299999999998,222.34199999999998 586.7879999999998,319.784 489.3459999999998,222.34199999999998" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="586.7879999999998" y="222.34199999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Stay Classifier Engine</text>
+</g>
+<g class="node" data-id="Single" data-label="STANDARD SINGLE ROOM
+Master Res: RES-202611110001
+Sub-Booking: None
+Group Code: null
+Folio: FOL-202611110001
+Reg Card: REG-202611110001" data-shape="rectangle">
+  <rect x="40" y="431.23400000000004" width="212.3799999999999" height="121.4" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="146.18999999999994" y="491.934" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="146.18999999999994" dy="-37.70000000000001">STANDARD SINGLE ROOM</tspan><tspan x="146.18999999999994" dy="16.900000000000002">Master Res: RES-202611110001</tspan><tspan x="146.18999999999994" dy="16.900000000000002">Sub-Booking: None</tspan><tspan x="146.18999999999994" dy="16.900000000000002">Group Code: null</tspan><tspan x="146.18999999999994" dy="16.900000000000002">Folio: FOL-202611110001</tspan><tspan x="146.18999999999994" dy="16.900000000000002">Reg Card: REG-202611110001</tspan></text>
+</g>
+<g class="node" data-id="Split" data-label="SPLIT STAY (Room Move)
+Master Res: RES-202611110002
+Leg 1: RES-202611110002-L1
+Leg 2: RES-202611110002-L2
+Group Code: null (কখনোই Group না)
+Folio: FOL-202611110002 (Single Master Folio)
+Reg Card: REG-202611110002 (Guest Signs Once)" data-shape="rectangle">
+  <rect x="280.3799999999999" y="431.23400000000004" width="317.60199999999986" height="138.3" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="439.1809999999998" y="500.384" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="439.1809999999998" dy="-46.150000000000006">SPLIT STAY (Room Move)</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Master Res: RES-202611110002</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Leg 1: RES-202611110002-L1</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Leg 2: RES-202611110002-L2</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Group Code: null (কখনোই Group না)</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Folio: FOL-202611110002 (Single Master Folio)</tspan><tspan x="439.1809999999998" dy="16.900000000000002">Reg Card: REG-202611110002 (Guest Signs Once)</tspan></text>
+</g>
+<g class="node" data-id="Conn" data-label="CONNECTING SUITE
+Master Res: RES-202611110003
+Rooms: 101 + 102
+Sub-Booking: None
+Group Code: null
+Folio: FOL-202611110003
+Reg Card: REG-202611110003" data-shape="rectangle">
+  <rect x="625.9819999999997" y="431.23400000000004" width="216.82599999999994" height="138.3" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="734.3949999999998" y="500.384" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="734.3949999999998" dy="-46.150000000000006">CONNECTING SUITE</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Master Res: RES-202611110003</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Rooms: 101 + 102</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Sub-Booking: None</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Group Code: null</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Folio: FOL-202611110003</tspan><tspan x="734.3949999999998" dy="16.900000000000002">Reg Card: REG-202611110003</tspan></text>
+</g>
+<g class="node" data-id="Group" data-label="MULTI-ROOM GROUP BOOKING
+Master Header: RES-202611110001
+Group Code: GRP-20261111-0001
+Room 1: RES-202611110001-01 (FOL-...-01)
+Room 2: RES-202611110001-02 (FOL-...-02)
+Master Folio: FOL-202611110001-M (Group Advance &amp; Billing)" data-shape="rectangle">
+  <rect x="870.8079999999997" y="431.23400000000004" width="382.80999999999983" height="121.4" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1062.2129999999995" y="491.934" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1062.2129999999995" dy="-37.70000000000001">MULTI-ROOM GROUP BOOKING</tspan><tspan x="1062.2129999999995" dy="16.900000000000002">Master Header: RES-202611110001</tspan><tspan x="1062.2129999999995" dy="16.900000000000002">Group Code: GRP-20261111-0001</tspan><tspan x="1062.2129999999995" dy="16.900000000000002">Room 1: RES-202611110001-01 (FOL-...-01)</tspan><tspan x="1062.2129999999995" dy="16.900000000000002">Room 2: RES-202611110001-02 (FOL-...-02)</tspan><tspan x="1062.2129999999995" dy="16.900000000000002">Master Folio: FOL-202611110001-M (Group Advance &amp; Billing)</tspan></text>
+</g>
+</svg>

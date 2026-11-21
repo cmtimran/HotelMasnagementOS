@@ -20,8 +20,7 @@ import {
     ShieldCheck,
     FileText,
     Cigarette,
-    CigaretteOff,
-    Delete
+    CigaretteOff
 } from 'lucide-react';
 import { formatIdentityDisplay } from '../../utils/identityUtils';
 import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../../utils/geoData';
@@ -31,8 +30,17 @@ import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/Sta
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
 import { getCanonicalGuestProfiles } from '../../utils/guestProfileEngine';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
+import { SearchableSelect } from '../common/SearchableSelect';
+import { PhoneInputWithCountry } from '../common/PhoneInputWithCountry';
 import { MultiRoomSelectorModal } from './MultiRoomSelectorModal';
 import { HoldTillModal, type HoldTillPayload } from './HoldTillModal';
+import { MoneyReceiptModal } from '../folio/modals/MoneyReceiptModal';
+import {
+    FinancialStatusStrip,
+    PaymentTenderConsole,
+    DiscountConsole,
+    SettlementBreakdownCard
+} from '../reservations/shared';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -82,6 +90,7 @@ import {
     validatePreBookingFlight
 } from '../../hooks/useReservationBookingEngine';
 import { toast } from '../../context/ToastContext';
+import { confirmModal } from '../../context/ConfirmModalContext';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
@@ -164,6 +173,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         calculateRoomRate,
         getPackageById,
         validateAllRoomRestrictions,
+        getStayHolidaySummary,
         getOfferValue,
         resolveOfferSelection,
         validatePackageRestrictions
@@ -198,6 +208,12 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             }
         ];
     });
+
+    const holidaySummary = useMemo(() => {
+        const totalA = roomsList.reduce((acc, r) => acc + (r.adults || 1), 0);
+        const totalC = roomsList.reduce((acc, r) => acc + (r.children || 0), 0);
+        return getStayHolidaySummary(checkInDate, nights, totalA, totalC);
+    }, [getStayHolidaySummary, checkInDate, nights, roomsList]);
 
     // Handle Day Use toggle
     const handleDayUseToggle = (isDayUse: boolean) => {
@@ -249,14 +265,36 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [selectedGuestProfile, setSelectedGuestProfile] = useState<any | null>(null);
     const [isNameSuggestOpen, setIsNameSuggestOpen] = useState(false);
     const [isMobileSuggestOpen, setIsMobileSuggestOpen] = useState(false);
+    // Memoized Select Options for Searchable Selects
+    const allCountryOptions = useMemo(() => {
+        return COUNTRIES_DATABASE.map(c => ({
+            value: c.name,
+            label: `${c.name} (${c.dialCode})`,
+            subLabel: c.code
+        }));
+    }, []);
+
+    const allNationalityOptions = useMemo(() => {
+        return COUNTRIES_DATABASE.map(c => ({
+            value: c.nationality,
+            label: `${c.nationality} (${c.name})`,
+            subLabel: c.code
+        }));
+    }, []);
+
+    const homeCityOptions = useMemo(() => {
+        const cities = getCitiesForCountry(homeCountry);
+        return cities.map(c => ({ value: c, label: c }));
+    }, [homeCountry]);
+
 
     // Suggestions matching typed Name
     const nameSuggestions = useMemo(() => {
         if (!name.trim() || name.length < 2 || selectedGuestProfile) return [];
-        const q = name.toLowerCase().trim();
+        const q = String(name || '').toLowerCase().trim();
         return allKnownGuests.filter(g =>
-            g.name.toLowerCase().includes(q) ||
-            (g.phone && g.phone.includes(q))
+            String(g?.name || '').toLowerCase().includes(q) ||
+            (g?.phone && String(g.phone).includes(q))
         ).slice(0, 5);
     }, [name, allKnownGuests, selectedGuestProfile]);
 
@@ -265,7 +303,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         const cleanP = (mobile || '').replace(/[^0-9]/g, '');
         if (cleanP.length < 3 || selectedGuestProfile) return [];
         return allKnownGuests.filter(g => {
-            const gp = (g.phone || '').replace(/[^0-9]/g, '');
+            const gp = String(g?.phone || '').replace(/[^0-9]/g, '');
             return gp.includes(cleanP);
         }).slice(0, 5);
     }, [mobile, allKnownGuests, selectedGuestProfile]);
@@ -275,12 +313,12 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         const cleanP = (mobile || '').replace(/[^0-9]/g, '');
         if (cleanP.length < 8) return null;
         const match = allKnownGuests.find(g => {
-            const gp = (g.phone || '').replace(/[^0-9]/g, '');
+            const gp = String(g?.phone || '').replace(/[^0-9]/g, '');
             return gp.length >= 8 && (gp.endsWith(cleanP.slice(-8)) || cleanP.endsWith(gp.slice(-8)));
         });
         if (match && name.trim()) {
-            const exName = match.name.toLowerCase().trim();
-            const inName = name.toLowerCase().trim();
+            const exName = String(match.name || '').toLowerCase().trim();
+            const inName = String(name || '').toLowerCase().trim();
             if (!exName.includes(inName) && !inName.includes(exName)) {
                 return {
                     existingGuestName: match.name,
@@ -327,18 +365,18 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const quickBlacklistAlert = useMemo(() => {
         if (!isOpen) return null;
         const cleanP = (mobile || '').replace(/[^0-9]/g, '');
-        const cleanId = (idNumber || '').trim().toLowerCase();
-        const cleanName = (name || '').trim().toLowerCase();
-        const cleanEmail = (email || '').trim().toLowerCase();
+        const cleanId = String(idNumber || '').trim().toLowerCase();
+        const cleanName = String(name || '').trim().toLowerCase();
+        const cleanEmail = String(email || '').trim().toLowerCase();
 
         if (cleanP.length >= 8 || cleanId.length >= 4 || (cleanName.length >= 4 && !cleanName.includes('walk-in')) || (cleanEmail.length >= 5 && !cleanEmail.includes('guest.com'))) {
             const match = knownProfiles.find(g => {
                 if (!g.isBlacklisted) return false;
-                const gPhoneClean = (g.phone || '').replace(/[^0-9]/g, '');
+                const gPhoneClean = String(g.phone || '').replace(/[^0-9]/g, '');
                 const phoneMatch = Boolean(cleanP && gPhoneClean && (cleanP.endsWith(gPhoneClean.slice(-8)) || gPhoneClean.endsWith(cleanP.slice(-8))));
-                const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.toLowerCase() === cleanId);
-                const nameMatch = Boolean(cleanName && g.name && g.name.toLowerCase() === cleanName);
-                const emailMatch = Boolean(cleanEmail && g.email && g.email.toLowerCase() === cleanEmail);
+                const idMatch = Boolean(cleanId && g.idNumber && String(g.idNumber || '').toLowerCase() === cleanId);
+                const nameMatch = Boolean(cleanName && g.name && String(g.name || '').toLowerCase() === cleanName);
+                const emailMatch = Boolean(cleanEmail && g.email && String(g.email || '').toLowerCase() === cleanEmail);
                 return phoneMatch || idMatch || nameMatch || emailMatch;
             });
             if (match) {
@@ -357,10 +395,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     // Payment Details
     const [discountType, setDiscountType] = useState<'Percentage' | 'Fixed'>('Fixed');
     const [discountValue, setDiscountValue] = useState<number>(0);
-    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([
-        { id: 1, method: 'Cash', amount: 3000 }
-    ]);
-    const [keypadTargetIndex, setKeypadTargetIndex] = useState<number>(0);
+    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
+    const [advanceReceiptToPrompt, setAdvanceReceiptToPrompt] = useState<{ payment: any; folio: any } | null>(null);
 
     // Track if modal was previously open to prevent reset loops while modal is open
     const prevIsOpenRef = useRef(false);
@@ -415,7 +451,15 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             const resolvedType = roomInfo?.roomType || canonical?.roomTypeName || 'Deluxe Double';
             const canonicalRate = roomInfo?.baseRate || canonical?.baseRate || 3000;
             const defaultPlan = availableRatePlans[0]?.name || '';
-            const initialCalculatedRate = calculateTariffForRatePlan(defaultPlan, resolvedType, canonicalRate, 2, 0, availableRatePlans);
+            const initialCalculatedRate = calculateRoomRate({
+                roomType: resolvedType,
+                ratePlan: defaultPlan,
+                adults: 2,
+                children: 0,
+                baseRate: canonicalRate,
+                nights: targetNights || 1,
+                checkInDate: targetStart
+            });
 
             setRoomsList([
                 {
@@ -434,9 +478,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     nights: targetNights
                 }
             ]);
-            setPaymentRows([
-                { id: 1, method: 'Cash', amount: initialCalculatedRate * (targetNights || 1) }
-            ]);
+            setPaymentRows([]);
         }
     }, [isOpen, roomInfo]);
 
@@ -492,12 +534,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     !usedInForm.has(row.roomNumber);
 
                 if (!isCurrentAvailable && liveAvailabilityReport.availableRooms.length > 0) {
-                    const freeMatches = liveAvailabilityReport.availableRooms.filter(ar =>
-                        !usedInForm.has(ar.number) && (
-                            ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
-                            row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())
-                        )
-                    );
+                    const rowTypeLower = String(row?.roomType || '').toLowerCase();
+                    const freeMatches = liveAvailabilityReport.availableRooms.filter(ar => {
+                        const arTypeLower = String(ar?.roomTypeName || '').toLowerCase();
+                        return !usedInForm.has(ar.number) && (
+                            arTypeLower.includes(rowTypeLower) ||
+                            rowTypeLower.includes(arTypeLower)
+                        );
+                    });
                     const fallbackFree = liveAvailabilityReport.availableRooms.filter(ar => !usedInForm.has(ar.number));
                     const chosenPool = freeMatches.length > 0 ? freeMatches : fallbackFree;
                     const freeMatch = chosenPool[0];
@@ -537,29 +581,36 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Total inventory free for this type in the hotel (before any form selection)
     const getTotalInventoryForType = (typeName: string): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return liveAvailabilityReport.allRoomsStatus.filter(st => {
-            const matches = st.room.roomTypeName.toLowerCase().includes(typeName.toLowerCase()) ||
-                            typeName.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
+            const stNameLower = String(st?.room?.roomTypeName || '').toLowerCase();
+            const matches = stNameLower.includes(targetLower) ||
+                            targetLower.includes(stNameLower);
             return matches && st.isAvailable;
         }).length;
     };
 
     // Rooms of this type already allocated across ALL rows in this form
     const getAllocatedCountForType = (typeName: string): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return roomsList
-            .filter(r => (
-                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
-                typeName.toLowerCase().includes(r.roomType.toLowerCase())
-            ))
+            .filter(r => {
+                const rTypeLower = String(r?.roomType || '').toLowerCase();
+                return (
+                    rTypeLower.includes(targetLower) ||
+                    targetLower.includes(rTypeLower)
+                );
+            })
             .reduce((sum, r) => sum + (Number(r.noOfRooms) || 1), 0);
     };
 
     // Rooms of this type allocated in OTHER rows (excluding currentItemId)
     const getAllocatedCountInOtherRows = (typeName: string, currentItemId?: number): number => {
+        const targetLower = String(typeName || '').toLowerCase();
         return roomsList
             .filter(r => r.id !== currentItemId && (
-                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
-                typeName.toLowerCase().includes(r.roomType.toLowerCase())
+                String(r?.roomType || '').toLowerCase().includes(targetLower) ||
+                targetLower.includes(String(r?.roomType || '').toLowerCase())
             ))
             .reduce((sum, r) => sum + (Number(r.noOfRooms) || 1), 0);
     };
@@ -594,16 +645,24 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         for (const r of roomsList) {
             if (r.id === item.id) break;
             const rCount = Number(r.noOfRooms) || 1;
+            const rTypeLower = String(r?.roomType || '').toLowerCase();
             const freeForPrev = liveAvailabilityReport.availableRooms
-                .filter(ar => (ar.roomTypeName.toLowerCase().includes(r.roomType.toLowerCase()) || r.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+                .filter(ar => {
+                    const arTypeLower = String(ar?.roomTypeName || '').toLowerCase();
+                    return (arTypeLower.includes(rTypeLower) || rTypeLower.includes(arTypeLower)) && !takenBefore.has(ar.number);
+                })
                 .slice(0, rCount)
                 .map(ar => ar.number);
             freeForPrev.forEach(rn => takenBefore.add(rn));
         }
 
         const countNeeded = Number(item.noOfRooms) || 1;
+        const itemTypeLower = String(item?.roomType || '').toLowerCase();
         const matchingAvailable = liveAvailabilityReport.availableRooms
-            .filter(ar => (ar.roomTypeName.toLowerCase().includes(item.roomType.toLowerCase()) || item.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+            .filter(ar => {
+                const arTypeLower = String(ar?.roomTypeName || '').toLowerCase();
+                return (arTypeLower.includes(itemTypeLower) || itemTypeLower.includes(arTypeLower)) && !takenBefore.has(ar.number);
+            })
             .slice(0, countNeeded)
             .map(ar => ar.number);
 
@@ -704,8 +763,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const totalSpaCharge = roomsList.reduce((acc, r) => acc + getSpaWellnessTotal(r.servicesBundle?.spaWellness), 0);
     const totalTimingCharge = roomsList.reduce((acc, r) => acc + getTimingFlexTotal(r.servicesBundle?.timingFlex), 0);
     const totalCustomCharge = roomsList.reduce((acc, r) => acc + getCustomAddonsTotal(r.servicesBundle?.customAddons, nightMultiplier), 0);
+    const totalGalaDinnerCharge = holidaySummary.hasGalaDinner ? holidaySummary.totalGalaFee : 0;
 
-    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge;
+    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge + totalGalaDinnerCharge;
     const totalAmount = roomBaseTotal + totalAllAddonsCharges;
     const discountedAmount = discountType === 'Percentage'
         ? (totalAmount * (discountValue || 0)) / 100
@@ -721,12 +781,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const totalPaid = paymentRows.reduce((acc, p) => acc + (p.amount || 0), 0);
     const totalDue = Math.max(0, finalPayable - totalPaid);
 
-    // Keep payment row default in sync if only 1 cash row
-    useEffect(() => {
-        if (paymentRows.length === 1 && paymentRows[0].method === 'Cash') {
-            setPaymentRows([{ id: 1, method: 'Cash', amount: finalPayable }]);
-        }
-    }, [finalPayable]);
 
     // Unified Rate / Package Offer Change Handler
     const handleUnifiedOfferChange = (rowId: number, offerKey: string) => {
@@ -839,7 +893,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     adults: r.adults,
                     children: r.children,
                     baseRate: canonicalRate,
-                    nights
+                    nights: nightMultiplier,
+                    checkInDate: checkInDate
                 });
                 return {
                     ...r,
@@ -866,7 +921,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     adults: r.adults,
                     children: r.children,
                     baseRate: canonicalRate,
-                    nights
+                    nights: nightMultiplier,
+                    checkInDate: checkInDate
                 });
                 return {
                     ...r,
@@ -886,7 +942,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: newAdults, children: r.children, baseRate: canonicalRate, nights });
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: newAdults, children: r.children, baseRate: canonicalRate, nights: nightMultiplier, checkInDate: checkInDate });
                 return {
                     ...r,
                     adults: newAdults,
@@ -905,7 +961,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: newChildren, baseRate: canonicalRate, nights });
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: newChildren, baseRate: canonicalRate, nights: nightMultiplier, checkInDate: checkInDate });
                 return {
                     ...r,
                     children: newChildren,
@@ -935,7 +991,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     toast.info(`Occupancy adjusted to fit ${newType} limits (Max Adults: ${newCapacity.maxAdults}, Max Children: ${newCapacity.maxChildren}).`);
                 }
 
-                const resolvedRate = calculateRoomRate({ roomType: newType, ratePlan: r.ratePlan, packageId: r.packageId, adults: clampedAdults, children: clampedChildren, baseRate: canonicalRate, nights });
+                const resolvedRate = calculateRoomRate({ roomType: newType, ratePlan: r.ratePlan, packageId: r.packageId, adults: clampedAdults, children: clampedChildren, baseRate: canonicalRate, nights: nightMultiplier, checkInDate: checkInDate });
                 return { 
                     ...r, 
                     roomType: newType, 
@@ -954,7 +1010,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 const dynamicTypes = getDynamicRoomTypes();
                 const matchedType = dynamicTypes.find(t => t.name === r.roomType);
                 const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
-                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: r.children, baseRate: canonicalRate, nights });
+                const newRate = calculateRoomRate({ roomType: r.roomType, ratePlan: r.ratePlan, packageId: r.packageId, adults: r.adults, children: r.children, baseRate: canonicalRate, nights: nightMultiplier, checkInDate: checkInDate });
                 return {
                     ...r,
                     roomNumber: selectedRoomNum,
@@ -989,46 +1045,32 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         }));
     };
 
-    // Payment handlers
+    // Payment handlers (Functional & Atomic to eliminate state loss)
     const handleAddPaymentRow = () => {
-        const nextId = paymentRows.length > 0 ? Math.max(...paymentRows.map(p => p.id)) + 1 : 1;
-        setPaymentRows([
-            ...paymentRows,
-            { id: nextId, method: 'Cash', amount: totalDue > 0 ? totalDue : 0 }
-        ]);
+        setPaymentRows(prev => {
+            const nextId = prev.length > 0 ? Math.max(...prev.map(p => p.id)) + 1 : 1;
+            const currentPaid = prev.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const remainingDue = Math.max(0, Number((finalPayable - currentPaid).toFixed(2)));
+            return [...prev, { id: nextId, method: 'Cash', amount: remainingDue }];
+        });
     };
 
     const handleRemovePaymentRow = (id: number) => {
-        if (paymentRows.length <= 1) return;
-        setPaymentRows(paymentRows.filter(p => p.id !== id));
+        setPaymentRows(prev => prev.filter(p => p.id !== id));
     };
 
-    const handlePaymentRowChange = <K extends keyof PaymentRow>(id: number, field: K, value: PaymentRow[K]) => {
-        setPaymentRows(paymentRows.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
-    // Front Desk Keypad Press Handler for Active Payment Row
-    const handleKeypadPress = (val: string) => {
-        const currentTarget = paymentRows[keypadTargetIndex] || paymentRows[0];
-        if (!currentTarget) return;
-
-        let currentStr = String(currentTarget.amount || '');
-        if (val === 'CLEAR') {
-            handlePaymentRowChange(currentTarget.id, 'amount', 0);
-        } else if (val === 'BACK') {
-            const trimmed = currentStr.slice(0, -1);
-            handlePaymentRowChange(currentTarget.id, 'amount', Number(trimmed) || 0);
-        } else if (val === 'FULL') {
-            handlePaymentRowChange(currentTarget.id, 'amount', finalPayable);
-        } else {
-            if (currentStr === '0') currentStr = '';
-            const newStr = currentStr + val;
-            handlePaymentRowChange(currentTarget.id, 'amount', Number(newStr));
-        }
+    const handlePaymentRowChange = (id: number, fieldOrUpdates: keyof PaymentRow | Partial<PaymentRow>, value?: any) => {
+        setPaymentRows(prev => prev.map(p => {
+            if (p.id !== id) return p;
+            if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
+                return { ...p, ...fieldOrUpdates };
+            }
+            return { ...p, [fieldOrUpdates as keyof PaymentRow]: value };
+        }));
     };
 
     // Submit reservation action
-    const handleCompleteReservation = (requestedStatus: 'hold' | 'confirmed' | 'reserved' | 'stayover' | 'arrived', holdPayload?: HoldTillPayload) => {
+    const handleCompleteReservation = async (requestedStatus: 'hold' | 'confirmed' | 'reserved' | 'stayover' | 'arrived', holdPayload?: HoldTillPayload) => {
         // Shared Pre-Commit Validation Guard
         const flightCheck = validatePreBookingFlight({
             actionType: requestedStatus === 'arrived' ? 'checkin' : requestedStatus === 'hold' ? 'hold' : 'reserve',
@@ -1111,7 +1153,12 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 return found && String(found.housekeepingStatus).toUpperCase() === 'DIRTY';
             });
             if (dirtyRooms.length > 0) {
-                const proceed = window.confirm(`⚠️ Room ${dirtyRooms.join(', ')} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with check-in?`);
+                const proceed = await confirmModal({
+                    title: 'Check-In to Dirty Room?',
+                    message: `Room ${dirtyRooms.join(', ')} is currently marked as DIRTY by Housekeeping.\n\nAre you sure you want to proceed with check-in?`,
+                    confirmText: 'Proceed Check-In',
+                    variant: 'warning'
+                });
                 if (!proceed) return;
             }
         }
@@ -1230,6 +1277,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             totalAmount: finalPayable,
             paidAmount: status === 'hold' ? 0 : totalPaid,
             dueAmount: status === 'hold' ? finalPayable : totalDue,
+            paymentRows: paymentRows,
+            advancePayments: paymentRows,
             taxApplicable,
             taxConfigId: selectedTaxConfigId,
             taxConfigCode: taxCalculation.configCode,
@@ -1466,6 +1515,41 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             onReservationCreated(newRecord);
         }
 
+        // Real-Time Auto-Prompt: If Advance Deposit was paid, immediately prompt Advance Deposit Receipt
+        if (totalPaid > 0) {
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+            const seqNo = String(Math.floor(1000 + Math.random() * 9000));
+            const advanceReceiptNo = `AR-${dateStr}-${seqNo}`;
+
+            const advancePaymentObj = {
+                id: Date.now(),
+                payment_number: advanceReceiptNo,
+                payment_method: paymentRows[0]?.method || 'Cash',
+                amount: totalPaid,
+                reference_code: paymentRows[0]?.reference || '',
+                transaction_date: now.toISOString(),
+                status: 'Settled',
+                user: 'Front Desk',
+                isAdvance: true
+            };
+
+            const folioStub: any = {
+                id: newRecord.folioNumber || `FOL-${newRecord.reservationNumber}`,
+                folio_number: newRecord.folioNumber || `FN~${newRecord.reservationNumber}`,
+                guest_name: guestDisplayName,
+                room_number: primaryRoom,
+                room_type: roomsList[0]?.roomType || 'Standard Room',
+                reservation_number: newRecord.reservationNumber
+            };
+
+            setAdvanceReceiptToPrompt({
+                payment: advancePaymentObj,
+                folio: folioStub
+            });
+            return;
+        }
+
         onClose();
     };
 
@@ -1549,6 +1633,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             dayUse={dayUse}
                                             onDateChange={(newIn, newOut, newNights) => {
                                                 setCheckInDate(newIn);
+                                                const targetNights = dayUse ? 0 : newNights;
                                                 if (dayUse) {
                                                     setCheckOutDate(newIn);
                                                     setNights(0);
@@ -1556,6 +1641,27 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                     setCheckOutDate(newOut);
                                                     setNights(newNights);
                                                 }
+                                                // Dynamic Holiday & Peak Tariff Recalculation across all room rows
+                                                setRoomsList(prev => prev.map(r => {
+                                                    const canonicalRoom = getCanonicalRooms().find(cr => cr.number === r.roomNumber);
+                                                    const dynamicTypes = getDynamicRoomTypes();
+                                                    const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                                                    const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                                                    const recalcedRate = calculateRoomRate({
+                                                        roomType: r.roomType,
+                                                        ratePlan: r.ratePlan,
+                                                        packageId: r.packageId,
+                                                        adults: r.adults,
+                                                        children: r.children,
+                                                        baseRate: canonicalRate,
+                                                        nights: targetNights || 1,
+                                                        checkInDate: newIn
+                                                    });
+                                                    return {
+                                                        ...r,
+                                                        rate: recalcedRate
+                                                    };
+                                                }));
                                             }}
                                             compact
                                             label="Stay Period (Check In - Check Out)"
@@ -1623,6 +1729,37 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
                                 </div>
 
+                                {/* Active Holiday & Festive Surge Alert Banner */}
+                                {holidaySummary.hasHoliday && (
+                                    <div className={`p-2.5 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 border transition-all ${holidaySummary.hasSurge
+                                        ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-2xs'
+                                        : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-950 shadow-2xs'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base select-none">🎉</span>
+                                            <div>
+                                                <span className="font-bold">{holidaySummary.activeHolidays.join(', ')}</span>
+                                                {holidaySummary.hasSurge && (
+                                                    <span className="ml-2 text-[10.5px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded">
+                                                        ⚡ +{Math.round((holidaySummary.maxMultiplier - 1) * 100)}% Peak Surge Active
+                                                    </span>
+                                                )}
+                                                {holidaySummary.hasGalaDinner && (
+                                                    <span className="ml-2 text-[10.5px] font-bold text-fuchsia-800 bg-fuchsia-100/90 border border-fuchsia-300 px-1.5 py-0.5 rounded">
+                                                        🍽️ Mandatory Gala Dinner Included
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {holidaySummary.isMlosViolated && (
+                                            <span className="text-[11px] font-bold text-rose-800 bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                                <span>⚠️</span>
+                                                <span>Min {holidaySummary.mlosRequiredNights} Nights Stay Policy Required</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Options Row */}
                                 <div className="flex items-center justify-between pt-2 border-t border-slate-200/80">
                                     <div className="flex items-center gap-2">
@@ -1688,20 +1825,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
                                 )}
 
-                                {availableRatePlans.length === 0 && (
-                                    <div className="mx-3 my-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
-                                        <div className="flex items-center gap-2">
-                                            <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
-                                            <span>
-                                                <strong>No Active Rate Plans Found:</strong> Please configure Rate Plans in{' '}
-                                                <a href="/rate-plans" className="underline text-blue-700 hover:text-blue-900">
-                                                    Rate Plan Management (/rate-plans)
-                                                </a>{' '}
-                                                first before booking.
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 <div className="overflow-x-hidden">
                                     <table className="w-full text-left border-collapse text-[11px] table-auto">
@@ -1828,11 +1952,15 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         className="w-full min-w-[145px] max-w-[185px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800"
                                                                         title="Select Rate Plan or Bundled Stay Package"
                                                                     >
-                                                                        <optgroup label="── 🏷️ Rate Plans ──">
-                                                                            {availableRatePlans.length === 0 ? (
-                                                                                <option value="" disabled>No rate plans configured</option>
-                                                                            ) : (
-                                                                                availableRatePlans.map(p => {
+                                                                        <optgroup label="── 📋 Standard Direct Rate ──">
+                                                                            <option value="direct:Direct Standard Room Rate (Rack Rate)">
+                                                                                🏷️ Direct Standard Room Rate (Rack Rate)
+                                                                            </option>
+                                                                        </optgroup>
+
+                                                                        {availableRatePlans.length > 0 && (
+                                                                            <optgroup label="── 🏷️ Rate Plans ──">
+                                                                                {availableRatePlans.map((p: any) => {
                                                                                     const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
                                                                                     const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
                                                                                     return (
@@ -1840,22 +1968,29 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                                             🏷️ {p.name}{badge}
                                                                                         </option>
                                                                                     );
-                                                                                })
-                                                                            )}
-                                                                        </optgroup>
+                                                                                })}
+                                                                            </optgroup>
+                                                                        )}
 
-                                                                        {availablePackages.filter(p => !p.status || p.status === 'Active').length > 0 && (
+                                                                        {availablePackages.filter(p => {
+                                                                            if (p.status && p.status !== 'Active') return false;
+                                                                            const applicable = p.roomConfig?.applicableRoomTypes;
+                                                                            if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                            return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(item?.roomType || '').toLowerCase());
+                                                                        }).length > 0 && (
                                                                             <optgroup label="── 🎁 Bundled Packages ──">
                                                                                 {availablePackages
-                                                                                    .filter(p => !p.status || p.status === 'Active')
-                                                                                    .map(p => {
+                                                                                    .filter(p => {
+                                                                                        if (p.status && p.status !== 'Active') return false;
                                                                                         const applicable = p.roomConfig?.applicableRoomTypes;
-                                                                                        const isApplicable = !applicable || !Array.isArray(applicable) || applicable.length === 0 || applicable.some((t: string) => t.toLowerCase() === 'all' || t.toLowerCase() === item.roomType.toLowerCase());
-                                                                                        const roomTypeNote = (!isApplicable && applicable && applicable.length > 0) ? ` (${applicable[0]})` : '';
+                                                                                        if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                                        return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(item?.roomType || '').toLowerCase());
+                                                                                    })
+                                                                                    .map(p => {
                                                                                         const surchargeText = p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : '';
                                                                                         return (
                                                                                             <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
-                                                                                                🎁 {p.name}{roomTypeNote}{surchargeText}
+                                                                                                🎁 {p.name}{surchargeText}
                                                                                             </option>
                                                                                         );
                                                                                     })
@@ -1912,10 +2047,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                                     otherRowsRooms.add(other.roomNumber);
                                                                                 }
                                                                             });
-                                                                            const matchingStatus = liveAvailabilityReport.allRoomsStatus.filter(st =>
-                                                                                st.room.roomTypeName.toLowerCase().includes(item.roomType.toLowerCase()) ||
-                                                                                item.roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase())
-                                                                            );
+                                                                            const itemTypeLower = String(item?.roomType || '').toLowerCase();
+                                                                            const matchingStatus = liveAvailabilityReport.allRoomsStatus.filter(st => {
+                                                                                const stNameLower = String(st?.room?.roomTypeName || '').toLowerCase();
+                                                                                return stNameLower.includes(itemTypeLower) || itemTypeLower.includes(stNameLower);
+                                                                            });
                                                                             const listToDisplay = matchingStatus.length > 0 ? matchingStatus : liveAvailabilityReport.allRoomsStatus;
 
                                                                             return listToDisplay.map(st => {
@@ -2170,229 +2306,216 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
                                 )}
 
-                                {/* Row 1: Title, Name, Mobile, Email */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-semibold text-slate-600">Title</label>
-                                        <select
-                                            value={title}
-                                            onChange={e => setTitle(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
-                                        >
-                                            <option value="Mr.">Mr.</option>
-                                            <option value="Mrs.">Mrs.</option>
-                                            <option value="Ms.">Ms.</option>
-                                            <option value="Dr.">Dr.</option>
-                                            <option value="Prof.">Prof.</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Name input with Auto-Suggest Dropdown */}
-                                    <div className="relative flex flex-col gap-1">
+                                {/* Row 1: Legal Name (Title + Name) [2 cols] | Mobile No. [1 col] | Email [1 col] */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 min-w-0">
+                                    {/* Full Legal Name (Col 1 & 2) */}
+                                    <div className="md:col-span-2 flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600 flex items-center justify-between">
-                                            <span>Name <span className="text-red-500">*</span></span>
+                                            <span>Full Legal Name <span className="text-red-500">*</span></span>
                                             {nameSuggestions.length > 0 && isNameSuggestOpen && (
-                                                <span className="text-[9px] text-blue-600 font-semibold">Found {nameSuggestions.length} returning guest{nameSuggestions.length > 1 ? 's' : ''}</span>
+                                                <span className="text-[9px] text-blue-600 font-semibold">Found {nameSuggestions.length} profile{nameSuggestions.length > 1 ? 's' : ''}</span>
                                             )}
                                         </label>
-                                        <input
-                                            type="search"
-                                            name="quick_gst_name_srch"
-                                            autoComplete="one-time-code"
-                                            autoCorrect="off"
-                                            autoCapitalize="off"
-                                            spellCheck={false}
-                                            role="combobox"
-                                            aria-autocomplete="list"
-                                            aria-expanded={isNameSuggestOpen && nameSuggestions.length > 0}
-                                            data-lpignore="true"
-                                            data-1p-ignore="true"
-                                            data-form-type="other"
-                                            placeholder="Guest full name..."
-                                            value={name}
-                                            readOnly
-                                            onFocus={(e) => {
-                                                e.currentTarget.readOnly = false;
-                                                setIsNameSuggestOpen(true);
-                                            }}
-                                            onPointerDown={(e) => {
-                                                e.currentTarget.readOnly = false;
-                                            }}
-                                            onChange={e => {
-                                                setName(e.target.value);
-                                                setIsNameSuggestOpen(true);
-                                                if (selectedGuestProfile && e.target.value !== selectedGuestProfile.name) {
-                                                    setSelectedGuestProfile(null);
-                                                }
-                                            }}
-                                            onBlur={() => setTimeout(() => setIsNameSuggestOpen(false), 250)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium [&::-webkit-search-decoration]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
-                                        />
+                                        <div className="flex gap-1.5 min-w-0">
+                                            <select
+                                                value={title}
+                                                onChange={e => setTitle(e.target.value)}
+                                                className="w-16 h-7.5 px-1.5 border border-slate-200 rounded-md text-[11px] bg-slate-50 hover:bg-slate-100 outline-none focus:border-blue-500 shrink-0 cursor-pointer font-medium text-slate-700"
+                                            >
+                                                <option value="Mr.">Mr.</option>
+                                                <option value="Mrs.">Mrs.</option>
+                                                <option value="Ms.">Ms.</option>
+                                                <option value="Dr.">Dr.</option>
+                                                <option value="Prof.">Prof.</option>
+                                            </select>
+                                            <div className="relative flex-1 min-w-0">
+                                                <input
+                                                    type="search"
+                                                    name="quick_gst_name_srch"
+                                                    autoComplete="one-time-code"
+                                                    autoCorrect="off"
+                                                    autoCapitalize="off"
+                                                    spellCheck={false}
+                                                    role="combobox"
+                                                    aria-autocomplete="list"
+                                                    aria-expanded={isNameSuggestOpen && nameSuggestions.length > 0}
+                                                    data-lpignore="true"
+                                                    data-1p-ignore="true"
+                                                    data-form-type="other"
+                                                    placeholder="Guest full name..."
+                                                    value={name}
+                                                    readOnly
+                                                    onFocus={(e) => {
+                                                        e.currentTarget.readOnly = false;
+                                                        setIsNameSuggestOpen(true);
+                                                    }}
+                                                    onPointerDown={(e) => {
+                                                        e.currentTarget.readOnly = false;
+                                                    }}
+                                                    onChange={e => {
+                                                        setName(e.target.value);
+                                                        setIsNameSuggestOpen(true);
+                                                        if (selectedGuestProfile && e.target.value !== selectedGuestProfile.name) {
+                                                            setSelectedGuestProfile(null);
+                                                        }
+                                                    }}
+                                                    onBlur={() => setTimeout(() => setIsNameSuggestOpen(false), 250)}
+                                                    className="w-full min-w-0 h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium [&::-webkit-search-decoration]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
+                                                />
 
-                                        {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
-                                        {isNameSuggestOpen && nameSuggestions.length > 0 && (
-                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
-                                                <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                                                    <span>Returning Guests ({nameSuggestions.length})</span>
-                                                    <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
-                                                </div>
-                                                {nameSuggestions.map(g => (
-                                                    <div
-                                                        key={g.id}
-                                                        onMouseDown={(e) => {
-                                                             e.preventDefault();
-                                                             handleSelectGuestProfile(g);
-                                                        }}
-                                                        className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
-                                                    >
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
-                                                                {g.name.slice(0, 2).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <span className="font-bold text-slate-900 text-[11.5px] truncate">
-                                                                        {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
-                                                                    </span>
-                                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
-                                                                        {g.vipTier || 'Regular'}
-                                                                    </span>
-                                                                    {g.company && (
-                                                                        <span className="text-[9.5px] text-slate-500 truncate">
-                                                                            ({g.company})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
-                                                                    <span className="text-slate-700 font-medium">📞 {g.phone}</span>
-                                                                    {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
-                                                                </div>
-                                                            </div>
+                                                {/* Inline Name Suggestions Dropdown */}
+                                                {isNameSuggestOpen && nameSuggestions.length > 0 && (
+                                                    <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                        <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                                                            <span>Returning Guests ({nameSuggestions.length})</span>
+                                                            <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
                                                         </div>
-                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap flex-shrink-0 shadow-2xs">
-                                                            Link Profile ↵
-                                                        </span>
+                                                        {nameSuggestions.map(g => (
+                                                            <div
+                                                                key={g.id}
+                                                                onMouseDown={(e) => {
+                                                                    e.preventDefault();
+                                                                    handleSelectGuestProfile(g);
+                                                                }}
+                                                                className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                                                            >
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                                                        {String(g?.name || 'G').slice(0, 2).toUpperCase()}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="font-bold text-slate-900 text-[11.5px] truncate">
+                                                                                {g?.title && !String(g?.name || '').toLowerCase().startsWith(String(g?.title || '').toLowerCase()) ? `${g.title} ` : ''}{g?.name}
+                                                                            </span>
+                                                                            <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                                {g.vipTier || 'Regular'}
+                                                                            </span>
+                                                                            {g.company && (
+                                                                                <span className="text-[9.5px] text-slate-500 truncate">
+                                                                                    ({g.company})
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
+                                                                            <span className="text-slate-800 font-bold">📞 {g.phone}</span>
+                                                                            {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[10px] font-semibold text-blue-600 shrink-0">
+                                                                    Link Profile ↵
+                                                                </span>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
 
-                                    {/* Mobile input with Auto-Suggest Dropdown */}
-                                    <div className="relative flex flex-col gap-1">
+                                    {/* Mobile input with Auto-Suggest Dropdown (Col 3) */}
+                                    <div className="relative flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600 flex items-center justify-between">
                                             <span>Mobile No. <span className="text-red-500">*</span></span>
                                             {mobileSuggestions.length > 0 && isMobileSuggestOpen && (
                                                 <span className="text-[9px] text-blue-600 font-semibold">Found {mobileSuggestions.length} profile{mobileSuggestions.length > 1 ? 's' : ''}</span>
                                             )}
                                         </label>
-                                        <input
-                                            type="search"
-                                            name="quick_gst_phone_srch"
-                                            autoComplete="one-time-code"
-                                            autoCorrect="off"
-                                            autoCapitalize="off"
-                                            spellCheck={false}
-                                            role="combobox"
-                                            aria-autocomplete="list"
-                                            aria-expanded={isMobileSuggestOpen && mobileSuggestions.length > 0}
-                                            data-lpignore="true"
-                                            data-1p-ignore="true"
-                                            data-form-type="other"
-                                            placeholder="e.g. 01712-345678"
+                                        <PhoneInputWithCountry
+                                            compact={true}
                                             value={mobile}
-                                            readOnly
-                                            onFocus={(e) => {
-                                                e.currentTarget.readOnly = false;
+                                            onChange={(val) => {
+                                                setMobile(val);
                                                 setIsMobileSuggestOpen(true);
                                             }}
-                                            onPointerDown={(e) => {
-                                                e.currentTarget.readOnly = false;
-                                            }}
-                                            onChange={e => {
-                                                setMobile(e.target.value);
-                                                setIsMobileSuggestOpen(true);
-                                            }}
+                                            onFocus={() => setIsMobileSuggestOpen(true)}
                                             onBlur={() => setTimeout(() => setIsMobileSuggestOpen(false), 250)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono [&::-webkit-search-decoration]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
-                                        />
-
-                                        {/* Inline Mobile Suggestions Dropdown (Spacious overlay width) */}
-                                        {isMobileSuggestOpen && mobileSuggestions.length > 0 && (
-                                            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
-                                                <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                                                    <span>Matching Phone Profiles ({mobileSuggestions.length})</span>
-                                                    <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
-                                                </div>
-                                                {mobileSuggestions.map(g => (
-                                                    <div
-                                                        key={g.id}
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault();
-                                                            handleSelectGuestProfile(g);
-                                                        }}
-                                                        className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
-                                                    >
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
-                                                                {g.name.slice(0, 2).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <span className="font-bold text-slate-900 text-[11.5px] truncate">
-                                                                        {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
-                                                                    </span>
-                                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
-                                                                        {g.vipTier || 'Regular'}
-                                                                    </span>
-                                                                    {g.company && (
-                                                                        <span className="text-[9.5px] text-slate-500 truncate">
-                                                                            ({g.company})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
-                                                                    <span className="text-slate-800 font-bold">📞 {g.phone}</span>
-                                                                    {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap flex-shrink-0 shadow-2xs">
-                                                            Link Profile ↵
-                                                        </span>
+                                            placeholder="1712-345678"
+                                            required
+                                        >
+                                            {/* Inline Mobile Suggestions Dropdown */}
+                                            {isMobileSuggestOpen && mobileSuggestions.length > 0 && (
+                                                <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                    <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                                                        <span>Matching Phone Profiles ({mobileSuggestions.length})</span>
+                                                        <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                                    {mobileSuggestions.map(g => (
+                                                        <div
+                                                            key={g.id}
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                handleSelectGuestProfile(g);
+                                                            }}
+                                                            className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                                                        >
+                                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                                <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                                                    {String(g?.name || 'G').slice(0, 2).toUpperCase()}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="font-bold text-slate-900 text-[11.5px] truncate">
+                                                                            {g?.title && !String(g?.name || '').toLowerCase().startsWith(String(g?.title || '').toLowerCase()) ? `${g.title} ` : ''}{g?.name}
+                                                                        </span>
+                                                                        <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                            {g.vipTier || 'Regular'}
+                                                                        </span>
+                                                                        {g.company && (
+                                                                            <span className="text-[9.5px] text-slate-500 truncate">
+                                                                                ({g.company})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
+                                                                        <span className="text-slate-800 font-bold">📞 {g.phone}</span>
+                                                                        {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-[10px] font-semibold text-blue-600 shrink-0">
+                                                                Link Profile ↵
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </PhoneInputWithCountry>
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-semibold text-slate-600">Email</label>
+                                    {/* Email (Col 4) */}
+                                    <div className="flex flex-col gap-1 min-w-0">
+                                        <label className="text-[10px] font-semibold text-slate-600">Email Address</label>
                                         <input
                                             type="email"
-                                            name="pms_guest_email_query"
-                                            autoComplete="one-time-code"
-                                            autoCorrect="off"
-                                            spellCheck={false}
-                                            data-lpignore="true"
-                                            data-1p-ignore="true"
-                                            data-form-type="other"
                                             placeholder="guest@example.com"
                                             value={email}
                                             onChange={e => setEmail(e.target.value)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
+                                            className="w-full min-w-0 h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
 
-                                {/* Row 2: Country, City, Nationality, Gender, Date of Birth */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1 border-t border-slate-200/60">
-                                    <div className="flex flex-col gap-1">
+                                {/* Row 2: Nationality | Country of Residence | City / District | Gender (4 Columns) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2.5 border-t border-slate-200/60 min-w-0">
+                                    <div className="flex flex-col gap-1 min-w-0">
+                                        <label className="text-[10px] font-semibold text-slate-600">Nationality</label>
+                                        <SearchableSelect
+                                            options={allNationalityOptions}
+                                            value={nationality}
+                                            onChange={(val) => setNationality(val)}
+                                            placeholder="Select nationality..."
+                                            compact={true}
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">Country of Residence</label>
-                                        <select
+                                        <SearchableSelect
+                                            options={allCountryOptions}
                                             value={homeCountry}
-                                            onChange={e => {
-                                                const newCountry = e.target.value;
+                                            onChange={(newCountry) => {
                                                 setHomeCountry(newCountry);
                                                 const cities = getCitiesForCountry(newCountry);
                                                 if (cities.length > 0) setHomeCity(cities[0]);
@@ -2400,79 +2523,50 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 const nat = getNationalityForCountry(newCountry);
                                                 if (nat && (!nationality || nationality === 'Bangladeshi')) setNationality(nat);
                                             }}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
-                                        >
-                                            {COUNTRIES_DATABASE.map(c => (
-                                                <option key={c.code} value={c.name}>{c.name} ({c.dialCode})</option>
-                                            ))}
-                                        </select>
+                                            placeholder="Select country..."
+                                            compact={true}
+                                        />
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">City / District</label>
-                                        {getCitiesForCountry(homeCountry).length > 0 ? (
-                                            <select
-                                                value={homeCity}
-                                                onChange={e => setHomeCity(e.target.value)}
-                                                className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
-                                            >
-                                                <option value="">Select City / District...</option>
-                                                {getCitiesForCountry(homeCountry).map(ct => (
-                                                    <option key={ct} value={ct}>{ct}</option>
-                                                ))}
-                                                <option value="__other__">+ Other / Enter Manually</option>
-                                            </select>
-                                        ) : (
-                                            <input
-                                                type="text"
-                                                placeholder="Dhaka..."
-                                                value={homeCity}
-                                                onChange={e => setHomeCity(e.target.value)}
-                                                className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
-                                            />
-                                        )}
+                                        <SearchableSelect
+                                            options={homeCityOptions}
+                                            value={homeCity}
+                                            onChange={(val) => setHomeCity(val)}
+                                            placeholder="City / District..."
+                                            allowCustom={true}
+                                            compact={true}
+                                        />
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-semibold text-slate-600">Nationality</label>
-                                        <select
-                                            value={nationality}
-                                            onChange={e => setNationality(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
-                                        >
-                                            {COUNTRIES_DATABASE.map(c => (
-                                                <option key={c.code} value={c.nationality}>{c.nationality} ({c.name})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">Gender</label>
                                         <select
                                             value={gender}
                                             onChange={e => setGender(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
+                                            className="w-full min-w-0 h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
                                         >
                                             <option value="Male">Male</option>
                                             <option value="Female">Female</option>
                                             <option value="Other">Other</option>
                                         </select>
                                     </div>
+                                </div>
 
-                                    <div className="flex flex-col gap-1">
+                                {/* Row 3: Date of Birth | ID Document Type | Identification Number (4 Columns: 1 + 1 + 2) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2.5 border-t border-slate-200/60 min-w-0">
+                                    <div className="flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">Date of Birth</label>
                                         <input
                                             type="date"
                                             value={dob}
                                             onChange={e => setDob(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
+                                            className="w-full min-w-0 h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
                                         />
                                     </div>
-                                </div>
 
-                                {/* Row 3: ID Document Type, ID Number */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-200/60">
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">ID Document Type</label>
                                         <select
                                             value={idType}
@@ -2481,7 +2575,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 setIdType(next);
                                                 if (idNumber) setIdNumber(formatIdentityDisplay(idNumber, next));
                                             }}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer font-medium"
+                                            className="w-full min-w-0 h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer font-medium"
                                         >
                                             <option value="National ID (NID)">National ID (NID)</option>
                                             <option value="Passport">Passport</option>
@@ -2491,7 +2585,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </select>
                                     </div>
 
-                                    <div className="flex flex-col gap-1 sm:col-span-2">
+                                    <div className="md:col-span-2 flex flex-col gap-1 min-w-0">
                                         <label className="text-[10px] font-semibold text-slate-600">
                                             {idType === 'Passport' ? 'Passport Number' : idType === 'Driving License' ? 'Driving License #' : idType === 'Diplomatic ID' ? 'Diplomatic ID #' : 'National ID (NID) Number'}
                                         </label>
@@ -2501,7 +2595,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             value={idNumber}
                                             onChange={e => setIdNumber(e.target.value)}
                                             onBlur={e => setIdNumber(formatIdentityDisplay(e.target.value, idType))}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
+                                            className="w-full min-w-0 h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
                                         />
                                     </div>
                                 </div>
@@ -2516,15 +2610,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             <div className="flex flex-col gap-0.5">
                                                 <label className="text-[9.5px] font-semibold text-slate-700">Issuing Country</label>
-                                                <select
+                                                <SearchableSelect
+                                                    options={allCountryOptions}
                                                     value={idIssueCountry}
-                                                    onChange={e => setIdIssueCountry(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-slate-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    {COUNTRIES_DATABASE.map(c => (
-                                                        <option key={c.code} value={c.name}>{c.name}</option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setIdIssueCountry(val)}
+                                                    placeholder="Issuing Country..."
+                                                    compact={true}
+                                                />
                                             </div>
                                             <div className="flex flex-col gap-0.5">
                                                 <label className="text-[9.5px] font-semibold text-slate-700">Passport Expiry</label>
@@ -2670,311 +2762,95 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     )}
 
                     {activeTab === 'payment' && (
-                        <div className="animate-in fade-in duration-100">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                                {/* Left: Discount & Payment Methods (7 cols) */}
-                                <div className="lg:col-span-7 space-y-3.5">
-                                    {/* Discount Section */}
-                                    <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
-                                        <h3 className="text-[10px] text-slate-700 uppercase tracking-wider mb-2">Discount</h3>
-                                        <div className="flex items-center gap-2">
-                                            <select
-                                                value={discountType}
-                                                onChange={e => setDiscountType(e.target.value as any)}
-                                                className="w-32 h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none cursor-pointer"
-                                            >
-                                                <option value="Fixed">Fixed (BDT)</option>
-                                                <option value="Percentage">Percentage (%)</option>
-                                            </select>
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                value={discountValue || ''}
-                                                onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
-                                                placeholder="0"
-                                                className="flex-1 h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none font-bold"
-                                            />
-                                            {discountValue > 0 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setDiscountValue(0)}
-                                                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-                                                    title="Clear Discount"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
+                        <div className="flex flex-col gap-2.5 animate-in fade-in duration-100">
+                            {/* 1. Top Live Financial Status Strip */}
+                            <FinancialStatusStrip
+                                finalPayable={finalPayable}
+                                totalPaid={totalPaid}
+                                totalDue={totalDue}
+                                currencySymbol={currencySymbol}
+                            />
 
-                                    {/* Payment Method Section */}
-                                    <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-[10px] text-slate-700 uppercase tracking-wider">Payment Method</h3>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddPaymentRow}
-                                                className="text-[#1e3a8a] hover:text-blue-900 text-[11px] font-semibold cursor-pointer"
-                                            >
-                                                + Add Method
-                                            </button>
-                                        </div>
+                            {/* 2. Main 2-Column Console */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+                                {/* Left: Payment Settlement & Discount */}
+                                <div className="lg:col-span-7 space-y-2">
+                                    <PaymentTenderConsole
+                                        paymentRows={paymentRows}
+                                        totalDue={totalDue}
+                                        finalPayable={finalPayable}
+                                        currencySymbol={currencySymbol}
+                                        onAddRow={handleAddPaymentRow}
+                                        onRemoveRow={handleRemovePaymentRow}
+                                        onUpdateRow={(id, field, val) => handlePaymentRowChange(id, field as any, val)}
+                                        onFillDue={(rowId) => {
+                                            const currentTotalPaid = paymentRows.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+                                            const remaining = Math.max(0, finalPayable - currentTotalPaid);
+                                            setPaymentRows(paymentRows.map(p => {
+                                                if (p.id === rowId) {
+                                                    return { ...p, amount: Number(((p.amount || 0) + remaining).toFixed(2)) };
+                                                }
+                                                return p;
+                                            }));
+                                        }}
+                                        onFill50Percent={(rowId) => {
+                                            setPaymentRows(paymentRows.map(p => {
+                                                if (p.id === rowId) {
+                                                    return { ...p, amount: Number((finalPayable * 0.5).toFixed(2)) };
+                                                }
+                                                return p;
+                                            }));
+                                        }}
+                                    />
 
-                                        <div className="space-y-2">
-                                            {paymentRows.map((row, idx) => (
-                                                <div
-                                                    key={row.id}
-                                                    onClick={() => setKeypadTargetIndex(idx)}
-                                                    className={`p-2.5 bg-white border rounded-lg transition-colors cursor-pointer space-y-2 ${
-                                                        keypadTargetIndex === idx ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-200/90'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex-1 flex flex-col gap-0.5">
-                                                            <label className="text-[9.5px] font-semibold text-slate-500">Method</label>
-                                                            <select
-                                                                value={row.method}
-                                                                onChange={e => handlePaymentRowChange(row.id, 'method', e.target.value as any)}
-                                                                className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                            >
-                                                                <option value="Cash">Cash at Desk</option>
-                                                                <option value="Card">Credit / Debit Card</option>
-                                                                <option value="bKash">bKash (MFS)</option>
-                                                                <option value="Nagad">Nagad (MFS)</option>
-                                                                <option value="Bank Transfer">Bank Transfer</option>
-                                                                <option value="Direct Billing">Company Direct Billing</option>
-                                                            </select>
-                                                        </div>
-
-                                                        <div className="flex-1 flex flex-col gap-0.5">
-                                                            <label className="text-[9.5px] font-semibold text-slate-500">Amount ({currencySymbol})</label>
-                                                            <input
-                                                                type="number"
-                                                                value={row.amount || ''}
-                                                                onChange={e => handlePaymentRowChange(row.id, 'amount', parseFloat(e.target.value) || 0)}
-                                                                placeholder="0.00"
-                                                                className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none font-bold"
-                                                            />
-                                                        </div>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={e => {
-                                                                e.stopPropagation();
-                                                                handleRemovePaymentRow(row.id);
-                                                            }}
-                                                            disabled={paymentRows.length <= 1}
-                                                            className="text-red-400 hover:text-red-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer self-end mb-0.5 p-1"
-                                                            title="Delete Payment Row"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </div>
-
-                                                    {row.method !== 'Cash' && (
-                                                        <div className="flex flex-col gap-0.5 pt-1 border-t border-slate-100">
-                                                            <label className="text-[9px] font-semibold text-slate-500">
-                                                                {row.method === 'Card' ? 'Card Last 4 / Auth Code' : row.method.includes('bKash') || row.method.includes('Nagad') ? 'MFS TrxID' : 'Bank Reference / Cheque No'}
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                value={row.reference || ''}
-                                                                onChange={e => handlePaymentRowChange(row.id, 'reference', e.target.value)}
-                                                                placeholder={row.method === 'Card' ? 'e.g. 4242 / Auth: 89123' : 'e.g. TRX-98234123'}
-                                                                className="w-full h-6.5 px-2 border border-slate-200 rounded text-[10px] bg-white outline-none font-mono"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Numeric Keypad for Front Desk Touchscreen Velocity */}
-                                        <div className="bg-white border border-slate-200 rounded-lg p-2.5 mt-3 shadow-2xs">
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <p className="text-[9.5px] text-slate-500 font-semibold uppercase tracking-wider">
-                                                    Touchpad Keypad (Row #{keypadTargetIndex + 1})
-                                                </p>
-                                                <span className="font-mono font-bold text-xs text-blue-900">
-                                                    {currencySymbol} {(paymentRows[keypadTargetIndex]?.amount || 0).toLocaleString()}
-                                                </span>
-                                            </div>
-                                            <div className="grid grid-cols-4 gap-1.5">
-                                                {['1', '2', '3'].map(k => (
-                                                    <button
-                                                        key={k}
-                                                        type="button"
-                                                        onClick={() => handleKeypadPress(k)}
-                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
-                                                    >
-                                                        {k}
-                                                    </button>
-                                                ))}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress('CLEAR')}
-                                                    className="h-8 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded font-bold text-xs cursor-pointer shadow-2xs"
-                                                >
-                                                    Clear
-                                                </button>
-
-                                                {['4', '5', '6'].map(k => (
-                                                    <button
-                                                        key={k}
-                                                        type="button"
-                                                        onClick={() => handleKeypadPress(k)}
-                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
-                                                    >
-                                                        {k}
-                                                    </button>
-                                                ))}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress('BACK')}
-                                                    className="h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded font-bold text-xs flex items-center justify-center cursor-pointer shadow-2xs"
-                                                    title="Backspace"
-                                                >
-                                                    <Delete size={13} />
-                                                </button>
-
-                                                {['7', '8', '9'].map(k => (
-                                                    <button
-                                                        key={k}
-                                                        type="button"
-                                                        onClick={() => handleKeypadPress(k)}
-                                                        className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
-                                                    >
-                                                        {k}
-                                                    </button>
-                                                ))}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress('0')}
-                                                    className="h-8 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-semibold text-xs text-slate-700 cursor-pointer shadow-2xs"
-                                                >
-                                                    0
-                                                </button>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => handleKeypadPress('FULL')}
-                                                className="w-full mt-2 h-7 bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
-                                            >
-                                                Pay Full Payable ({currencySymbol} {finalPayable.toLocaleString()})
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <DiscountConsole
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        discountedAmount={discountedAmount}
+                                        currencySymbol={currencySymbol}
+                                        onTypeChange={setDiscountType}
+                                        onValueChange={setDiscountValue}
+                                        onApplyPreset={(pct) => {
+                                            setDiscountType('Percentage');
+                                            setDiscountValue(pct);
+                                        }}
+                                        onClear={() => setDiscountValue(0)}
+                                    />
                                 </div>
 
-                                {/* Right: Summary Box (5 cols) */}
+                                {/* Right: Summary Box */}
                                 <div className="lg:col-span-5">
-                                    <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 shadow-2xs">
-                                        <div className="space-y-1 text-[11px]">
-                                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
-                                                <span>Room Base ({nights}N)</span>
-                                                <span className="font-semibold text-slate-900">{currencySymbol}{roomBaseTotal.toLocaleString()}</span>
-                                            </div>
-
-                                            {totalPickupArrivalCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-blue-700">
-                                                    <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalPickupArrivalCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalDropDepartureCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-sky-700">
-                                                    <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalDropDepartureCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalExtraBedCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-indigo-700">
-                                                    <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalExtraBedCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalMealPlanCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-amber-700">
-                                                    <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalMealPlanCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalCelebrationCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-rose-700">
-                                                    <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalCelebrationCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalSpaCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-teal-700">
-                                                    <span className="flex items-center gap-1"><Sparkles size={11} /> Wellness &amp; Spa</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalSpaCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            {totalTimingCharge > 0 && (
-                                                <div className="flex justify-between py-0.5 text-sky-700">
-                                                    <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
-                                                    <span className="font-mono">+{currencySymbol}{totalTimingCharge.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="flex justify-between py-1 border-t border-slate-200 text-slate-700 font-semibold">
-                                                <span>Total Gross (Tariff + Addons)</span>
-                                                <span className="text-slate-900">{currencySymbol}{totalAmount.toLocaleString()}</span>
-                                            </div>
-
-                                            {discountedAmount > 0 && (
-                                                <div className="flex justify-between py-1 text-slate-600">
-                                                    <span>Discount ({discountType === 'Percentage' ? `${discountValue}%` : 'Flat'})</span>
-                                                    <span className="font-semibold text-emerald-700">-{currencySymbol}{discountedAmount.toLocaleString()}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="flex justify-between py-1 text-slate-800 border-t border-dashed border-slate-200">
-                                                <span>Subtotal (Net Base)</span>
-                                                <span className="text-slate-900">{currencySymbol}{netBaseAmount.toLocaleString()}</span>
-                                            </div>
-
-                                            {taxApplicable && taxCalculation.breakdown.length > 0 && (
-                                                <div className="py-1.5 space-y-1 bg-amber-50/70 p-2 rounded-lg border border-amber-200/80 my-1">
-                                                    <div className="flex justify-between items-center text-[10px] text-amber-900 uppercase tracking-wider">
-                                                        <span>Taxes, VAT &amp; Surcharge</span>
-                                                        <span className="font-mono text-amber-900">+{currencySymbol}{taxCalculation.totalTaxAmount.toLocaleString()}</span>
-                                                    </div>
-                                                    {taxCalculation.breakdown.map((item, idx) => (
-                                                        <div key={idx} className="flex justify-between text-[11px] text-slate-600 pl-1">
-                                                            <span>{item.name} ({item.rate}%):</span>
-                                                            <span className="font-mono font-medium">+{currencySymbol}{item.amount.toLocaleString()}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            <div className="flex justify-between py-1 text-slate-900 font-extrabold border-t border-slate-300 text-sm">
-                                                <span>Grand Total (Payable)</span>
-                                                <span className="text-blue-900">{currencySymbol}{finalPayable.toLocaleString()}</span>
-                                            </div>
-
-                                            <div className="flex justify-between py-1 text-slate-600">
-                                                <span>Total Advance Paid</span>
-                                                <span className="text-emerald-700">{currencySymbol}{totalPaid.toLocaleString()}</span>
-                                            </div>
-
-                                            <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between text-xs border-t border-slate-200 rounded-b-lg">
-                                                <span className="text-slate-800">Remaining Balance Due:</span>
-                                                <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
-                                                    {currencySymbol}{totalDue.toLocaleString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <SettlementBreakdownCard
+                                        roomBaseTotal={roomBaseTotal}
+                                        nights={nightMultiplier}
+                                        grossTotal={totalAmount}
+                                        discountedAmount={discountedAmount}
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        netBaseAmount={netBaseAmount}
+                                        taxCalculation={taxCalculation}
+                                        finalPayable={finalPayable}
+                                        totalPaid={totalPaid}
+                                        totalDue={totalDue}
+                                        currencySymbol={currencySymbol}
+                                        addons={{
+                                            pickup: totalPickupArrivalCharge,
+                                            drop: totalDropDepartureCharge,
+                                            extraBed: totalExtraBedCharge,
+                                            mealPlan: totalMealPlanCharge,
+                                            celebration: totalCelebrationCharge,
+                                            spa: totalSpaCharge,
+                                            timing: totalTimingCharge,
+                                            custom: totalCustomCharge,
+                                            galaDinner: totalGalaDinnerCharge,
+                                            totalAll: totalAllAddonsCharges
+                                        }}
+                                        holidaySurge={{
+                                            hasSurge: holidaySummary.hasSurge,
+                                            multiplier: holidaySummary.maxMultiplier,
+                                            holidayName: holidaySummary.activeHolidays[0]
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -3346,6 +3222,20 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                         setIsHoldTillModalOpen(false);
                         handleCompleteReservation('hold', payload);
                     }}
+                />
+            )}
+
+            {/* Real-Time Auto-Prompt Advance Deposit Receipt Modal */}
+            {advanceReceiptToPrompt && (
+                <MoneyReceiptModal
+                    isOpen={Boolean(advanceReceiptToPrompt)}
+                    onClose={() => {
+                        setAdvanceReceiptToPrompt(null);
+                        onClose();
+                    }}
+                    payment={advanceReceiptToPrompt.payment}
+                    folio={advanceReceiptToPrompt.folio}
+                    isAdvance={true}
                 />
             )}
         </div>

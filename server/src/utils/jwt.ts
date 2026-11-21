@@ -1,14 +1,20 @@
 import crypto from 'crypto';
 
-let cachedDynamicSecret = process.env.JWT_SECRET;
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable must be set in production mode.');
+}
+let cachedDynamicSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 
 /**
  * Returns dynamic cryptographic secret. If not provided in environment,
- * dynamically generates a cryptographically secure 512-bit key.
+ * securely generates an unguessable ephemeral secret in development.
  */
 export function getDynamicJwtSecret(): string {
     if (!cachedDynamicSecret) {
-        cachedDynamicSecret = crypto.randomBytes(64).toString('hex');
+        if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+            throw new Error('FATAL: JWT_SECRET environment variable must be set in production mode.');
+        }
+        cachedDynamicSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
     }
     return cachedDynamicSecret;
 }

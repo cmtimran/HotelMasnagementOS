@@ -17,6 +17,11 @@ import authRoutes from './auth.routes.js';
 import keycardRoutes from './keycard.routes.js';
 import channelManagerRoutes from './channelManager.routes.js';
 import { nightAuditRoutes } from './nightAudit.routes.js';
+import masterDataRoutes from './masterData.routes.js';
+import guestCxRoutes from './guestCx.routes.js';
+import housekeepingRoutes from './housekeeping.routes.js';
+import restaurantRoutes from './restaurant.routes.js';
+import posRoutes from './pos.routes.js';
 
 const apiRouter = Router();
 
@@ -65,6 +70,11 @@ apiRouter.use('/lost-and-found', lostAndFoundRoutes);
 apiRouter.use('/keycard', keycardRoutes);
 apiRouter.use('/channel-manager', channelManagerRoutes);
 apiRouter.use('/night-audit', nightAuditRoutes);
+apiRouter.use('/housekeeping', housekeepingRoutes);
+apiRouter.use('/restaurant', restaurantRoutes);
+apiRouter.use('/pos', posRoutes);
+apiRouter.use('/master-data', masterDataRoutes);
+apiRouter.use('/cx', guestCxRoutes);
 apiRouter.use('/central', tenantRoutes);
 apiRouter.use('/tenants', tenantRoutes);
 

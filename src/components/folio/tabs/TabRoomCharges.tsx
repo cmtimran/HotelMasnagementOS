@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DoorClosed, RefreshCw, X, CheckCircle2 } from 'lucide-react';
-import { getCurrencySymbol, getActiveCurrencyCode } from '../../../utils/currencyUtils';
+import { useActiveCurrency, getActiveCurrencyCode } from '../../../utils/currencyUtils';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import { broadcastPMSEvent } from '../../../utils/roomInventoryEngine';
 import type { FolioData } from '../folioTypes';
@@ -17,7 +17,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     booking,
     onRefresh
 }) => {
-    const currency = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol: currency } = useActiveCurrency();
     const ratePlanCode = folio?.market_code || booking?.ratePlan || 'Standard Rate';
     const roomNumber = folio?.rooms?.[0]?.room_number || folio?.room_number || booking?.roomNumber || 'Unassigned';
     const roomTypeName = folio?.rooms?.[0]?.room_type || folio?.room_type || booking?.roomType || 'Standard Suite';
@@ -30,7 +30,7 @@ export const TabRoomCharges: React.FC<TabRoomChargesProps> = ({
     const [modalAdults, setModalAdults] = useState(adults);
     const [modalChildren, setModalChildren] = useState(children);
     const [isComplimentary, setIsComplimentary] = useState(false);
-    const [modalCurrency, setModalCurrency] = useState(getActiveCurrencyCode() || 'USD');
+    const [modalCurrency, setModalCurrency] = useState(getActiveCurrencyCode() || 'BDT');
     const [modalRate, setModalRate] = useState('0');
     const [ratesInclusiveTax, setRatesInclusiveTax] = useState(false);
     const [scope, setScope] = useState<'SELECTED_DATES' | 'WHOLE_STAY'>('SELECTED_DATES');

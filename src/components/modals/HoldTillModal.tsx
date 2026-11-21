@@ -11,7 +11,7 @@ import {
     Crown
 } from 'lucide-react';
 import { getOperatingSystemDate } from '../../utils/roomInventoryEngine';
-import { getCurrencySymbol } from '../../utils/currencyUtils';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 
 export type HoldGuaranteeTier = 'courtesy' | 'corporate' | 'vip' | 'group';
 
@@ -64,7 +64,7 @@ export const HoldTillModal: React.FC<HoldTillModalProps> = ({
     initialReason = '',
     onConfirmHold
 }) => {
-    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol } = useActiveCurrency();
     const systemDate = getOperatingSystemDate();
 
     // Default: Start date is systemDate, End date is checkInDate (or systemDate if checkIn is today/past)

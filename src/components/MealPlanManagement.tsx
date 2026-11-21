@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Utensils,
     DollarSign, Clock, FileText, Search, RefreshCw, AlertTriangle, CheckCircle2,
-    Coffee, Pizza
+    Coffee, Pizza, Users, BedDouble, Sparkles
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
-import { getCurrencySymbol } from '../utils/currencyUtils';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 
 interface MealPlan {
     id: number;
@@ -58,7 +60,12 @@ interface MealPlan {
     // Global Default (Fallback)
     servingType: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
 
-    // Pricing
+    // Pricing & 3-Pillar Unified Structure
+    baseAdultsIncluded?: number;
+    baseChildrenIncluded?: number;
+    extraBedMealIncluded?: boolean;
+    extraBedMealPrice?: number;
+
     internalCost: number;
     sellingPriceAdult: number;
     sellingPriceChild: number;
@@ -76,8 +83,31 @@ interface MealPlan {
 
 const MEAL_STORAGE_KEY = 'hotel_meal_plans_v1';
 
+export const COURSE_DEFAULTS: Record<string, { adult: number; child: number; cost: number; label: string }> = {
+    hasBreakfast: { adult: 450, child: 225, cost: 180, label: 'Breakfast' },
+    hasLunch: { adult: 750, child: 375, cost: 300, label: 'Lunch' },
+    hasDinner: { adult: 950, child: 475, cost: 380, label: 'Dinner' },
+    hasBrunch: { adult: 600, child: 300, cost: 240, label: 'Brunch' },
+    hasCupole: { adult: 800, child: 400, cost: 320, label: 'Cupole' },
+    hasSnacks: { adult: 300, child: 150, cost: 120, label: 'Snacks' }
+};
+
+export const calculateDynamicMealPrice = (plan: Partial<MealPlan>) => {
+    let adult = 0;
+    let child = 0;
+    let cost = 0;
+    Object.entries(COURSE_DEFAULTS).forEach(([key, rates]) => {
+        if (plan[key as keyof MealPlan]) {
+            adult += rates.adult;
+            child += rates.child;
+            cost += rates.cost;
+        }
+    });
+    return { adult, child, cost, extraBed: Math.round(adult * 0.8) };
+};
+
 export default function MealPlanManagement() {
-    const currencySymbol = getCurrencySymbol();
+    const { currencySymbol } = useActiveCurrency();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [mealPlans, setMealPlans] = useState<MealPlan[]>(() => {
         try {
@@ -147,7 +177,14 @@ export default function MealPlanManagement() {
             snacksVenue: '',
             snacksCuisine: '',
             infantMealsFree: true,
-            maxInfantAge: 4
+            maxInfantAge: 3,
+            baseAdultsIncluded: 0,
+            baseChildrenIncluded: 0,
+            extraBedMealIncluded: false,
+            extraBedMealPrice: 0,
+            sellingPriceAdult: 0,
+            sellingPriceChild: 0,
+            internalCost: 0
         });
         setEditingPlan(null);
         setView('form');
@@ -180,13 +217,13 @@ export default function MealPlanManagement() {
 
     const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
-            alert('Please provide Plan Name and Short Code.');
+            toast.warning('Please provide Plan Name and Short Code.');
             return;
         }
 
         const currentCode = editingPlan?.shortCode;
         if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
-            alert(`Short Code "${formData.shortCode}" is already in use by another Meal Plan! Please use a unique code.`);
+            toast.error(`Short Code "${formData.shortCode}" is already in use by another Meal Plan! Please use a unique code.`);
             return;
         }
 
@@ -202,6 +239,7 @@ export default function MealPlanManagement() {
                     body: JSON.stringify(finalPlan)
                 });
             } catch {}
+            toast.success(`Meal Plan "${finalPlan.name}" updated!`);
         } else {
             finalPlan = { ...formData, id: Date.now() } as MealPlan;
             try {
@@ -213,6 +251,7 @@ export default function MealPlanManagement() {
                 const json = await res.json();
                 if (json.success && json.data?.id) finalPlan.id = json.data.id;
             } catch {}
+            toast.success(`Meal Plan "${finalPlan.name}" created!`);
         }
 
         let updated: MealPlan[];
@@ -232,20 +271,38 @@ export default function MealPlanManagement() {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this meal plan configuration?')) {
-            try {
-                await fetch(`${getApiBaseUrl()}/api/rates/meal-plans/${id}`, { method: 'DELETE' });
-            } catch {}
-            const updated = mealPlans.filter(p => p.id !== id);
-            persistMealPlans(updated);
-            try {
-                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-            } catch {}
-        }
+        const target = mealPlans.find(p => p.id === id);
+        const name = target?.name || 'this meal plan';
+        const confirmed = await confirmModal({
+            title: `Delete Meal Plan "${name}"?`,
+            message: 'Are you sure you want to delete this meal plan configuration? Future reservations will not be able to select this plan.',
+            confirmText: 'Delete Plan',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+            await fetch(`${getApiBaseUrl()}/api/rates/meal-plans/${id}`, { method: 'DELETE' });
+        } catch {}
+        const updated = mealPlans.filter(p => p.id !== id);
+        persistMealPlans(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
+        toast.success(`Meal Plan "${name}" deleted.`);
     };
 
     const toggleInclusion = (field: keyof MealPlan) => {
-        setFormData({ ...formData, [field]: !formData[field] });
+        const nextVal = !formData[field];
+        const next = { ...formData, [field]: nextVal };
+        const calc = calculateDynamicMealPrice(next);
+        next.sellingPriceAdult = calc.adult;
+        next.sellingPriceChild = calc.child;
+        next.internalCost = calc.cost;
+        if (next.extraBedMealIncluded) {
+            next.extraBedMealPrice = calc.extraBed;
+        }
+        setFormData(next);
     };
 
     const filteredMealPlans = mealPlans.filter(p =>
@@ -710,31 +767,242 @@ export default function MealPlanManagement() {
 
                 {/* 3. Pricing */}
                 {activeTab === 'pricing' && (
-                    <div className="card-container p-6 space-y-6">
+                    <div className="card-container p-6 space-y-8">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div className="flex items-center gap-2.5">
                                 <DollarSign className="size-5 text-primary" />
                                 <div>
-                                    <h3 className="text-sm text-slate-900">Pricing & Accounting Ledger</h3>
-                                    <p className="text-xs text-slate-500">Configure adult/child rates and automated posting ledger</p>
+                                    <h3 className="text-sm font-semibold text-slate-900">3-Pillar Board Pricing & Surcharges</h3>
+                                    <p className="text-xs text-slate-500">Occupancy covers, extra bedding meal policies, and ledger surcharges</p>
                                 </div>
                             </div>
                             <span className="badge-code">Ledger Sync</span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="space-y-4">
+                        {/* Pillar 1: Occupancy & Covers Allowance */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <Users className="size-4 text-primary" />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Pillar 1: Occupancy & Covers Allowance</h4>
+                                    <p className="text-[11px] text-slate-500">Base guest meal allowances covered under this board plan</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-700">Internal Cost / Unit ({currencySymbol})</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold text-slate-700">Base Adults Covered</label>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary-subtle text-primary border border-primary-border">
+                                            {formData.baseAdultsIncluded === 0 ? '⚡ Dynamic: Matches Room' : `${formData.baseAdultsIncluded} Adults`}
+                                        </span>
+                                    </div>
+                                    <select 
+                                        className="select-standard bg-white" 
+                                        value={formData.baseAdultsIncluded === 0 ? 'dynamic' : String(formData.baseAdultsIncluded || 2)} 
+                                        onChange={e => {
+                                            const val = e.target.value === 'dynamic' ? 0 : parseInt(e.target.value, 10);
+                                            setFormData({ ...formData, baseAdultsIncluded: val });
+                                        }}
+                                    >
+                                        <option value="dynamic">⚡ Dynamic (Inherit from Reserved Room Type)</option>
+                                        <option value="1">Fixed: 1 Adult Covered</option>
+                                        <option value="2">Fixed: 2 Adults Covered</option>
+                                        <option value="3">Fixed: 3 Adults Covered</option>
+                                        <option value="4">Fixed: 4 Adults Covered</option>
+                                    </select>
+                                    <p className="text-[11px] text-slate-400">
+                                        {formData.baseAdultsIncluded === 0 
+                                            ? 'Automatically scales meal covers to match the reserved room category' 
+                                            : 'Fixed adult guest meals bundled in base tariff'}
+                                    </p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Base Children Covered</label>
                                     <input 
                                         type="number" 
-                                        className="input-standard" 
-                                        placeholder="0.00" 
-                                        value={formData.internalCost || ''} 
-                                        onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) })} 
+                                        className="input-standard bg-white" 
+                                        value={formData.baseChildrenIncluded ?? 0} 
+                                        onChange={e => setFormData({ ...formData, baseChildrenIncluded: parseInt(e.target.value) || 0 })} 
                                     />
-                                    <p className="text-[11px] text-slate-500">Calculates Gross Operating Profit (GOP)</p>
+                                    <p className="text-[11px] text-slate-400">Children meals bundled without extra charge</p>
                                 </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Infant Policy</label>
+                                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                className="size-4 rounded text-primary" 
+                                                checked={formData.infantMealsFree !== false} 
+                                                onChange={e => setFormData({ ...formData, infantMealsFree: e.target.checked })} 
+                                            />
+                                            <span className="text-xs text-slate-700 font-semibold">Free Meals</span>
+                                        </label>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[11px] text-slate-500">Up to</span>
+                                            <input 
+                                                type="number" 
+                                                className="w-10 px-1 py-0.5 border border-slate-200 rounded text-xs text-center font-bold" 
+                                                value={formData.maxInfantAge || 3} 
+                                                onChange={e => setFormData({ ...formData, maxInfantAge: parseInt(e.target.value) || 3 })} 
+                                            />
+                                            <span className="text-[11px] text-slate-500">yrs</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">Complimentary baby food / infant buffet</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pillar 2: Extra Bedding Meal Policy */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <BedDouble className="size-4 text-primary" />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Pillar 2: Extra Bedding Meal Policy</h4>
+                                    <p className="text-[11px] text-slate-500">Catering entitlement when guests book a physical rollaway bed</p>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-primary-subtle/30 rounded-2xl border border-primary-border/40 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="extraBedMealIncluded"
+                                            className="size-4 rounded text-primary" 
+                                            checked={formData.extraBedMealIncluded || false} 
+                                            onChange={e => setFormData({ ...formData, extraBedMealIncluded: e.target.checked })} 
+                                        />
+                                        <label htmlFor="extraBedMealIncluded" className="text-xs font-bold text-slate-800 cursor-pointer">
+                                            Include Meals for Rollaway Extra Bed?
+                                        </label>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 pl-6">
+                                        If enabled, guests utilizing an extra bed automatically receive this meal plan without additional F&B billing.
+                                    </p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold text-slate-700">
+                                            Extra Bed Meal Supplement ({currencySymbol})
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const calc = calculateDynamicMealPrice(formData);
+                                                setFormData({ ...formData, extraBedMealPrice: calc.extraBed });
+                                            }}
+                                            className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-1"
+                                        >
+                                            <Sparkles className="size-3" /> Auto (80%)
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard pl-8 font-mono font-bold bg-white" 
+                                            placeholder="0" 
+                                            value={formData.extraBedMealPrice ?? 0} 
+                                            onChange={e => setFormData({ ...formData, extraBedMealPrice: parseFloat(e.target.value) || 0 })} 
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">Nightly meal surcharge for the extra bed occupant</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pillar 3: Base Pricing & Ledger Surcharges */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <DollarSign className="size-4 text-primary" />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Pillar 3: Base Pricing & Ledger Surcharges</h4>
+                                    <p className="text-[11px] text-slate-500">A-la-carte meal pricing, internal F&B costing, and folio ledger posting</p>
+                                </div>
+                            </div>
+
+                            {/* Dynamic Live Course Pricing Banner */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-primary-subtle/40 rounded-xl border border-primary-border/60">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="size-4 text-primary shrink-0" />
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-800 block">⚡ Dynamic Course-Based Pricing</span>
+                                        <span className="text-[11px] text-slate-600">
+                                            Active inclusions: {[
+                                                formData.hasBreakfast && 'Breakfast',
+                                                formData.hasLunch && 'Lunch',
+                                                formData.hasDinner && 'Dinner',
+                                                formData.hasBrunch && 'Brunch',
+                                                formData.hasCupole && 'Cupole',
+                                                formData.hasSnacks && 'Snacks'
+                                            ].filter(Boolean).join(' + ') || 'None selected'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const calc = calculateDynamicMealPrice(formData);
+                                        setFormData({
+                                            ...formData,
+                                            sellingPriceAdult: calc.adult,
+                                            sellingPriceChild: calc.child,
+                                            internalCost: calc.cost,
+                                            extraBedMealPrice: formData.extraBedMealIncluded ? calc.extraBed : 0
+                                        });
+                                        toast.success('Prices dynamically synchronized with active meal courses.');
+                                    }}
+                                    className="px-2.5 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary-hover transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+                                >
+                                    <RefreshCw className="size-3" /> Sync Dynamic Prices
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Selling Price Adult ({currencySymbol})</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard pl-8 font-mono font-bold" 
+                                            value={formData.sellingPriceAdult || ''} 
+                                            onChange={e => setFormData({ ...formData, sellingPriceAdult: parseFloat(e.target.value) || 0 })} 
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">Per additional adult per meal cycle</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Selling Price Child ({currencySymbol})</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard pl-8 font-mono font-bold" 
+                                            value={formData.sellingPriceChild || ''} 
+                                            onChange={e => setFormData({ ...formData, sellingPriceChild: parseFloat(e.target.value) || 0 })} 
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">Per additional child per meal cycle</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Internal Cost / Unit ({currencySymbol})</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400 font-bold">{currencySymbol}</span>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard pl-8" 
+                                            placeholder="0.00" 
+                                            value={formData.internalCost || ''} 
+                                            onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) || 0 })} 
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">F&B food cost (calculates kitchen GOP)</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-semibold text-slate-700">Posting Frequency</label>
                                     <select 
@@ -746,78 +1014,34 @@ export default function MealPlanManagement() {
                                         <option value="One-time">Check-in (Once per Stay)</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div className="space-y-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-800">Selling Price Adult ({currencySymbol})</label>
-                                        <input 
-                                            type="number" 
-                                            className="input-standard font-mono font-bold" 
-                                            value={formData.sellingPriceAdult || ''} 
-                                            onChange={e => setFormData({ ...formData, sellingPriceAdult: parseFloat(e.target.value) })} 
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-800">Selling Price Child ({currencySymbol})</label>
-                                        <input 
-                                            type="number" 
-                                            className="input-standard font-mono font-bold" 
-                                            value={formData.sellingPriceChild || ''} 
-                                            onChange={e => setFormData({ ...formData, sellingPriceChild: parseFloat(e.target.value) })} 
-                                        />
-                                    </div>
-                                </div>
-                                <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            className="size-4 rounded text-primary" 
-                                            checked={formData.infantMealsFree || false} 
-                                            onChange={e => setFormData({ ...formData, infantMealsFree: e.target.checked })} 
-                                        />
-                                        <span className="text-xs text-slate-700 font-semibold">Infant Meals Free</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-xs text-slate-500 font-medium">Up to</span>
-                                        <input 
-                                            type="number" 
-                                            className="w-12 px-2 py-1 border border-slate-200 rounded-lg text-xs text-center font-bold" 
-                                            value={formData.maxInfantAge || 4} 
-                                            onChange={e => setFormData({ ...formData, maxInfantAge: parseInt(e.target.value) })} 
-                                        />
-                                        <span className="text-xs text-slate-500 font-medium">yrs</span>
-                                    </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Revenue Ledger Code</label>
+                                    <select
+                                        className="select-standard font-mono"
+                                        value={formData.revenueCode || ''}
+                                        onChange={e => setFormData({ ...formData, revenueCode: e.target.value })}
+                                    >
+                                        <option value="">Select Revenue Ledger...</option>
+                                        <option value="REV-FB-BRK">REV-FB-BRK (Breakfast Revenue)</option>
+                                        <option value="REV-FB-LUN">REV-FB-LUN (Lunch Revenue) </option>
+                                        <option value="REV-FB-DIN">REV-FB-DIN (Dinner Revenue)</option>
+                                        <option value="REV-FB-SNC">REV-FB-SNC (Snack/Mini Revenue)</option>
+                                        <option value="REV-FB-MAP">REV-FB-MAP (Meal Inclusion/Half-Board)</option>
+                                        <option value="REV-FB-AP">REV-FB-AP (Meal Inclusion/Full-Board)</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <div className="md:col-span-2 space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-700">Revenue Ledger Code</label>
-                                <select
-                                    className="select-standard font-mono"
-                                    value={formData.revenueCode || ''}
-                                    onChange={e => setFormData({ ...formData, revenueCode: e.target.value })}
-                                >
-                                    <option value="">Select Revenue Ledger...</option>
-                                    <option value="REV-FB-BRK">REV-FB-BRK (Breakfast Revenue)</option>
-                                    <option value="REV-FB-LUN">REV-FB-LUN (Lunch Revenue) </option>
-                                    <option value="REV-FB-DIN">REV-FB-DIN (Dinner Revenue)</option>
-                                    <option value="REV-FB-SNC">REV-FB-SNC (Snack/Mini Revenue)</option>
-                                    <option value="REV-FB-MAP">REV-FB-MAP (Meal Inclusion/Half-Board)</option>
-                                    <option value="REV-FB-AP">REV-FB-AP (Meal Inclusion/Full-Board)</option>
-                                </select>
-                            </div>
-
-                            <div className="md:col-span-2 p-4 bg-amber-50/80 rounded-2xl border border-amber-200/80 flex items-start gap-3">
+                            <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200/80 flex items-start gap-3">
                                 <input
                                     type="checkbox"
+                                    id="mealTaxInclusive"
                                     className="size-4 mt-0.5 text-amber-600 rounded border-amber-300"
                                     checked={formData.taxInclusive || false}
                                     onChange={e => setFormData({ ...formData, taxInclusive: e.target.checked })}
                                 />
                                 <div className="text-xs">
-                                    <span className="text-amber-900 block">Selling Price is Tax Inclusive</span>
+                                    <label htmlFor="mealTaxInclusive" className="text-amber-900 font-semibold block cursor-pointer">Selling Price is Tax Inclusive</label>
                                     <span className="text-amber-800">If checked, taxes and service charges are included in the tariff. If unchecked, the guest folio will be assessed supplemental VAT/SC.</span>
                                 </div>
                             </div>

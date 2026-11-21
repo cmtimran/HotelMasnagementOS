@@ -1,4 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useActiveCurrency } from '../utils/currencyUtils';
+import {
+    resolveDynamicPropertyId,
+    getPropertyPaymentConfig,
+    getPaymentMethodsForOutlet
+} from '../utils/propertyPaymentMethodEngine';
 import {
     Search,
     ChevronLeft,
@@ -21,9 +27,29 @@ const TableIcon = () => (
 );
 
 const POSPage = () => {
+    const { currencySymbol } = useActiveCurrency();
     const [selectedCategory, setSelectedCategory] = useState('Fast Food');
     const [selectedTable, setSelectedTable] = useState<number | null>(null);
     const [cart, setCart] = useState<any[]>([]);
+
+    // Dynamic F&B Payment Engine
+    const activePropertyId = useMemo(() => resolveDynamicPropertyId(), []);
+    const posConfig = useMemo(() => getPropertyPaymentConfig(activePropertyId), [activePropertyId]);
+    const fbMethods = useMemo(() => getPaymentMethodsForOutlet(activePropertyId, 'FOOD_AND_BEVERAGE'), [activePropertyId]);
+    const fbCardSchemes = useMemo(() => fbMethods.filter(m => m.category === 'CARD'), [fbMethods]);
+    const fbMfsProviders = useMemo(() => fbMethods.filter(m => m.category === 'MOBILE_BANKING'), [fbMethods]);
+    const posTerminalsList = useMemo(() => {
+        const terms = posConfig.posTerminals.filter(t => t.assignedOutlets.includes('FOOD_AND_BEVERAGE') || t.status === 'Active');
+        if (terms.length > 0) return terms;
+        if (posConfig.registeredBanks.length > 0) {
+            return posConfig.registeredBanks.map((b, idx) => ({
+                id: `term-${b.id}`,
+                terminalName: `POS Terminal #${idx + 1} (${b.bankName})`,
+                bankName: b.bankName
+            }));
+        }
+        return [{ id: 'term-def', terminalName: 'Restaurant POS EDC #1', bankName: 'Asia Bank Plc.' }];
+    }, [posConfig]);
 
     const categories = ['All', 'Fast Food', 'Beverage', 'Desert', 'Platter'];
 
@@ -90,7 +116,7 @@ const POSPage = () => {
                             <div className="mb-6">
                                 <h3 className="text-xl text-gray-900 mb-1">{selectedProductForModal.name}</h3>
                                 <p className="text-gray-500 text-sm mb-2">with Spicy Special Sauce</p>
-                                <p className="text-xl text-gray-900">৳ {selectedProductForModal.price}</p>
+                                <p className="text-xl text-gray-900">{currencySymbol} {selectedProductForModal.price}</p>
                             </div>
 
                             {/* Variants (Mock Data for demo) */}
@@ -104,7 +130,7 @@ const POSPage = () => {
                                         </div>
                                         <span className="text-gray-700">Juicy</span>
                                     </div>
-                                    <span className="text-gray-500 text-sm">৳ {selectedProductForModal.price.toFixed(2)}</span>
+                                    <span className="text-gray-500 text-sm">{currencySymbol} {selectedProductForModal.price.toFixed(2)}</span>
                                 </label>
                             </div>
 
@@ -196,11 +222,20 @@ const POSPage = () => {
                                             <div className="flex gap-3">
                                                 <div className="flex-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Card Type</label>
-                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option>Visa/Master</option></select>
+                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                                        {fbCardSchemes.map(c => (
+                                                            <option key={c.id} value={c.displayName}>{c.displayName} {c.defaultCommissionRate ? `(${c.defaultCommissionRate}%)` : ''}</option>
+                                                        ))}
+                                                        {fbCardSchemes.length === 0 && <option>Visa / MasterCard</option>}
+                                                    </select>
                                                 </div>
                                                 <div className="flex-[1.5] space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">POS Terminal</label>
-                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option>POS - BRAC Bank</option></select>
+                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                                        {posTerminalsList.map((t: any) => (
+                                                            <option key={t.id} value={t.id}>{t.terminalName}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div className="flex-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Amount</label>
@@ -213,7 +248,7 @@ const POSPage = () => {
                                         <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex flex-col gap-3">
                                             <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                                                 <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                                    <span className="font-serif text-green-600">৳</span> Cash Payment
+                                                    <span className="font-serif text-green-600">{currencySymbol}</span> Cash Payment
                                                 </span>
                                                 <button className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                                             </div>
@@ -237,7 +272,12 @@ const POSPage = () => {
                                             <div className="grid grid-cols-4 gap-3">
                                                 <div className="col-span-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Provider</label>
-                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option>bKash</option></select>
+                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                                        {fbMfsProviders.map(p => (
+                                                            <option key={p.id} value={p.displayName}>{p.displayName} {p.walletNumber ? `[${p.walletNumber}]` : ''}</option>
+                                                        ))}
+                                                        {fbMfsProviders.length === 0 && <option>bKash</option>}
+                                                    </select>
                                                 </div>
                                                 <div className="col-span-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Txn ID</label>
@@ -504,7 +544,7 @@ const POSPage = () => {
                                 <p className="text-[10px] text-gray-400 mb-1">{product.time}</p>
 
                                 <div className="flex items-center justify-between">
-                                    <span className="text-gray-800 text-sm">৳ {product.price.toFixed(2)}</span>
+                                    <span className="text-gray-800 text-sm">{currencySymbol} {product.price.toFixed(2)}</span>
                                     <button
                                         onClick={() => addToCart(product)}
                                         className="p-0.5 bg-green-500 text-white rounded-full hover:bg-green-600 shadow-sm transition-transform active:scale-95"
@@ -583,7 +623,7 @@ const POSPage = () => {
                             {cart.map((item, idx) => (
                                 <div key={idx} className="flex justify-between text-sm border-b pb-2">
                                     <span>{item.name}</span>
-                                    <span className="font-semibold">৳ {item.price}</span>
+                                    <span className="font-semibold">{currencySymbol} {item.price}</span>
                                 </div>
                             ))}
                         </div>
@@ -593,10 +633,10 @@ const POSPage = () => {
                 {/* Total Section */}
                 <div className="p-3 bg-white border-t border-gray-100">
                     <div className="text-right mb-3">
-                        <h2 className="text-2xl text-gray-900">Total: ৳ {cart.reduce((sum, item) => sum + item.price, 0).toFixed(2)}</h2>
+                        <h2 className="text-2xl text-gray-900">Total: {currencySymbol} {cart.reduce((sum, item) => sum + item.price, 0).toFixed(2)}</h2>
                         <div className="flex justify-end gap-3 text-[10px] text-gray-500 mt-1">
-                            <span>Tax: ৳ 0.00</span>
-                            <span>Service: ৳ 0.00</span>
+                            <span>Tax: {currencySymbol} 0.00</span>
+                            <span>Service: {currencySymbol} 0.00</span>
                         </div>
                     </div>
 

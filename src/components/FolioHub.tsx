@@ -15,6 +15,8 @@ import {
 } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 import { toast } from '../context/ToastContext';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { RefundVoucherModal, type RefundVoucherData } from './folio/modals/RefundVoucherModal';
 
 // ---------------------------------------------------------------------------
 // DATA CONTRACTS
@@ -179,6 +181,7 @@ export const FolioHub: React.FC = () => {
         refundMethod: 'bKash MFS',
         reason: 'Cancellation forfeiture under 48-hr policy'
     });
+    const [refundVoucherPrompt, setRefundVoucherPrompt] = useState<RefundVoucherData | null>(null);
 
     // ---------------------------------------------------------------------------
     // BUILD FOLIOS FROM REAL DATABASE / STORED RESERVATIONS
@@ -257,26 +260,111 @@ export const FolioHub: React.FC = () => {
         });
     }, []);
 
+    // Fetch Canonical Folios from Cloud PostgreSQL API
+    const fetchFoliosFromAPI = useCallback(async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                const mapped: FolioAccount[] = json.data.map((f: any) => {
+                    const charges = f.charges || [];
+                    const payments = f.payments || [];
+                    const txns: FolioTransaction[] = [];
+
+                    charges.forEach((c: any) => {
+                        txns.push({
+                            id: `chg-${c.id}`,
+                            date: c.charge_date ? `${c.charge_date} 12:00` : `${getOperatingSystemDate()} 12:00`,
+                            refNo: `CHG-${c.charge_code || 'SRV'}-${c.id}`,
+                            particulars: c.description || 'Department Charge',
+                            description: `Posted charge (Tax: ৳${Number(c.tax_amount || 0).toFixed(2)})`,
+                            user: 'system_pms',
+                            amount: -Number(c.total_amount || c.amount || 0),
+                            windowId: (c.window_id || (c.charge_code?.includes('FB') || c.charge_code?.includes('SPA') ? 2 : 1)) as 1 | 2,
+                            category: c.charge_code?.includes('FB') ? 'F&B' : c.charge_code?.includes('ROOM') ? 'Room' : 'Extra' as any,
+                            isTaxExempt: false
+                        });
+                    });
+
+                    payments.forEach((p: any) => {
+                        txns.push({
+                            id: `pmt-${p.id}`,
+                            date: p.transaction_date ? String(p.transaction_date).slice(0, 16).replace('T', ' ') : `${getOperatingSystemDate()} 14:00`,
+                            refNo: p.payment_number || `PAY-${p.id}`,
+                            particulars: `Payment Received (${p.payment_method})`,
+                            description: `Receipt Ref: ${p.reference_code || 'Front Desk'}`,
+                            user: 'fo_cashier',
+                            amount: Number(p.amount || 0),
+                            windowId: (p.window_id || 1) as 1 | 2,
+                            category: 'Payment'
+                        });
+                    });
+
+                    if (txns.length === 0 && Number(f.balance) > 0) {
+                        txns.push({
+                            id: `tar-${f.id}`,
+                            date: `${f.check_in || getOperatingSystemDate()} 14:00`,
+                            refNo: `TAR-${f.reservation_number || f.id}`,
+                            particulars: 'Room Accommodation Tariff',
+                            description: `${f.room_type || 'Room'} stay rate`,
+                            user: 'system_night_audit',
+                            amount: -Number(f.balance),
+                            windowId: 1,
+                            category: 'Room',
+                            isTaxExempt: false
+                        });
+                    }
+
+                    return {
+                        id: Number(f.id),
+                        reservationNumber: f.reservation_number || `RES-${f.id}`,
+                        roomNumber: String(f.room_number || 'Unassigned'),
+                        guestName: f.guest_name || 'Valued Guest',
+                        guestPhone: f.phone || '',
+                        guestEmail: f.email || '',
+                        folioNumber: f.folio_number || `FOL-${f.id}`,
+                        roomType: f.room_type || 'Standard Room',
+                        checkIn: f.check_in || getOperatingSystemDate(),
+                        checkOut: f.check_out || getOperatingSystemDate(),
+                        nights: Number(f.nights || 1),
+                        billTo: 'GUEST' as BillToType,
+                        groupCode: f.group_code,
+                        isTaxExempt: false,
+                        hasRoutingRules: true,
+                        routedIncidentalsWindow: 2 as 1 | 2,
+                        status: ((f.status || 'OPEN').toUpperCase() === 'CLOSED' ? 'SETTLED' : 'OPEN') as any,
+                        transactions: txns
+                    };
+                });
+                setFolios(mapped);
+                localStorage.setItem('hotel_folios_hub_v1', JSON.stringify(mapped));
+                return;
+            }
+        } catch (e) {
+            console.warn('API fetch folios fallback in FolioHub:', e);
+        }
+
+        const fallback = buildFoliosFromDB();
+        if (fallback.length > 0) setFolios(fallback);
+    }, [buildFoliosFromDB]);
+
     // Initial Load & Event Sync
     useEffect(() => {
         syncReservationsFromDB();
-        const built = buildFoliosFromDB();
-        if (built.length > 0) {
-            setFolios(built);
-            setSelectedFolioId(built[0].id);
-        }
+        fetchFoliosFromAPI();
 
         const handleSync = () => {
             syncReservationsFromDB();
-            const refreshed = buildFoliosFromDB();
-            if (refreshed.length > 0) {
-                setFolios(refreshed);
-            }
+            fetchFoliosFromAPI();
         };
 
         window.addEventListener('hotel_pms_sync_event', handleSync);
-        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
-    }, [buildFoliosFromDB]);
+        window.addEventListener('pms_network_sync', handleSync);
+        return () => {
+            window.removeEventListener('hotel_pms_sync_event', handleSync);
+            window.removeEventListener('pms_network_sync', handleSync);
+        };
+    }, [fetchFoliosFromAPI]);
 
     // Save to Local Storage Cache
     useEffect(() => {
@@ -375,7 +463,21 @@ export const FolioHub: React.FC = () => {
         setIsPaymentModalOpen(false);
         setPaymentForm({ ...paymentForm, amount: 0, referenceCode: '', notes: '' });
         toast.success(`Payment of ৳${paymentForm.amount.toLocaleString()} posted to Window ${paymentForm.targetWindow}!`);
+        
+        // Post payment to PostgreSQL canonical ledger
+        fetch(`${getApiBaseUrl()}/api/accounting/folios/${currentFolio.id}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: Number(paymentForm.amount),
+                paymentMethod: paymentForm.method,
+                referenceCode: paymentForm.referenceCode,
+                remarks: paymentForm.notes
+            })
+        }).catch(err => console.warn('Payment API notice:', err));
+
         broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: currentFolio.id });
+        window.dispatchEvent(new CustomEvent('pms_network_sync', { detail: { type: 'FOLIO_UPDATED', folioId: currentFolio.id } }));
     };
 
     // OP 03 & OP 16: Add Extra Charges (With Item-Level Tax Exemption Toggle)
@@ -429,7 +531,21 @@ export const FolioHub: React.FC = () => {
         setFolios(updated);
         setIsExtraChargeModalOpen(false);
         toast.success(`Posted ৳${Math.round(total).toLocaleString()} to Window ${targetWindow} (${extraChargeForm.department})`);
+
+        // Post charge to PostgreSQL canonical ledger
+        fetch(`${getApiBaseUrl()}/api/accounting/folios/${currentFolio.id}/charges`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chargeCode: 'EXTRA_CHG',
+                description: `${extraChargeForm.department}: ${extraChargeForm.description}`,
+                amount: Math.round(total),
+                taxAmount: 0
+            })
+        }).catch(err => console.warn('Charge API notice:', err));
+
         broadcastPMSEvent({ type: 'FOLIO_UPDATED', folioId: currentFolio.id });
+        window.dispatchEvent(new CustomEvent('pms_network_sync', { detail: { type: 'FOLIO_UPDATED', folioId: currentFolio.id } }));
     };
 
     // OP 04 & OP 14: Apply Tax Exemption
@@ -691,6 +807,34 @@ export const FolioHub: React.FC = () => {
             toast.success(`Partial settlement: ৳${depositSettleForm.retentionAmount} retained, ৳${depositSettleForm.refundAmount} refunded for ${resNo}.`);
         } else {
             toast.success(`Deposit of ৳${depositAmount.toLocaleString()} converted to 1-Year Guest Stay Credit Voucher (VCH-${resNo}).`);
+        }
+
+        if (depositSettleForm.settleOption === 'REFUND' || depositSettleForm.settleOption === 'PARTIAL') {
+            const refundAmt = depositSettleForm.settleOption === 'REFUND' ? depositAmount : Number(depositSettleForm.refundAmount || 0);
+            const retentionAmt = depositSettleForm.settleOption === 'REFUND' ? 0 : Number(depositSettleForm.retentionAmount || 0);
+
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+            const seqNo = String(Math.floor(1000 + Math.random() * 9000));
+            const voucherNo = `RFV-${dateStr}-${seqNo}`;
+
+            setRefundVoucherPrompt({
+                voucherNumber: voucherNo,
+                originalReceiptNumber: (targetCancelledRes as any).originalReceiptNumber || `AR-${dateStr}-0101`,
+                date: now.toISOString(),
+                guestName: targetCancelledRes.guestName,
+                roomNumber: targetCancelledRes.roomNumber || '101',
+                roomType: targetCancelledRes.roomType || 'Standard',
+                reservationNumber: resNo,
+                folioNumber: (targetCancelledRes as any).folioNumber || `FN~${resNo}`,
+                originalDepositAmount: depositAmount,
+                retentionAmount: retentionAmt,
+                refundAmount: refundAmt,
+                disbursementMethod: depositSettleForm.refundMethod || 'Cash',
+                reason: depositSettleForm.reason || 'Cancellation policy refund',
+                authorizedBy: 'Duty Manager',
+                cashierName: 'Front Desk Cashier'
+            });
         }
 
         setIsSettleDepositModalOpen(false);
@@ -2367,6 +2511,15 @@ export const FolioHub: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Real-Time Auto-Prompt Refund Voucher Modal */}
+            {refundVoucherPrompt && (
+                <RefundVoucherModal
+                    isOpen={Boolean(refundVoucherPrompt)}
+                    onClose={() => setRefundVoucherPrompt(null)}
+                    refundData={refundVoucherPrompt}
+                />
             )}
         </div>
     );

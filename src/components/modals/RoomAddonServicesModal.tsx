@@ -17,8 +17,10 @@ import {
     FileText,
     Cake,
     Heart,
-    Coffee
+    Coffee,
+    Ban
 } from 'lucide-react';
+import { getRoomTypeCapacity } from '../../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -90,6 +92,9 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
     }, [assignedRooms, roomNumber]);
 
     const isMultiRoomRow = (roomsCount && roomsCount > 1) || assignedRoomsList.length > 1;
+
+    const roomCapacity = useMemo(() => getRoomTypeCapacity(roomType), [roomType]);
+    const isExtraBedPhysicallyAllowed = roomCapacity.extraBedAllowed !== false;
 
     const [targetRoomScope, setTargetRoomScope] = useState<string>(() => {
         return currentServices?.targetRoomNumber || 'all';
@@ -802,22 +807,36 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                         Active
                                                     </span>
                                                 )}
+                                                {!isExtraBedPhysicallyAllowed && (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-bold">
+                                                        Prohibited
+                                                    </span>
+                                                )}
                                             </label>
                                             <p className="text-xs text-slate-500 m-0">
                                                 Allocate rollaway adult bed, foldable mattress, or infant crib with linens
                                             </p>
                                         </div>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
+                                    <label className={`relative inline-flex items-center ${!isExtraBedPhysicallyAllowed ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={extraBed.enabled}
-                                            onChange={e => setExtraBed(prev => ({ ...prev, enabled: e.target.checked }))}
+                                            checked={extraBed.enabled && isExtraBedPhysicallyAllowed}
+                                            disabled={!isExtraBedPhysicallyAllowed}
+                                            onChange={e => setExtraBed(prev => ({ ...prev, enabled: isExtraBedPhysicallyAllowed && e.target.checked }))}
                                             className="sr-only peer"
                                         />
                                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                     </label>
                                 </div>
+                                {!isExtraBedPhysicallyAllowed && (
+                                    <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-800">
+                                        <Ban size={16} className="text-rose-600 shrink-0" />
+                                        <div>
+                                            <strong>Hardware Prohibited:</strong> Room category &quot;{roomType}&quot; does not physically accommodate rollaway extra beds. Extra bedding cannot be allocated for this room.
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {extraBed.enabled && (

@@ -6,9 +6,12 @@ import {
     Lock,
     CheckCircle2,
     DollarSign,
-    AlertCircle
+    AlertCircle,
+    Sparkles,
+    X
 } from 'lucide-react';
-import { getCurrencySymbol } from '../../../utils/currencyUtils';
+import { useActiveCurrency } from '../../../utils/currencyUtils';
+import { getApiBaseUrl } from '../../../utils/apiUrl';
 import type { FolioData } from '../folioTypes';
 import type { AmendBookingData } from '../../modals/AmendStayModal';
 
@@ -39,10 +42,10 @@ export const TabCreditCard: React.FC<TabCreditCardProps> = ({
     onOpenAddPayment,
     onRefresh: _onRefresh
 }) => {
-    const currency = getCurrencySymbol();
+    const { currencySymbol: currency } = useActiveCurrency();
     const guestName = folio?.guest_name || booking?.guestName || 'Valued Guest';
 
-    // Stored tokenized cards (matching Yanolja PMS / Zeamster integration)
+    // Stored tokenized cards (Enterprise Payment Gateway integration)
     const [cards, setCards] = useState<StoredCard[]>([
         {
             id: 'card-1',
@@ -67,6 +70,55 @@ export const TabCreditCard: React.FC<TabCreditCardProps> = ({
     const [newCardExpiry, setNewCardExpiry] = useState('08/29');
     const [newCardCvv, setNewCardCvv] = useState('');
     const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    // Extend Sale States (Card-on-File Protocol)
+    const [isExtendSaleOpen, setIsExtendSaleOpen] = useState(false);
+    const [selectedExtendCard, setSelectedExtendCard] = useState<StoredCard | null>(null);
+    const [extendSaleAmount, setExtendSaleAmount] = useState('500.00');
+    const [extendSaleRevenueHead, setExtendSaleRevenueHead] = useState('Minibar');
+    const [extendSaleDescription, setExtendSaleDescription] = useState('Post-stay incidental charge (Extend Sale)');
+    const [isProcessingExtend, setIsProcessingExtend] = useState(false);
+
+    const handleExtendSale = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const amt = parseFloat(extendSaleAmount) || 0;
+        if (amt <= 0 || !selectedExtendCard) {
+            setActionMsg({ type: 'error', text: 'Please enter a valid charge amount.' });
+            return;
+        }
+
+        setIsProcessingExtend(true);
+        try {
+            const folioId = folio?.id || '1';
+            const res = await fetch(`${getApiBaseUrl()}/api/accounting/folios/${folioId}/extend-sale`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: amt,
+                    revenueHead: extendSaleRevenueHead,
+                    description: extendSaleDescription,
+                    cardLast4: selectedExtendCard.last4,
+                    cardType: selectedExtendCard.cardType,
+                    userName: 'Front Desk'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setActionMsg({
+                    type: 'success',
+                    text: json.message || `Extend sale of ${currency} ${amt.toFixed(2)} charged to ${selectedExtendCard.cardType} ****${selectedExtendCard.last4} successfully!`
+                });
+                setIsExtendSaleOpen(false);
+                if (_onRefresh) _onRefresh();
+            } else {
+                setActionMsg({ type: 'error', text: json.error || 'Failed to process extend sale' });
+            }
+        } catch (err: any) {
+            setActionMsg({ type: 'error', text: err.message || 'Error processing extend sale' });
+        } finally {
+            setIsProcessingExtend(false);
+        }
+    };
 
     const handlePreAuthorize = (cardId: string) => {
         const amt = parseFloat(preAuthInputAmount) || 0;
@@ -158,7 +210,7 @@ export const TabCreditCard: React.FC<TabCreditCardProps> = ({
                     <div>
                         <h3 className="text-xs font-bold text-gray-800">Credit Card &amp; Payment Gateway Operations</h3>
                         <p className="text-[10px] text-gray-500">
-                            PCI-DSS compliant card vaulting, pre-authorizations, and settlements (eZee / Zeamster / Shift4)
+                            PCI-DSS compliant card vaulting, pre-authorizations, and settlements (Direct Gateway / Tokenized)
                         </p>
                     </div>
                 </div>
@@ -279,6 +331,20 @@ export const TabCreditCard: React.FC<TabCreditCardProps> = ({
                                     <span>Charge Card</span>
                                 </button>
                             )}
+
+                            {/* Extend Sale Button */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedExtendCard(c);
+                                    setIsExtendSaleOpen(true);
+                                }}
+                                title="Extend Sale: Charge card-on-file for late incidentals"
+                                className="h-7 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded px-2 text-xs font-semibold shadow-2xs transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                                <Sparkles size={11} className="text-indigo-600" />
+                                <span>Extend Sale</span>
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -407,6 +473,97 @@ export const TabCreditCard: React.FC<TabCreditCardProps> = ({
                                 Pre-Authorize
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Extend Sale (Charge Card-on-File) */}
+            {isExtendSaleOpen && selectedExtendCard && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-4 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-gray-800 text-xs">
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <Sparkles size={15} className="text-indigo-600" />
+                                <span>Extend Sale (Card-on-File Post-Stay Charge)</span>
+                            </h3>
+                            <button type="button" onClick={() => setIsExtendSaleOpen(false)} className="text-gray-400 hover:text-gray-700 cursor-pointer">
+                                <X size={15} />
+                            </button>
+                        </div>
+
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5 text-[11px] text-indigo-900 space-y-1">
+                            <p className="font-semibold">Charge Tokenized Card:</p>
+                            <p>
+                                Card: <strong>{selectedExtendCard.cardType} •••• {selectedExtendCard.last4}</strong> ({selectedExtendCard.cardholderName})
+                            </p>
+                            <p className="text-[10px] text-indigo-700 font-mono">Token: {selectedExtendCard.token}</p>
+                        </div>
+
+                        <form onSubmit={handleExtendSale} className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Charge Amount ({currency}) *
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={extendSaleAmount}
+                                    onChange={e => setExtendSaleAmount(e.target.value)}
+                                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold text-gray-900 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Revenue Category *
+                                </label>
+                                <select
+                                    value={extendSaleRevenueHead}
+                                    onChange={e => setExtendSaleRevenueHead(e.target.value)}
+                                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                >
+                                    <option value="Minibar">Minibar Consumption</option>
+                                    <option value="Laundry">Laundry &amp; Valet Service</option>
+                                    <option value="F&B Room Service">F&B / Restaurant Bill</option>
+                                    <option value="Late Departure">Late Departure Fee</option>
+                                    <option value="Room Damage">Room Damage / Replacement</option>
+                                    <option value="Transportation">Airport Shuttle / Cab</option>
+                                    <option value="Other Extra">Other Incidental</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                    Description / Slip Ref
+                                </label>
+                                <input
+                                    type="text"
+                                    value={extendSaleDescription}
+                                    onChange={e => setExtendSaleDescription(e.target.value)}
+                                    placeholder="Enter slip reference or charge details..."
+                                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsExtendSaleOpen(false)}
+                                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isProcessingExtend}
+                                    className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <Sparkles size={12} />
+                                    <span>{isProcessingExtend ? 'Processing...' : 'Process Extend Sale'}</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

@@ -115,9 +115,8 @@ const Login = ({ onLogin }: LoginProps) => {
                     }
                 }
                 localStorage.setItem('user_data', JSON.stringify(userData));
-                if (data.token) {
-                    localStorage.setItem('auth_token', data.token);
-                }
+                localStorage.setItem('auth_token', data.token || ('hotel_session_' + Date.now()));
+                localStorage.setItem('hotel_last_activity_time', String(Date.now()));
 
                 setTimeout(() => {
                     onLogin(userData);

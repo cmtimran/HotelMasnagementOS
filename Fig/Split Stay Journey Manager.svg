@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 905.731 371.6" width="905.731" height="371.6" style="--bg:#FFFFFF;--fg:#1E293B;--line:#64748B;--muted:#475569;--surface:#F8FAFC;--border:#CBD5E1;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="Current_Itinerary" data-label="Current Itinerary">
+  <rect x="40" y="151.7375" width="491.711" height="144.75" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="151.7375" width="491.711" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="165.7375" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Current Itinerary</text>
+</g>
+<g class="subgraph" data-id="Management_Capabilities" data-label="Management Capabilities">
+  <rect x="591.711" y="40" width="274.0199999999999" height="291.6" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="591.711" y="40" width="274.0199999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="603.711" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Management Capabilities</text>
+</g>
+<polyline class="edge" data-from="L2" data-to="M1" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="349.438,209.18750000000003 361.438,209.18750000000003 361.438,202.46250000000003 573.711,202.4625 573.711,167.35000000000002 613.45375,167.35000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L2" data-to="M2" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="349.438,222.63750000000002 361.438,222.63750000000002 361.438,215.68750000000003 573.711,215.6875 573.711,232.25 613.45375,232.25" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L3" data-to="M3" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="515.711,253.58750000000003 573.711,253.5875 573.711,297.15000000000003 613.45375,297.15000000000003" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L1" data-to="L2" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="178.719,222.63750000000002 226.719,222.63750000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L2" data-to="L3" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="349.438,236.0875 361.438,236.0875 361.438,253.5875 397.438,253.5875" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="L1" data-label="Leg 1: Rm 202
+02-04 Jul (2N)" data-shape="rectangle">
+  <rect x="56" y="195.7375" width="122.719" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="117.3595" y="222.63750000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="117.3595" dy="-3.9000000000000012">Leg 1: Rm 202</tspan><tspan x="117.3595" dy="16.900000000000002">02-04 Jul (2N)</tspan></text>
+</g>
+<g class="node" data-id="L2" data-label="Leg 2: Rm 101
+04-06 Jul (2N)" data-shape="rectangle">
+  <rect x="226.719" y="195.7375" width="122.719" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="288.07849999999996" y="222.63750000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="288.07849999999996" dy="-3.9000000000000012">Leg 2: Rm 101</tspan><tspan x="288.07849999999996" dy="16.900000000000002">04-06 Jul (2N)</tspan></text>
+</g>
+<g class="node" data-id="L3" data-label="Leg 3: Rm 201
+06-07 Jul (1N)" data-shape="rectangle">
+  <rect x="397.438" y="226.6875" width="118.273" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="456.5745" y="253.5875" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="456.5745" dy="-3.9000000000000012">Leg 3: Rm 201</tspan><tspan x="456.5745" dy="16.900000000000002">06-07 Jul (1N)</tspan></text>
+</g>
+<g class="node" data-id="M1" data-label="Change Room Assignment per Leg" data-shape="rectangle">
+  <rect x="613.45375" y="148.9" width="242.01999999999992" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="734.46375" y="167.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Change Room Assignment per Leg</text>
+</g>
+<g class="node" data-id="M2" data-label="✂ Split Leg into Sub-Leg" data-shape="rectangle">
+  <rect x="613.45375" y="213.8" width="186.44500000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="706.67625" y="232.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">✂ Split Leg into Sub-Leg</text>
+</g>
+<g class="node" data-id="M3" data-label="Merge Leg with Previous/Next" data-shape="rectangle">
+  <rect x="613.45375" y="278.70000000000005" width="219.04899999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="722.97825" y="297.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Merge Leg with Previous/Next</text>
+</g>
+<g class="node" data-id="M4" data-label="+ Add Extra Room Move at End" data-shape="rectangle">
+  <rect x="613.45375" y="84" width="219.049" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="722.97825" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">+ Add Extra Room Move at End</text>
+</g>
+</svg>

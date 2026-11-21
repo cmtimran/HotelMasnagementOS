@@ -4,13 +4,16 @@ import {
     Shield, Percent, Star, Calendar as CalendarIcon,
     TrendingUp, AlertCircle, Layers, Coffee, Utensils,
     Moon, Sun, MapPin, Clock, FileText, Search,
-    RefreshCw, AlertTriangle, CheckCircle2, Tags
+    RefreshCw, AlertTriangle, CheckCircle2, Tags,
+    BedDouble, Users, Check, Ban
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
-import { getCurrencySymbol, getActiveCurrencyCode } from '../utils/currencyUtils';
+import { useActiveCurrency, getActiveCurrencyCode } from '../utils/currencyUtils';
 import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 
 interface RatePlan {
     id: number;
@@ -61,12 +64,18 @@ interface RatePricing {
     extraChild: number;
     baseOccupancy: number;
     maxOccupancy: number;
+    // 3-Pillar Unified Fields matching RoomType & Package:
+    baseChild?: number;
+    maxChild?: number;
+    extraBedAllowed?: boolean;
+    extraBedPrice?: number;
+    useCustomSurcharges?: boolean;
 }
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function RatePlanManagement() {
-    const currencySymbol = getCurrencySymbol();
+    const { currencySymbol } = useActiveCurrency();
     const [view, setView] = useState<'list' | 'form' | 'calendar'>('list');
     const [ratePlans, setRatePlans] = useState<RatePlan[]>(() => {
         try {
@@ -134,18 +143,33 @@ export default function RatePlanManagement() {
     const openCreate = () => {
         setIsCodeManual(false);
         const dynamicRooms = getDynamicRoomTypes();
-        const initialPricing = dynamicRooms.map(rt => ({
-            roomTypeId: rt.name,
-            structure: 'Flat' as const,
-            operatingCost: 0,
-            baseRate: rt.baseRate || 0,
-            doubleRate: rt.baseRate || 0,
-            tripleRate: (rt.baseRate || 0) + (rt.extraAdultPrice || 0),
-            extraAdult: rt.extraAdultPrice || 0,
-            extraChild: rt.extraChildPrice || 0,
-            baseOccupancy: rt.baseOccupancy || 2,
-            maxOccupancy: rt.maxAdults || 3
-        }));
+        const initialPricing = dynamicRooms.map(rt => {
+            const baseR = Number(rt.baseRate) || 0;
+            const extraA = Number(rt.extraAdultPrice ?? rt.extraBedRate) || 0;
+            const extraC = Number(rt.extraChildPrice) || 0;
+            const baseOcc = Number(rt.baseOccupancy) || 1;
+            const maxOcc = Number(rt.maxAdults) || baseOcc;
+            const maxCh = Number(rt.maxChildren) || 0;
+            const extraBedAllow = rt.extraBedAllowed !== undefined ? Boolean(rt.extraBedAllowed) : (Number(rt.extraBedRate) > 0);
+            const extraBedP = Number(rt.extraBedRate || rt.extraAdultPrice || 1000);
+            return {
+                roomTypeId: rt.name,
+                structure: 'Flat' as const,
+                operatingCost: 0,
+                baseRate: baseR,
+                doubleRate: baseR,
+                tripleRate: baseR + extraA,
+                extraAdult: extraA,
+                extraChild: extraC,
+                baseOccupancy: baseOcc,
+                maxOccupancy: maxOcc,
+                baseChild: 0,
+                maxChild: maxCh,
+                extraBedAllowed: extraBedAllow,
+                extraBedPrice: extraBedP,
+                useCustomSurcharges: false
+            };
+        });
         const oneYearAhead = new Date();
         oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
 
@@ -205,27 +229,36 @@ export default function RatePlanManagement() {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this rate plan?')) {
-            try {
-                await fetch(`${getApiBaseUrl()}/api/rates/plans/${id}`, { method: 'DELETE' });
-            } catch {}
-            const updated = ratePlans.filter(p => p.id !== id);
-            persistRatePlans(updated);
-            try {
-                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-            } catch {}
-        }
+        const target = ratePlans.find(p => p.id === id);
+        const name = target?.name || 'this rate plan';
+        const confirmed = await confirmModal({
+            title: `Delete Rate Plan "${name}"?`,
+            message: 'Are you sure you want to delete this rate plan? Existing bookings with this rate plan will retain their snapshot tariff.',
+            confirmText: 'Delete Plan',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+            await fetch(`${getApiBaseUrl()}/api/rates/plans/${id}`, { method: 'DELETE' });
+        } catch {}
+        const updated = ratePlans.filter(p => p.id !== id);
+        persistRatePlans(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
+        toast.success(`Rate Plan "${name}" deleted.`);
     };
 
     const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
-            alert('Please provide Plan Name and Short Code.');
+            toast.warning('Please provide Plan Name and Short Code.');
             return;
         }
 
         const currentCode = editingPlan?.shortCode;
         if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
-            alert(`Short Code "${formData.shortCode}" is already in use by another Rate Plan! Please use a unique code.`);
+            toast.error(`Short Code "${formData.shortCode}" is already in use by another Rate Plan! Please use a unique code.`);
             return;
         }
 
@@ -264,6 +297,7 @@ export default function RatePlanManagement() {
         try {
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
+        toast.success(editingPlan ? `Rate Plan "${finalData.name}" updated!` : `Rate Plan "${finalData.name}" created!`);
         setView('list');
         setFormData({});
         setEditingPlan(null);
@@ -804,29 +838,136 @@ export default function RatePlanManagement() {
                     )}
 
                     {activeTab === 5 && (
-                        <div className="space-y-8">
-                            {(formData.pricing || []).map((price: RatePricing, idx: number) => (
-                                <div key={idx} className="bg-white rounded-2xl shadow-sm border p-8 space-y-8 group hover:border-blue-200 transition-all duration-300 relative">
-                                    <button onClick={() => setFormData({ ...formData, pricing: (formData.pricing || []).filter((_: RatePricing, i: number) => i !== idx) })} className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 border rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                        <div className="space-y-6">
+                            {/* Smart Room Types Sync Header */}
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-blue-50/80 border border-blue-200/90 rounded-2xl p-4 shadow-2xs">
+                                <div>
+                                    <h4 className="text-sm font-bold text-blue-950 flex items-center gap-2">
+                                        <Layers size={16} className="text-blue-600" />
+                                        <span>Room Category Rate Matrix</span>
+                                    </h4>
+                                    <p className="text-xs text-blue-700 mt-0.5">
+                                        Sync with registered Room Types to avoid spelling errors and ensure exact booking matching.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const dynamicRooms = getDynamicRoomTypes();
+                                        const existingMap = new Map((formData.pricing || []).map(p => [p.roomTypeId.toLowerCase(), p]));
+                                        const merged = dynamicRooms.map(rt => {
+                                            const existing = existingMap.get(rt.name.toLowerCase());
+                                            if (existing) return existing;
+                                            const baseR = Number(rt.baseRate) || 0;
+                                            const extraA = Number(rt.extraAdultPrice ?? rt.extraBedRate) || 0;
+                                            const extraC = Number(rt.extraChildPrice) || 0;
+                                            const baseOcc = Number(rt.baseOccupancy) || 1;
+                                            const maxOcc = Number(rt.maxAdults) || baseOcc;
+                                            const maxCh = Number(rt.maxChildren) || 0;
+                                            const extraBedAllow = rt.extraBedAllowed !== undefined ? Boolean(rt.extraBedAllowed) : (Number(rt.extraBedRate) > 0);
+                                            const extraBedP = Number(rt.extraBedRate || rt.extraAdultPrice || 1000);
+                                            return {
+                                                roomTypeId: rt.name,
+                                                structure: 'Flat' as const,
+                                                operatingCost: 0,
+                                                baseRate: baseR,
+                                                doubleRate: baseR,
+                                                tripleRate: baseR + extraA,
+                                                extraAdult: extraA,
+                                                extraChild: extraC,
+                                                baseOccupancy: baseOcc,
+                                                maxOccupancy: maxOcc,
+                                                baseChild: 0,
+                                                maxChild: maxCh,
+                                                extraBedAllowed: extraBedAllow,
+                                                extraBedPrice: extraBedP,
+                                                useCustomSurcharges: false
+                                            };
+                                        });
+                                        setFormData({ ...formData, pricing: merged });
+                                    }}
+                                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer select-none whitespace-nowrap"
+                                >
+                                    <RefreshCw size={13} />
+                                    <span>Sync All Room Types ({getDynamicRoomTypes().length})</span>
+                                </button>
+                            </div>
+
+                            {(formData.pricing || []).map((price: RatePricing, idx: number) => {
+                                const dynamicRooms = getDynamicRoomTypes();
+                                const matchedRt = dynamicRooms.find(r => r.name.toLowerCase() === price.roomTypeId.toLowerCase());
+                                const isPhysicallyAllowed = matchedRt
+                                    ? (matchedRt.extraBedAllowed !== false && (Boolean(matchedRt.extraBedAllowed) || Number(matchedRt.extraBedRate) > 0))
+                                    : true;
+                                const defaultExtraBedTariff = matchedRt?.extraBedRate || 1000;
+
+                                return (
+                                <div key={idx} className="bg-white rounded-2xl shadow-sm border p-6 sm:p-8 space-y-6 group hover:border-blue-200 transition-all duration-300 relative">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, pricing: (formData.pricing || []).filter((_: RatePricing, i: number) => i !== idx) })} 
+                                        className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 border rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                        title="Remove room category from this rate plan"
+                                    >
                                         <Trash2 size={16} />
                                     </button>
-                                    <div className="flex items-center gap-4 border-b pb-6 mb-2">
-                                        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white text-lg italic">#{idx + 1}</div>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b pb-5">
+                                        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white text-lg font-bold">#{idx + 1}</div>
                                         <div className="flex-1">
-                                            <input 
-                                                className="w-full text-xl bg-transparent border-none outline-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-200" 
-                                                placeholder="Enter Room Category Name..." 
-                                                value={price.roomTypeId}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                    const newPricing = [...(formData.pricing || [])];
-                                                    newPricing[idx] = { ...newPricing[idx], roomTypeId: e.target.value };
-                                                    setFormData({ ...formData, pricing: newPricing });
-                                                }}
-                                            />
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    className="w-full text-lg font-bold bg-transparent border-b border-dashed border-gray-300 focus:border-blue-600 outline-none pb-1 text-gray-900 cursor-pointer"
+                                                    value={price.roomTypeId}
+                                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                        const selectedRtName = e.target.value;
+                                                        const matched = dynamicRooms.find(r => r.name === selectedRtName);
+                                                        const newPricing = [...(formData.pricing || [])];
+                                                        if (matched) {
+                                                            const baseR = Number(matched.baseRate) || 0;
+                                                            const extraA = Number(matched.extraAdultPrice ?? matched.extraBedRate) || 0;
+                                                            const extraC = Number(matched.extraChildPrice) || 0;
+                                                            const baseOcc = Number(matched.baseOccupancy) || 1;
+                                                            const maxOcc = Number(matched.maxAdults) || baseOcc;
+                                                            const maxCh = Number(matched.maxChildren) || 0;
+                                                            const extraBedAllow = matched.extraBedAllowed !== undefined ? Boolean(matched.extraBedAllowed) : (Number(matched.extraBedRate) > 0);
+                                                            const extraBedP = Number(matched.extraBedRate || matched.extraAdultPrice || 1000);
+
+                                                            newPricing[idx] = {
+                                                                ...newPricing[idx],
+                                                                roomTypeId: selectedRtName,
+                                                                baseRate: newPricing[idx].baseRate > 0 ? newPricing[idx].baseRate : baseR,
+                                                                doubleRate: newPricing[idx].doubleRate > 0 ? newPricing[idx].doubleRate : baseR,
+                                                                tripleRate: newPricing[idx].tripleRate > 0 ? newPricing[idx].tripleRate : (baseR + extraA),
+                                                                extraAdult: newPricing[idx].extraAdult > 0 ? newPricing[idx].extraAdult : extraA,
+                                                                extraChild: newPricing[idx].extraChild > 0 ? newPricing[idx].extraChild : extraC,
+                                                                baseOccupancy: baseOcc,
+                                                                maxOccupancy: maxOcc,
+                                                                baseChild: 0,
+                                                                maxChild: maxCh,
+                                                                extraBedAllowed: extraBedAllow,
+                                                                extraBedPrice: extraBedP
+                                                            };
+                                                        } else {
+                                                            newPricing[idx] = {
+                                                                ...newPricing[idx],
+                                                                roomTypeId: selectedRtName
+                                                            };
+                                                        }
+                                                        setFormData({ ...formData, pricing: newPricing });
+                                                    }}
+                                                >
+                                                    {dynamicRooms.map(r => (
+                                                        <option key={r.name} value={r.name}>{r.name} ({r.code || 'STD'})</option>
+                                                    ))}
+                                                    {!dynamicRooms.some(r => r.name === price.roomTypeId) && price.roomTypeId && (
+                                                        <option value={price.roomTypeId}>{price.roomTypeId} (Custom Tier)</option>
+                                                    )}
+                                                </select>
+                                            </div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tier-Wise Revenue Grid</div>
-                                                <div className={`text-[10px] px-2 py-0.5 rounded ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                                                    GOP: {currencySymbol}{(price.baseRate - price.operatingCost).toLocaleString()}
+                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Rate Plan Category Strategy</div>
+                                                <div className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                    GOP Margin: {currencySymbol}{(price.baseRate - price.operatingCost).toLocaleString()}
                                                 </div>
                                             </div>
                                         </div>
@@ -847,40 +988,252 @@ export default function RatePlanManagement() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-5 gap-4">
-                                        {[
-                                            { label: 'Single Rate', key: 'baseRate' },
-                                            { label: 'Double Rate', key: 'doubleRate' },
-                                            { label: 'Triple Rate', key: 'tripleRate' },
-                                            { label: 'Extra Adult', key: 'extraAdult' },
-                                            { label: 'Extra Child', key: 'extraChild' }
-                                        ].map((field: { label: string; key: string }) => (
-                                            <div key={field.key} className="space-y-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block pl-1">{field.label}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 font-bold">{currencySymbol}</span>
+
+                                    {/* Physical Space & Capacity Ceiling Reference (Ground Truth) */}
+                                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <BedDouble size={15} className="text-blue-600 shrink-0" />
+                                            <span className="font-semibold">Room Type Physical Limits:</span>
+                                            <span className="text-slate-600">
+                                                Base: <strong>{matchedRt?.baseOccupancy || price.baseOccupancy || 1}A</strong> · Physical Max: <strong>{matchedRt?.maxAdults || price.maxOccupancy || 2} Adults, {matchedRt?.maxChildren || 0} Children</strong> (Total: {(matchedRt?.maxAdults || 2) + (matchedRt?.maxChildren || 0)} Guests)
+                                            </span>
+                                        </div>
+                                        <div>
+                                            {isPhysicallyAllowed ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <Check size={11} /> Rollaway Bed Supported
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                                    <Ban size={11} /> Extra Bed Physically Prohibited (No Space)
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 3 Unified Pillars matching RoomType */}
+                                    <div className="space-y-6">
+                                        {/* Pillar 1: Occupancy & Inclusions */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                                <Users size={14} className="text-blue-600" />
+                                                <span>1. Occupancy & Plan Inclusions</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Base Adults Included</label>
                                                     <input 
-                                                        type="number" 
-                                                        className="w-full pl-7 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-800"
-                                                        value={(price as any)[field.key]}
+                                                        type="number"
+                                                        min={1}
+                                                        max={matchedRt?.maxAdults || 4}
+                                                        className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={price.baseOccupancy || 1}
                                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                             const newPricing = [...(formData.pricing || [])];
-                                                            (newPricing[idx] as any)[field.key] = parseInt(e.target.value) || 0;
+                                                            newPricing[idx] = { ...newPricing[idx], baseOccupancy: parseInt(e.target.value) || 1 };
                                                             setFormData({ ...formData, pricing: newPricing });
                                                         }}
                                                     />
+                                                    <span className="text-[9px] text-gray-400 block">Guests included in Base Rate</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Base Children Included</label>
+                                                    <input 
+                                                        type="number"
+                                                        min={0}
+                                                        max={matchedRt?.maxChildren || 2}
+                                                        className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={price.baseChild || 0}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            const newPricing = [...(formData.pricing || [])];
+                                                            newPricing[idx] = { ...newPricing[idx], baseChild: parseInt(e.target.value) || 0 };
+                                                            setFormData({ ...formData, pricing: newPricing });
+                                                        }}
+                                                    />
+                                                    <span className="text-[9px] text-gray-400 block">Complimentary kids (e.g. 0 or 1)</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Commercial Max Adults</label>
+                                                    <input 
+                                                        type="number"
+                                                        min={1}
+                                                        max={matchedRt?.maxAdults || 6}
+                                                        className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={price.maxOccupancy || matchedRt?.maxAdults || 2}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            const val = parseInt(e.target.value) || 1;
+                                                            const newPricing = [...(formData.pricing || [])];
+                                                            newPricing[idx] = { ...newPricing[idx], maxOccupancy: val };
+                                                            setFormData({ ...formData, pricing: newPricing });
+                                                        }}
+                                                    />
+                                                    <span className="text-[9px] text-gray-400 block">Max adults allowed on this plan</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Commercial Max Children</label>
+                                                    <input 
+                                                        type="number"
+                                                        min={0}
+                                                        max={matchedRt?.maxChildren || 4}
+                                                        className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={price.maxChild !== undefined ? price.maxChild : (matchedRt?.maxChildren || 0)}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            const newPricing = [...(formData.pricing || [])];
+                                                            newPricing[idx] = { ...newPricing[idx], maxChild: val };
+                                                            setFormData({ ...formData, pricing: newPricing });
+                                                        }}
+                                                    />
+                                                    <span className="text-[9px] text-gray-400 block">Max children allowed on this plan</span>
                                                 </div>
                                             </div>
-                                        ))}
+                                        </div>
+
+                                        {/* Pillar 2: Extra Bedding Policies (Hardware Governed) */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                                <BedDouble size={14} className="text-blue-600" />
+                                                <span>2. Extra Bedding Policies</span>
+                                            </div>
+                                            {!isPhysicallyAllowed ? (
+                                                <div className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-xl flex items-center gap-3 text-xs text-rose-800">
+                                                    <Ban size={18} className="text-rose-600 shrink-0" />
+                                                    <div>
+                                                        <strong>Physically Prohibited:</strong> Room category &quot;{price.roomTypeId}&quot; dimensions do not support extra rollaway beds. Extra bedding is permanently disabled for this category.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="p-4 bg-gray-50/60 rounded-xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="sr-only peer" 
+                                                                checked={price.extraBedAllowed !== false} 
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                    const newPricing = [...(formData.pricing || [])];
+                                                                    newPricing[idx] = { ...newPricing[idx], extraBedAllowed: e.target.checked };
+                                                                    setFormData({ ...formData, pricing: newPricing });
+                                                                }} 
+                                                            />
+                                                            <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                                        </label>
+                                                        <div>
+                                                            <div className="text-xs font-bold text-gray-800">
+                                                                {price.extraBedAllowed !== false ? 'Extra Rollaway Bed Allowed' : 'Extra Rollaway Bed Disallowed for this Plan'}
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500">
+                                                                Can guests request a rollaway bed when booking this rate plan?
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {price.extraBedAllowed !== false && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Extra Bed Tariff:</span>
+                                                            <div className="relative">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">{currencySymbol}</span>
+                                                                <input 
+                                                                    type="number" 
+                                                                    className="w-32 pl-6 pr-3 py-1.5 border rounded-lg text-xs font-mono font-bold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                    value={price.extraBedPrice !== undefined ? price.extraBedPrice : defaultExtraBedTariff}
+                                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                        const val = parseInt(e.target.value) || 0;
+                                                                        const newPricing = [...(formData.pricing || [])];
+                                                                        newPricing[idx] = { ...newPricing[idx], extraBedPrice: val };
+                                                                        setFormData({ ...formData, pricing: newPricing });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-[10px] text-gray-400">/night</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Pillar 3: Base Pricing & Surcharges */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                                <DollarSign size={14} className="text-blue-600" />
+                                                <span>3. Base Pricing & Surcharges</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                                {[
+                                                    { label: 'Single Rate', key: 'baseRate', hint: '1 Adult occupant' },
+                                                    { label: 'Double Rate', key: 'doubleRate', hint: '2 Adult occupants' },
+                                                    { label: 'Triple Rate', key: 'tripleRate', hint: '3 Adult occupants' },
+                                                    { label: 'Extra Adult', key: 'extraAdult', hint: `Default: ${currencySymbol}${matchedRt?.extraAdultPrice || 0}` },
+                                                    { label: 'Extra Child', key: 'extraChild', hint: `Default: ${currencySymbol}${matchedRt?.extraChildPrice || 0}` }
+                                                ].map((field: { label: string; key: string; hint: string }) => (
+                                                    <div key={field.key} className="space-y-1 bg-gray-50/60 p-3 rounded-xl border border-gray-100">
+                                                        <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">{field.label}</label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">{currencySymbol}</span>
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-full pl-6 pr-2.5 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-xs font-mono font-bold text-gray-800 bg-white"
+                                                                value={(price as any)[field.key] || 0}
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                    const newPricing = [...(formData.pricing || [])];
+                                                                    (newPricing[idx] as any)[field.key] = parseInt(e.target.value) || 0;
+                                                                    setFormData({ ...formData, pricing: newPricing });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[9px] text-gray-400 block truncate">{field.hint}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
+                            );})}
                             <button 
-                                onClick={() => setFormData({ ...formData, pricing: [...(formData.pricing || []), { roomTypeId: 'New Tier Strategy', structure: 'Flat', operatingCost: 0, baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 4 }] as any })}
-                                className="w-full py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-300 text-lg uppercase tracking-widest hover:border-blue-400 hover:text-blue-500 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-3"
+                                type="button"
+                                onClick={() => {
+                                    const dynamicRooms = getDynamicRoomTypes();
+                                    const existingTypes = new Set((formData.pricing || []).map(p => p.roomTypeId.toLowerCase()));
+                                    const nextUnused = dynamicRooms.find(r => !existingTypes.has(r.name.toLowerCase())) || dynamicRooms[0];
+                                    
+                                    if (nextUnused) {
+                                        const baseR = Number(nextUnused.baseRate) || 0;
+                                        const extraA = Number(nextUnused.extraAdultPrice ?? nextUnused.extraBedRate) || 0;
+                                        const extraC = Number(nextUnused.extraChildPrice) || 0;
+                                        const baseOcc = Number(nextUnused.baseOccupancy) || 1;
+                                        const maxOcc = Number(nextUnused.maxAdults) || baseOcc;
+                                        const maxCh = Number(nextUnused.maxChildren) || 0;
+                                        const extraBedAllow = nextUnused.extraBedAllowed !== undefined ? Boolean(nextUnused.extraBedAllowed) : (Number(nextUnused.extraBedRate) > 0);
+                                        const extraBedP = Number(nextUnused.extraBedRate || nextUnused.extraAdultPrice || 1000);
+
+                                        setFormData({
+                                            ...formData,
+                                            pricing: [
+                                                ...(formData.pricing || []),
+                                                {
+                                                    roomTypeId: nextUnused.name,
+                                                    structure: 'Flat',
+                                                    operatingCost: 0,
+                                                    baseRate: baseR,
+                                                    doubleRate: baseR,
+                                                    tripleRate: baseR + extraA,
+                                                    extraAdult: extraA,
+                                                    extraChild: extraC,
+                                                    baseOccupancy: baseOcc,
+                                                    maxOccupancy: maxOcc,
+                                                    baseChild: 0,
+                                                    maxChild: maxCh,
+                                                    extraBedAllowed: extraBedAllow,
+                                                    extraBedPrice: extraBedP,
+                                                    useCustomSurcharges: false
+                                                }
+                                            ] as any
+                                        });
+                                    }
+                                }}
+                                className="w-full py-8 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 text-sm font-semibold uppercase tracking-wider hover:border-blue-400 hover:text-blue-600 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-2 cursor-pointer"
                             >
-                                <Plus size={32} />
-                                Add Inventory Tier Configuration
+                                <Plus size={24} />
+                                <span>Add Room Category Strategy</span>
                             </button>
                         </div>
                     )}
@@ -913,7 +1266,10 @@ export default function RatePlanManagement() {
                 {[...Array(31)].map((_: any, i: number) => {
                     const dayNum = i + 1;
                     const isFriOrSat = (dayNum + 2) % 7 === 5 || (dayNum + 2) % 7 === 6;
-                    const baseRate = isFriOrSat ? 3800 : 3000;
+                    const dynamicRooms = getDynamicRoomTypes();
+                    const defaultDailyRate = Number(dynamicRooms[0]?.baseRate) || (Number(ratePlans[0]?.pricing?.[0]?.baseRate) || 0);
+                    const weekendDailyRate = Math.round(defaultDailyRate * 1.15);
+                    const baseRate = isFriOrSat ? (weekendDailyRate || defaultDailyRate) : defaultDailyRate;
                     return (
                         <div key={i} className="h-28 bg-white border border-gray-200/90 rounded-xl p-2.5 hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between shadow-2xs">
                             <div className="flex justify-between items-start">

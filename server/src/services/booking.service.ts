@@ -2,6 +2,7 @@ import { generateMasterReservationNumber, generateGroupCode } from '../database/
 import { pgPool } from '../database/postgres.js';
 import { getActiveTenantPool } from '../database/tenantContext.js';
 import { normalizePhone } from '../routes/guest.routes.js';
+import { NotificationService } from './notification.service.js';
 
 const getPool = () => getActiveTenantPool(pgPool);
 
@@ -105,6 +106,7 @@ function attachGroupRoomsList(records: BookingRecord[]) {
       const gList = groupCodeMap.get(b.groupCode)!;
       if (b.roomsList && b.roomsList.length > 0) {
         b.roomsList.forEach((rm, idx) => {
+          // Group bookings: each room is a separate guest → keep suffixed sub-booking numbers
           gList.push({
             bookingId: b.id,
             reservationNumber: rm.subBookingNumber || `${b.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
@@ -153,11 +155,13 @@ function attachGroupRoomsList(records: BookingRecord[]) {
     if (b.groupCode && groupCodeMap.has(b.groupCode)) {
       b.groupRoomsList = groupCodeMap.get(b.groupCode);
     } else if (b.roomsList && b.roomsList.length > 1) {
+      // Split Stay (single guest, multiple room segments): master reservation number NEVER changes
+      const isSplitStay = !b.groupCode && !b.isGroup;
       b.groupRoomsList = b.roomsList.map((rm, idx) => ({
         bookingId: b.id,
-        reservationNumber: rm.subBookingNumber || `${b.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
+        reservationNumber: isSplitStay ? b.reservationNumber : (rm.subBookingNumber || `${b.reservationNumber}-${String(idx + 1).padStart(2, '0')}`),
         masterReservationNumber: b.reservationNumber,
-        subBookingNumber: rm.subBookingNumber || `${b.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
+        subBookingNumber: isSplitStay ? b.reservationNumber : (rm.subBookingNumber || `${b.reservationNumber}-${String(idx + 1).padStart(2, '0')}`),
         registrationNumber: rm.registrationNumber || b.registrationNumber,
         folioNumber: rm.folioNumber || b.folioNumber,
         roomNumber: rm.roomNumber,
@@ -177,7 +181,7 @@ function attachGroupRoomsList(records: BookingRecord[]) {
         bookingId: b.id,
         reservationNumber: b.reservationNumber,
         masterReservationNumber: b.reservationNumber,
-        subBookingNumber: `${b.reservationNumber}-01`,
+        subBookingNumber: b.reservationNumber,
         registrationNumber: b.registrationNumber,
         folioNumber: b.folioNumber,
         roomNumber: b.roomNumber,
@@ -272,20 +276,22 @@ export const bookingService = {
         rr.registration_date,
         rr.folio_number,
         rr.room_id,
+        rr.room_type_id,
         rr.check_in_date,
         rr.check_out_date,
         rr.nights,
         rr.room_rate,
+        rr.rate_amount,
         rr.adults,
         rr.children,
         rr.status as room_stay_status,
-        rm.room_number,
-        rm.name as room_name,
-        rt.name as room_type_name,
-        rt.code as room_type_code
+        COALESCE(rm.room_number, 'Unassigned') as room_number,
+        COALESCE(rm.name, rt.name, 'Unassigned Room') as room_name,
+        COALESCE(rt.name, 'Deluxe Suite') as room_type_name,
+        COALESCE(rt.code, 'ROOM') as room_type_code
       FROM reservation_rooms rr
-      JOIN rooms rm ON rm.id = rr.room_id
-      JOIN room_types rt ON rt.id = rm.room_type_id
+      LEFT JOIN rooms rm ON rm.id = rr.room_id
+      LEFT JOIN room_types rt ON rt.id = COALESCE(rr.room_type_id, rm.room_type_id)
       ORDER BY rr.id ASC
     `);
 
@@ -339,9 +345,16 @@ export const bookingService = {
         ))
       );
 
+      // Extract dynamic room type from special requests if available (e.g. "Category: Deluxe Suite")
+      let fallbackRoomType = 'Deluxe Suite';
+      if (r.special_requests) {
+        const catMatch = r.special_requests.match(/Category:\s*([^|]+)/i);
+        if (catMatch && catMatch[1]) fallbackRoomType = catMatch[1].trim();
+      }
+
       const primaryRoom = rooms[0] || {
         room_number: 'Unassigned',
-        room_type_name: 'Standard Single',
+        room_type_name: fallbackRoomType,
         check_in_date: todayStr,
         check_out_date: todayStr,
         nights: 1,
@@ -357,13 +370,13 @@ export const bookingService = {
         ? allocatedRoomNumbers.join(' + ') 
         : primaryRoom.room_number;
 
-      const primaryIn = formatDate(primaryRoom.check_in_date);
-      const primaryOut = formatDate(primaryRoom.check_out_date);
+      const overallIn = rooms.length > 0 ? formatDate(rooms[0].check_in_date) : formatDate(primaryRoom.check_in_date);
+      const overallOut = rooms.length > 0 ? formatDate(rooms[rooms.length - 1].check_out_date) : formatDate(primaryRoom.check_out_date);
 
       let uiStatus = STATUS_DB_TO_UI[r.db_status] || 'confirmed';
-      if (uiStatus === 'confirmed' && primaryIn === todayStr) {
+      if (uiStatus === 'confirmed' && overallIn === todayStr) {
         uiStatus = 'arriving';
-      } else if (uiStatus === 'in-house' && primaryOut === todayStr) {
+      } else if (uiStatus === 'in-house' && overallOut === todayStr) {
         uiStatus = 'departing';
       }
 
@@ -371,14 +384,28 @@ export const bookingService = {
       const regNo = r.registration_number || (uiStatus === 'in-house' || uiStatus === 'checked-out' ? `REG-${r.reservation_number.replace(/^RES-/, '')}` : undefined);
       const folioNo = r.folio_number || `FOL-${r.reservation_number.replace(/^RES-/, '')}`;
 
-      const nightsCount = Math.max(1, Math.round((new Date(primaryOut).getTime() - new Date(primaryIn).getTime()) / 86400000) || Number(primaryRoom.nights) || 1);
+      const nightsCount = Math.max(1, Math.round((new Date(overallOut).getTime() - new Date(overallIn).getTime()) / 86400000) || Number(primaryRoom.nights) || 1);
+
+      // Extract dynamic rate plan (Never leak channel/source names like WHATSAPP, OTA, BOOKING_COM into ratePlan)
+      let resolvedRatePlan = 'Best Available Rate (BAR)';
+      if (r.corporate_name) {
+        resolvedRatePlan = `${r.corporate_name} Corporate Rate`;
+      } else if (r.special_requests) {
+        const rpMatch = r.special_requests.match(/Rate Plan:\s*([^|]+)/i);
+        if (rpMatch && rpMatch[1]) {
+          const extractedRp = rpMatch[1].trim();
+          if (!/whatsapp|booking_com|booking\.com|agoda|airbnb|expedia|direct|walk-in|front\s*desk|staypulse/i.test(extractedRp)) {
+            resolvedRatePlan = extractedRp;
+          }
+        }
+      }
 
       results.push({
         id: r.id,
         resNo: r.reservation_number,
         reservationNumber: r.reservation_number,
         groupCode: isConnSuite ? undefined : (r.group_code || undefined),
-        subBookingNumber: isConnSuite ? r.reservation_number : (primaryRoom.sub_booking_number || (rooms.length > 1 ? `${r.reservation_number}-01` : r.reservation_number)),
+        subBookingNumber: isConnSuite ? r.reservation_number : (Boolean(r.is_group || r.group_code) ? undefined : (primaryRoom.sub_booking_number || r.reservation_number)),
         registrationNumber: regNo,
         registeredAt: r.registration_date ? (typeof r.registration_date === 'string' ? r.registration_date : r.registration_date.toISOString()) : undefined,
         folioNumber: folioNo,
@@ -390,15 +417,15 @@ export const bookingService = {
         allocatedRooms: allocatedRoomNumbers.length > 0 ? allocatedRoomNumbers : [primaryRoom.room_number],
         roomType: resolvedRoomType,
         isConnectingSuite: isConnSuite,
-        ratePlan: r.corporate_name || (r.source && r.source !== 'Direct' ? r.source : 'BAR'),
+        ratePlan: resolvedRatePlan,
         rateAmount: Number(r.total_amount) || 0,
         totalAmount: Number(r.total_amount) || 0,
         paidAmount: Number(r.paid_amount) || 0,
         dueAmount: Number(r.due_amount) || 0,
-        arrivalDate: primaryIn,
-        departureDate: primaryOut,
-        checkIn: primaryIn,
-        checkOut: primaryOut,
+        arrivalDate: overallIn,
+        departureDate: overallOut,
+        checkIn: overallIn,
+        checkOut: overallOut,
         nights: nightsCount,
         adults: Number(primaryRoom.adults) || 1,
         children: Number(primaryRoom.children) || 0,
@@ -424,7 +451,9 @@ export const bookingService = {
           const rIn = formatDate(rm.check_in_date);
           const rOut = formatDate(rm.check_out_date);
           const diffN = Math.round((new Date(rOut).getTime() - new Date(rIn).getTime()) / 86400000);
-          const subNo = rm.sub_booking_number || (rooms.length > 1 ? `${r.reservation_number}-${String(idx + 1).padStart(2, '0')}` : `${r.reservation_number}-01`);
+          // Split Stay Rule: sub_booking_number must equal the master reservation_number for non-group reservations
+          const isGroupRes = Boolean(r.is_group || r.group_code);
+          const subNo = rm.sub_booking_number || (isGroupRes && rooms.length > 1 ? `${r.reservation_number}-${String(idx + 1).padStart(2, '0')}` : r.reservation_number);
           const roomReg = rm.registration_number || (uiStatus === 'in-house' || uiStatus === 'checked-out' ? `REG-${subNo.replace(/^RES-/, '')}` : undefined);
           const roomFolio = rm.folio_number || `FOL-${subNo.replace(/^RES-/, '')}`;
           return {
@@ -441,6 +470,7 @@ export const bookingService = {
             checkOutDate: rOut,
             nights: diffN > 0 ? diffN : (Number(rm.nights) || 1),
             rate: Number(rm.room_rate) || 0,
+            ratePlan: resolvedRatePlan,
             adults: Number(rm.adults) || 1,
             children: Number(rm.children) || 0,
             status: rm.room_stay_status
@@ -637,12 +667,40 @@ export const bookingService = {
         ? payload.reservationNumber 
         : (payload.resNo || await generateMasterReservationNumber());
       const totalAmount = Number(payload.totalAmount || payload.rateAmount || 0);
-      const paidAmount = Number(payload.paidAmount || 0);
+
+      // Extract advance payments from paymentRows or advancePayments if provided
+      const rawPaymentsList: any[] = Array.isArray(payload.paymentRows) && payload.paymentRows.length > 0
+        ? payload.paymentRows
+        : (Array.isArray(payload.advancePayments) && payload.advancePayments.length > 0 ? payload.advancePayments : []);
+
+      const incomingPaidSum = rawPaymentsList.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+      const paidAmount = incomingPaidSum > 0 ? incomingPaidSum : Number(payload.paidAmount || 0);
       const statusDb = STATUS_UI_TO_DB[payload.status] || (paidAmount > 0 ? 'CONFIRMED' : 'RESERVED');
-      const dueAmount = totalAmount - paidAmount;
+      const dueAmount = Math.max(0, totalAmount - paidAmount);
       const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
       const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
-      const isGroup = !isConnectingSuite && Boolean(payload.isGroup || finalRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1));
+
+      // Determine if rooms are sequential (Split Stay) vs concurrent (Group)
+      let areSequential = false;
+      if (finalRooms.length > 1 && !payload.isGroup) {
+        const sorted = [...finalRooms].filter(r => (r.checkIn || r.checkInDate) && (r.checkOut || r.checkOutDate)).sort((a, b) => 
+          new Date(a.checkIn || a.checkInDate).getTime() - new Date(b.checkIn || b.checkInDate).getTime()
+        );
+        if (sorted.length > 1) {
+          areSequential = true;
+          for (let i = 0; i < sorted.length - 1; i++) {
+            const outStr = String(sorted[i].checkOut || sorted[i].checkOutDate).slice(0, 10);
+            const inStr = String(sorted[i + 1].checkIn || sorted[i + 1].checkInDate).slice(0, 10);
+            if (outStr !== inStr) {
+              areSequential = false;
+              break;
+            }
+          }
+        }
+      }
+
+      const isSplitStay = Boolean(payload.isSplitStay || areSequential);
+      const isGroup = !isConnectingSuite && !isSplitStay && Boolean(payload.isGroup || finalRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1));
       const groupCode = isGroup ? (payload.groupCode || await generateGroupCode()) : null;
       const regNo = statusDb === 'IN_HOUSE' ? (payload.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : (payload.registrationNumber || null);
       const folioNo = payload.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`;
@@ -717,9 +775,16 @@ export const bookingService = {
         const roomOut = rm.checkOut || rm.checkOutDate || checkOut;
         const roomNights = rm.nights || nights;
         const roomRate = rm.rate || roomRatePerRoom;
-        const subBookingNum = (!isConnectingSuite && (finalRooms.length > 1 || payload.subBookingNumber))
-          ? (rm.subBookingNumber || `${reservationNumber}-${String(i + 1).padStart(2, '0')}`)
-          : (rm.subBookingNumber || reservationNumber);
+        // Split Stay Rule: for a single guest moving rooms (non-group, non-connecting-suite),
+        // room segments get -L1, -L2 (Legs).
+        // Group Bookings get -01, -02, etc.
+        const subBookingNum = isConnectingSuite
+          ? (rm.subBookingNumber || reservationNumber)
+          : (isSplitStay
+            ? (rm.subBookingNumber || `${reservationNumber}-L${i + 1}`)
+            : (isGroup
+              ? (rm.subBookingNumber || `${reservationNumber}-${String(i + 1).padStart(2, '0')}`)
+              : (rm.subBookingNumber || reservationNumber)));
 
         const roomRegNo = statusDb === 'IN_HOUSE'
           ? (rm.registrationNumber || `REG-${subBookingNum.replace(/^RES-/, '')}`)
@@ -784,7 +849,28 @@ export const bookingService = {
       }
 
       // 5. If initial payment provided, record in `payments`
-      if (paidAmount > 0) {
+      if (rawPaymentsList.length > 0) {
+        for (let pIdx = 0; pIdx < rawPaymentsList.length; pIdx++) {
+          const p = rawPaymentsList[pIdx];
+          const pAmt = Number(p.amount) || 0;
+          if (pAmt <= 0) continue;
+          const methodUpper = String(p.method || 'CASH').toUpperCase();
+          const pNum = `PAY-${reservationNumber}-${String(pIdx + 1).padStart(2, '0')}`;
+          const refCode = p.reference ? `ADV_DEP: ${p.reference}` : 'FRONT_DESK_DEPOSIT';
+
+          await client.query(`
+            INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            folioId,
+            propId,
+            pNum,
+            methodUpper,
+            pAmt,
+            refCode
+          ]);
+        }
+      } else if (paidAmount > 0) {
         await client.query(`
           INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
           VALUES ($1, $2, $3, 'CASH', $4, 'FRONT_DESK_DEPOSIT')
@@ -1074,9 +1160,20 @@ export const bookingService = {
    */
   moveRoom: async (id: string | number, propertyId: string | number, payload: {
     oldRoomNumber?: string;
-    newRoomNumber: string;
+    newRoomNumber?: string;
     newFromDate?: string;
     newToDate?: string;
+    segments?: Array<{
+      roomNumber: string;
+      fromDate: string;
+      toDate: string;
+      roomType?: string;
+      dailyRate?: number;
+      nights?: number;
+    }>;
+    overrideRoomRate?: boolean;
+    newTotalAmount?: number;
+    newDueAmount?: number;
   }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return null;
@@ -1084,16 +1181,210 @@ export const bookingService = {
     if (!existing) return null;
 
     const resId = existing.id;
-    const { oldRoomNumber, newRoomNumber, newFromDate, newToDate } = payload;
 
-    // Yanolja PMS Stop Room Move Enforcement
+    // Stop Room Move Enforcement
     if (existing.stopRoomMove && !(payload as any).overrideStopMove) {
       throw new Error(`Room Move blocked: Stop Room Move is active for reservation ${existing.reservationNumber} (${existing.stopRoomMoveReason || 'Locked'}). Uncheck Stop Room Move or provide supervisor override.`);
     }
 
-    const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(newRoomNumber)]);
+    // =========================================================================
+    // MULTI-SEGMENT SPLIT STAY MOVE (Enterprise Reference Architecture)
+    // =========================================================================
+    if (payload.segments && Array.isArray(payload.segments) && payload.segments.length > 0) {
+      const client = await getPool().connect();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Validate all segments and perform strict collision checks
+        const validatedSegments: Array<{
+          roomNumber: string;
+          roomId: number;
+          roomTypeId: number;
+          fromDate: string;
+          toDate: string;
+          nights: number;
+          dailyRate: number;
+          rateAmount: number;
+        }> = [];
+
+        for (let i = 0; i < payload.segments.length; i++) {
+          const seg = payload.segments[i];
+          const segRoomNo = String(seg.roomNumber).trim();
+          const segFrom = String(seg.fromDate).slice(0, 10);
+          const segTo = String(seg.toDate).slice(0, 10);
+
+          if (!segRoomNo || segRoomNo === 'Unassigned') {
+            throw new Error(`Segment ${i + 1}: Room number is required`);
+          }
+          if (segTo <= segFrom) {
+            throw new Error(`Segment ${i + 1} (${segRoomNo}): To Date (${segTo}) must be after From Date (${segFrom})`);
+          }
+          if (i > 0) {
+            const prev = payload.segments[i - 1];
+            if (segFrom < String(prev.toDate).slice(0, 10)) {
+              throw new Error(`Segment ${i + 1} starts at ${segFrom} before previous segment ends at ${prev.toDate}`);
+            }
+          }
+
+          const rmRes = await client.query(
+            'SELECT id, room_type_id FROM rooms WHERE property_id = $1 AND room_number = $2 FOR UPDATE LIMIT 1',
+            [propId, segRoomNo]
+          );
+          if (rmRes.rows.length === 0) {
+            throw new Error(`Segment ${i + 1}: Room ${segRoomNo} does not exist for property ${propId}`);
+          }
+          const roomId = rmRes.rows[0].id;
+          const roomTypeId = rmRes.rows[0].room_type_id;
+
+          // Collision check against OTHER active reservations
+          const conflictRes = await client.query(`
+            SELECT r.reservation_number, rr.check_in_date, rr.check_out_date, g.first_name, g.last_name
+            FROM reservation_rooms rr
+            JOIN reservations r ON r.id = rr.reservation_id
+            LEFT JOIN guests g ON g.id = r.booker_guest_id
+            WHERE rr.room_id = $1
+              AND rr.reservation_id != $2
+              AND r.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+              AND rr.check_in_date < $3
+              AND rr.check_out_date > $4
+            LIMIT 1
+          `, [roomId, resId, segTo, segFrom]);
+
+          if (conflictRes.rows.length > 0) {
+            const c = conflictRes.rows[0];
+            const gName = `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'another guest';
+            throw new Error(`Segment ${i + 1}: Room ${segRoomNo} is already booked by ${gName} (${c.reservation_number}: ${String(c.check_in_date).slice(0, 10)} to ${String(c.check_out_date).slice(0, 10)})`);
+          }
+
+          const nights = Math.max(1, Math.round((new Date(segTo).getTime() - new Date(segFrom).getTime()) / 86400000));
+          const dailyRate = Number(seg.dailyRate) || Number(existing.rateAmount) || 0;
+          const rateAmount = dailyRate * nights;
+
+          validatedSegments.push({
+            roomNumber: segRoomNo,
+            roomId,
+            roomTypeId,
+            fromDate: segFrom,
+            toDate: segTo,
+            nights,
+            dailyRate,
+            rateAmount
+          });
+        }
+
+        // 2. Fetch existing allocated rooms so any vacated room can be marked DIRTY
+        const prevRoomsRes = await client.query('SELECT room_id FROM reservation_rooms WHERE reservation_id = $1', [resId]);
+        const prevRoomIds = prevRoomsRes.rows.map(r => r.room_id);
+
+        // 3. Replace reservation_rooms entries with new validated segments
+        await client.query('DELETE FROM reservation_rooms WHERE reservation_id = $1', [resId]);
+
+        for (let i = 0; i < validatedSegments.length; i++) {
+          const vs = validatedSegments[i];
+          // Split Stay Rule: ALL segments of a split stay share the EXACT master reservation number.
+          // The guest is the same person — only the room changes. No suffix ever.
+          const subBookingNo = existing.reservationNumber;
+
+          await client.query(`
+            INSERT INTO reservation_rooms (
+              reservation_id, room_id, room_type_id, check_in_date, check_out_date,
+              nights, room_rate, rate_amount, sub_booking_number, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ASSIGNED')
+          `, [
+            resId,
+            vs.roomId,
+            vs.roomTypeId,
+            vs.fromDate,
+            vs.toDate,
+            vs.nights,
+            vs.dailyRate,
+            vs.rateAmount,
+            subBookingNo
+          ]);
+        }
+
+        // 4. Update parent reservation check-in, check-out, nights and amounts
+        const overallCheckIn = validatedSegments[0].fromDate;
+        const overallCheckOut = validatedSegments[validatedSegments.length - 1].toDate;
+        const totalNights = validatedSegments.reduce((sum, s) => sum + s.nights, 0);
+
+        let finalTotal = Number(existing.totalAmount || 0);
+        let finalDue = Number(existing.dueAmount || 0);
+
+        if (payload.overrideRoomRate || payload.newTotalAmount !== undefined) {
+          finalTotal = payload.newTotalAmount !== undefined 
+            ? Number(payload.newTotalAmount)
+            : validatedSegments.reduce((sum, s) => sum + s.rateAmount, 0);
+          finalDue = Math.max(0, finalTotal - Number(existing.paidAmount || 0));
+
+          await client.query(`
+            UPDATE folios
+            SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
+            WHERE reservation_id = $2
+          `, [finalDue, resId]);
+        }
+
+        await client.query(`
+          UPDATE reservations
+          SET total_amount = $1, due_amount = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $3
+        `, [finalTotal, finalDue, resId]);
+
+        // 5. Mark vacated rooms as DIRTY if in-house and spawn turnover cleaning tasks
+        const isCurrentlyInHouse = ['in-house', 'checked-in', 'in_house', 'checked_in'].includes(String(existing.status).toLowerCase());
+        if (isCurrentlyInHouse) {
+          const newRoomIds = validatedSegments.map(s => s.roomId);
+          const vacatedRoomIds = prevRoomIds.filter(id => !newRoomIds.includes(id));
+          if (vacatedRoomIds.length > 0) {
+            await client.query(`
+              UPDATE rooms
+              SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1::bigint[])
+            `, [vacatedRoomIds]);
+
+            for (const vacId of vacatedRoomIds) {
+              await client.query(`
+                INSERT INTO housekeeping_tasks (
+                  room_id, cleaner_employee_id, task_type, priority, status, inspection_notes, reservation_id, guest_name, created_at
+                ) VALUES ($1, NULL, 'TURNOVER', 'HIGH', 'PENDING', $2, $3, $4, CURRENT_TIMESTAMP)
+              `, [
+                vacId,
+                `Room Move Turnover - Guest transferred to Room ${validatedSegments[0].roomNumber}`,
+                resId,
+                existing.guestName || 'In-House Guest'
+              ]);
+            }
+          }
+
+          // Migrate pending unconsumed meal plan entitlements to new primary room
+          await client.query(`
+            UPDATE reservation_meal_entitlements
+            SET room_number = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE reservation_id = $2 AND is_consumed = false
+          `, [validatedSegments[0].roomNumber, resId]);
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      notifyChannelManager(propId);
+      return bookingService.getBookingById(resId, propId);
+    }
+
+    // =========================================================================
+    // STANDARD SINGLE ROOM MOVE FALLBACK
+    // =========================================================================
+    const { oldRoomNumber, newRoomNumber, newFromDate, newToDate } = payload;
+    const targetRoomNo = String(newRoomNumber || existing.roomNumber);
+
+    const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, targetRoomNo]);
     if (targetRoomRes.rows.length === 0) {
-      throw new Error(`Target room ${newRoomNumber} not found for property ${propId}`);
+      throw new Error(`Target room ${targetRoomNo} not found for property ${propId}`);
     }
     const targetRoomId = targetRoomRes.rows[0].id;
 
@@ -1115,7 +1406,7 @@ export const bookingService = {
 
     if (conflictRes.rows.length > 0) {
       const c = conflictRes.rows[0];
-      throw new Error(`Target Room ${newRoomNumber} is already booked (${c.reservation_number}: ${c.check_in_date} to ${c.check_out_date})`);
+      throw new Error(`Target Room ${targetRoomNo} is already booked (${c.reservation_number}: ${c.check_in_date} to ${c.check_out_date})`);
     }
 
     if (oldRoomNumber) {
@@ -1129,7 +1420,7 @@ export const bookingService = {
           WHERE reservation_id = $4 AND room_id = $5
         `, [targetRoomId, newFromDate || null, newToDate || null, resId, oldRoomRes.rows[0].id]);
 
-        // If reservation is currently IN-HOUSE or active, mark the vacated room as DIRTY
+        // If reservation is currently IN-HOUSE or active, mark the vacated room as DIRTY and spawn turnover task
         const isCurrentlyInHouse = existing.status === 'in-house' || existing.status === 'checked-in' as any;
         if (isCurrentlyInHouse) {
           try {
@@ -1138,8 +1429,26 @@ export const bookingService = {
               SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
               WHERE id = $1
             `, [oldRoomRes.rows[0].id]);
+
+            await getPool().query(`
+              INSERT INTO housekeeping_tasks (
+                room_id, cleaner_employee_id, task_type, priority, status, inspection_notes, reservation_id, guest_name, created_at
+              ) VALUES ($1, NULL, 'TURNOVER', 'HIGH', 'PENDING', $2, $3, $4, CURRENT_TIMESTAMP)
+            `, [
+              oldRoomRes.rows[0].id,
+              `Room Move Turnover - Vacated Room ${oldRoomNumber} (Transferred to Room ${targetRoomNo})`,
+              resId,
+              existing.guestName || 'In-House Guest'
+            ]);
+
+            // Migrate pending meal plan entitlements to new room
+            await getPool().query(`
+              UPDATE reservation_meal_entitlements
+              SET room_number = $1, updated_at = CURRENT_TIMESTAMP
+              WHERE reservation_id = $2 AND is_consumed = false
+            `, [targetRoomNo, resId]);
           } catch (hkErr) {
-            console.warn('Failed to update vacated room to DIRTY during room move:', hkErr);
+            console.warn('Failed to update vacated room or housekeeping during room move:', hkErr);
           }
         }
       }
@@ -1162,7 +1471,7 @@ export const bookingService = {
    */
   
   /**
-   * Stop Room Move (Toggle Lock on Reservation to prevent moving, matching Yanolja PMS)
+   * Stop Room Move (Toggle Lock on Reservation to prevent moving)
    */
   stopRoomMove: async (id: string | number, propertyId: string | number, payload: {
     stopRoomMove: boolean;
@@ -1655,8 +1964,19 @@ export const bookingService = {
 
   /**
    * Update status of reservation (check-in, check-out, cancel, hold)
+   * With Strict Room Readiness Gate, Zero-Balance Check-Out Guard, and Departure Housekeeping Turnaround Automation
    */
-  updateBookingStatus: async (id: string | number, propertyId: string | number, status: string): Promise<BookingRecord | null> => {
+  updateBookingStatus: async (
+    id: string | number,
+    propertyId: string | number,
+    status: string,
+    options?: {
+      skipRoomReadinessCheck?: boolean;
+      managerOverride?: boolean;
+      allowDirectBillToCompany?: boolean;
+      closedBy?: string;
+    }
+  ): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return null;
     const normalizedKey = (status || '').toLowerCase().replace(/_/g, '-');
@@ -1670,7 +1990,7 @@ export const bookingService = {
     const numericId = isNaN(Number(id)) ? -1 : Number(id);
 
     if (dbStatus === 'IN_HOUSE') {
-      // Strict PMS Guard: Prevent check-in if room is unassigned
+      // Strict PMS Guard 1: Prevent check-in if room is unassigned
       const isUnassignedString = (s?: string | null): boolean => {
         if (!s) return true;
         const clean = String(s).trim().toLowerCase();
@@ -1715,6 +2035,56 @@ export const bookingService = {
         throw new Error(`Cannot check in reservation ${resNum}: Room is unassigned. Please assign a room number first.`);
       }
 
+      // Strict PMS Guard 2: Room Readiness (Clean/Inspected & Active)
+      if (!options?.skipRoomReadinessCheck && !options?.managerOverride) {
+        const assignedRoomsRes = await getPool().query(`
+          SELECT rm.id, rm.room_number, rm.housekeeping_status, rm.status 
+          FROM rooms rm
+          WHERE rm.id IN (
+            SELECT room_id FROM reservation_rooms WHERE reservation_id IN (
+              SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)
+            ) AND room_id IS NOT NULL
+          )
+        `, [propId, numericId, String(id)]);
+
+        // Check property housekeeping settings for 2-Tier inspection requirement
+        let requireInspection = false;
+        try {
+          const hkSettingsRes = await getPool().query('SELECT require_inspection_before_checkin FROM housekeeping_settings WHERE property_id = $1', [propId]);
+          requireInspection = hkSettingsRes.rows[0]?.require_inspection_before_checkin ?? false;
+        } catch {
+          requireInspection = false;
+        }
+
+        if (assignedRoomsRes.rows.length > 0) {
+          for (const rm of assignedRoomsRes.rows) {
+            const hk = (rm.housekeeping_status || '').toUpperCase();
+            const st = (rm.status || '').toUpperCase();
+
+            // Guard 2A: Check for active unresolved physical room discrepancies (Sleepers, Skippers, etc.)
+            const discRes = await getPool().query(`
+              SELECT id, discrepancy_type, room_number 
+              FROM room_discrepancies 
+              WHERE room_id = $1 AND status = 'ACTIVE'
+              LIMIT 1;
+            `, [rm.id]);
+            if (discRes.rows.length > 0) {
+              throw new Error(`Cannot check in reservation ${resNum}: Room ${rm.room_number} has an unresolved physical discrepancy (${discRes.rows[0].discrepancy_type}). Floor Supervisor or Duty Manager resolution required before check-in.`);
+            }
+
+            if (hk !== 'CLEAN' && hk !== 'INSPECTED') {
+              throw new Error(`Cannot check in reservation ${resNum}: Room ${rm.room_number} is currently ${rm.housekeeping_status || 'DIRTY'}. Room must be Clean & Inspected before check-in.`);
+            }
+            if (requireInspection && hk !== 'INSPECTED') {
+              throw new Error(`Cannot check in reservation ${resNum}: Room ${rm.room_number} is currently CLEAN but not yet INSPECTED. Under 5-Star Quality Standards, room must be verified and passed by a Floor Supervisor before check-in.`);
+            }
+            if (st !== 'ACTIVE') {
+              throw new Error(`Cannot check in reservation ${resNum}: Room ${rm.room_number} is currently marked as ${rm.status || 'UNAVAILABLE'}.`);
+            }
+          }
+        }
+      }
+
       if (!autoRegNum) {
         autoRegNum = `REG-${resNum.replace(/^RES-/, '')}`;
       }
@@ -1738,7 +2108,9 @@ export const bookingService = {
         const pgRooms = await getPool().query('SELECT id, sub_booking_number, registration_number, folio_number FROM reservation_rooms WHERE reservation_id = $1 ORDER BY id ASC', [existing.id]);
         for (let i = 0; i < pgRooms.rows.length; i++) {
           const rRow = pgRooms.rows[i];
-          const subNo = rRow.sub_booking_number || (pgRooms.rows.length > 1 ? `${resNum}-${String(i + 1).padStart(2, '0')}` : `${resNum}-01`);
+          // Split Stay Rule: sub_booking_number stays as master reservation number for non-group guests
+          const isGroupForCheckin = Boolean(existing.isGroup || existing.groupCode);
+          const subNo = rRow.sub_booking_number || (isGroupForCheckin && pgRooms.rows.length > 1 ? `${resNum}-${String(i + 1).padStart(2, '0')}` : resNum);
           const regNo = rRow.registration_number || `REG-${subNo.replace(/^RES-/, '')}`;
           const folNo = rRow.folio_number || `FOL-${subNo.replace(/^RES-/, '')}`;
           await getPool().query(`
@@ -1767,6 +2139,156 @@ export const bookingService = {
           console.warn('Folio auto-create check notice:', folErr);
         }
       }
+    } else if (dbStatus === 'COMPLETED') {
+      // =========================================================================
+      // CHECK-OUT GATE GUARD & DEPARTURE AUTOMATION (5-Star PMS Enterprise Standard)
+      // =========================================================================
+
+      // 1. Fetch current reservation details & active folio balances
+      const resQuery = await getPool().query(`
+        SELECT id, total_amount, paid_amount, due_amount, booker_guest_id, reservation_number 
+        FROM reservations 
+        WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)
+      `, [propId, numericId, String(id)]);
+
+      if (resQuery.rows.length === 0) {
+        throw new Error(`Reservation ${resNum} not found for check-out.`);
+      }
+      const targetRes = resQuery.rows[0];
+      const targetResId = targetRes.id;
+
+      const foliosRes = await getPool().query(`
+        SELECT id, folio_number, balance, status FROM folios WHERE reservation_id = $1
+      `, [targetResId]);
+
+      const openFolios = foliosRes.rows.filter((f: any) => f.status !== 'CLOSED');
+      const openFolioBalance = openFolios.reduce((sum: number, f: any) => sum + Math.max(0, Number(f.balance) || 0), 0);
+      const resDueAmount = Math.max(0, Number(targetRes.due_amount) || 0);
+      const totalOutstanding = openFolios.length > 0 ? openFolioBalance : resDueAmount;
+
+      // Strict Zero-Balance Enforcer: Prevent Departure with Unsettled Folio
+      if (totalOutstanding > 0.01 && !options?.managerOverride && !options?.allowDirectBillToCompany) {
+        throw new Error(
+          `Cannot check out reservation ${resNum}: Outstanding balance of ৳${totalOutstanding.toFixed(2)} must be settled before check-out. If this is a corporate billing, select Direct Bill to Company or provide manager override.`
+        );
+      }
+
+      // 2. Mark reservation COMPLETED & zero out due amount
+      await getPool().query(`
+        UPDATE reservations 
+        SET status = 'COMPLETED',
+            paid_amount = CASE WHEN $1 > 0 THEN total_amount ELSE paid_amount END,
+            due_amount = 0.00,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [totalOutstanding, targetResId]);
+
+      // 3. Mark reservation rooms CHECKED_OUT
+      await getPool().query(`
+        UPDATE reservation_rooms
+        SET status = 'CHECKED_OUT'
+        WHERE reservation_id = $1
+      `, [targetResId]);
+
+      // 4. Update physical rooms to DIRTY and identify affected room IDs
+      const checkedOutRooms = await getPool().query(`
+        SELECT rm.id, rm.room_number 
+        FROM rooms rm
+        WHERE rm.id IN (
+          SELECT room_id FROM reservation_rooms WHERE reservation_id = $1 AND room_id IS NOT NULL
+        )
+      `, [targetResId]);
+
+      if (checkedOutRooms.rows.length > 0) {
+        await getPool().query(`
+          UPDATE rooms
+          SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+          WHERE id IN (
+            SELECT room_id FROM reservation_rooms WHERE reservation_id = $1 AND room_id IS NOT NULL
+          )
+        `, [targetResId]);
+
+        // 5. Spawn high-priority departure TURNOVER housekeeping tasks
+        for (const rm of checkedOutRooms.rows) {
+          try {
+            const existingTask = await getPool().query(`
+              SELECT id FROM housekeeping_tasks 
+              WHERE room_id = $1 AND task_type = 'TURNOVER' AND status IN ('PENDING', 'IN_PROGRESS')
+              LIMIT 1
+            `, [rm.id]);
+
+            if (existingTask.rows.length === 0) {
+              await getPool().query(`
+                INSERT INTO housekeeping_tasks (
+                  room_id, cleaner_employee_id, task_type, priority, status, inspection_notes, reservation_id, guest_name, created_at
+                ) VALUES ($1, NULL, 'TURNOVER', 'HIGH', 'PENDING', $2, $3, $4, CURRENT_TIMESTAMP)
+              `, [
+                rm.id,
+                `Departure Turnover Cleaning - Room ${rm.room_number} vacated by ${existing?.guestName || 'Guest'} (${resNum})`,
+                targetResId,
+                existing?.guestName || 'Departed Guest'
+              ]);
+            }
+          } catch (taskErr) {
+            console.warn('Housekeeping task creation notice:', taskErr);
+          }
+        }
+      }
+
+      // 6. Close all open folios with audit timestamp and cashier signature
+      await getPool().query(`
+        UPDATE folios 
+        SET status = 'CLOSED',
+            closed_at = CURRENT_TIMESTAMP,
+            closed_by = $1,
+            balance = 0.00,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE reservation_id = $2 AND status != 'CLOSED'
+      `, [options?.closedBy || 'Front Desk', targetResId]);
+
+      // 7. Update Guest Profile CRM & Lifetime Value Analytics
+      if (targetRes.booker_guest_id) {
+        try {
+          const staySpend = Number(targetRes.total_amount) || 0;
+          await getPool().query(`
+            UPDATE guests
+            SET total_stays = COALESCE(total_stays, 0) + 1,
+                lifetime_spend = COALESCE(lifetime_spend, 0) + $1,
+                last_stay_date = CURRENT_DATE,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+          `, [staySpend, targetRes.booker_guest_id]);
+        } catch (crmErr) {
+          console.warn('Guest CRM stats update notice:', crmErr);
+        }
+      }
+
+      // 8. Reconcile & release security deposit held in escrow
+      try {
+        await getPool().query(`
+          UPDATE guest_security_deposits
+          SET status = 'REFUNDED',
+              refunded_at = CURRENT_TIMESTAMP,
+              refund_amount = amount,
+              refunded_by = $1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE reservation_id = $2 AND status = 'HELD'
+        `, [options?.closedBy || 'Front Desk', targetResId]);
+      } catch (depErr) {
+        console.warn('Security deposit release notice:', depErr);
+      }
+
+      // 9. Revoke RFID & smart lock keycards in keycard_logs
+      try {
+        await getPool().query(`
+          UPDATE keycard_logs
+          SET status = 'REVOKED', revoked_at = CURRENT_TIMESTAMP
+          WHERE (reservation_id = $1 OR room_number IN (SELECT room_number FROM reservation_rooms WHERE reservation_id = $1))
+            AND status != 'REVOKED'
+        `, [targetResId]);
+      } catch (keyErr) {
+        console.warn('Keycard revocation log notice:', keyErr);
+      }
     } else {
       await getPool().query(`
         UPDATE reservations 
@@ -1779,23 +2301,6 @@ export const bookingService = {
         SET status = $1
         WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $2 AND (id = $3 OR reservation_number = $4))
       `, [roomStayStatus, propId, numericId, String(id)]);
-
-      // Auto-set room to DIRTY on guest checkout (COMPLETED)
-      if (dbStatus === 'COMPLETED') {
-        try {
-          await getPool().query(`
-            UPDATE rooms
-            SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
-            WHERE id IN (
-              SELECT room_id FROM reservation_rooms rr
-              JOIN reservations r ON r.id = rr.reservation_id
-              WHERE r.property_id = $1 AND (r.id = $2 OR r.reservation_number = $3)
-            )
-          `, [propId, numericId, String(id)]);
-        } catch (hkErr) {
-          console.warn('Housekeeping status update notice on checkout:', hkErr);
-        }
-      }
 
       if (dbStatus === 'CANCELLED' || dbStatus === 'VOIDED') {
         await getPool().query(`

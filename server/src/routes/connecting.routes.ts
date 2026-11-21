@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import { broadcastServerEvent } from './realtime.routes.js';
 
 const router = Router();
@@ -11,19 +11,20 @@ const router = Router();
 async function syncRoomsConnectingStatus(propertyId: number): Promise<void> {
     try {
         // 1. Reset all rooms for this property
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms
             SET is_connecting = false, connected_to = NULL
-            WHERE property_id = ?
-        `).run(propertyId);
+            WHERE property_id = $1;
+        `, [propertyId]);
 
         // 2. Fetch all active connecting suites
-        const suites = await db.prepare(`
+        const suitesRes = await pgPool.query(`
             SELECT component_rooms_json
             FROM connecting_rooms
-            WHERE property_id = ? AND status = 'Active'
-        `).all(propertyId) as any[];
+            WHERE property_id = $1 AND status = 'Active';
+        `, [propertyId]);
 
+        const suites = suitesRes.rows;
         const partnerMap = new Map<string, string[]>();
 
         for (const suite of suites) {
@@ -58,14 +59,12 @@ async function syncRoomsConnectingStatus(propertyId: number): Promise<void> {
         }
 
         // 3. Update physical rooms with active partners
-        const updateStmt = db.prepare(`
-            UPDATE rooms
-            SET is_connecting = true, connected_to = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE property_id = ? AND room_number = ?
-        `);
-
         for (const [roomNumber, partners] of partnerMap.entries()) {
-            await updateStmt.run(partners.join(', '), propertyId, roomNumber);
+            await pgPool.query(`
+                UPDATE rooms
+                SET is_connecting = true, connected_to = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE property_id = $2 AND room_number = $3;
+            `, [partners.join(', '), propertyId, roomNumber]);
         }
 
         // 4. Realtime broadcast to all connected terminals
@@ -88,18 +87,18 @@ router.get('/', async (req: Request, res: Response) => {
             return res.json({ success: true, data: [] });
         }
         const propertyId = Number(rawProp);
-        const rows = await db.prepare(`
-            SELECT * FROM connecting_rooms WHERE property_id = ? ORDER BY id ASC
-        `).all(propertyId) as any[];
+        const rowsRes = await pgPool.query(`
+            SELECT * FROM connecting_rooms WHERE property_id = $1 ORDER BY id ASC;
+        `, [propertyId]);
 
-        const mapped = rows.map(r => ({
+        const mapped = rowsRes.rows.map(r => ({
             id: r.id,
             name: r.name,
             inventoryLogic: r.inventory_logic,
             pricingStrategy: r.pricing_strategy,
             fixedPrice: Number(r.fixed_price) || 0,
             status: r.status,
-            componentRooms: r.component_rooms_json ? JSON.parse(r.component_rooms_json) : []
+            componentRooms: r.component_rooms_json ? (typeof r.component_rooms_json === 'string' ? JSON.parse(r.component_rooms_json) : r.component_rooms_json) : []
         }));
 
         res.json({ success: true, data: mapped });
@@ -119,11 +118,12 @@ router.post('/', async (req: Request, res: Response) => {
         const propertyId = Number(rawProp);
         const name = body.name || 'Connecting Suite';
 
-        const result = await db.prepare(`
+        const insertRes = await pgPool.query(`
             INSERT INTO connecting_rooms (
                 property_id, name, inventory_logic, pricing_strategy, fixed_price, status, component_rooms_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id;
+        `, [
             propertyId,
             name,
             body.inventoryLogic || 'Auto-Sync',
@@ -131,9 +131,9 @@ router.post('/', async (req: Request, res: Response) => {
             Number(body.fixedPrice) || 0,
             body.status || 'Active',
             JSON.stringify(body.componentRooms || [])
-        );
+        ]);
 
-        const newId = Number(result.lastInsertRowid);
+        const newId = Number(insertRes.rows[0]?.id);
 
         // Sync physical rooms
         await syncRoomsConnectingStatus(propertyId);
@@ -149,20 +149,21 @@ router.put('/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const body = req.body || {};
-        const existing = await db.prepare('SELECT property_id FROM connecting_rooms WHERE id = ?').get(id) as any;
+        const existingRes = await pgPool.query('SELECT property_id FROM connecting_rooms WHERE id = $1', [id]);
+        const existing = existingRes.rows[0];
         const propertyId = Number(body.propertyId || existing?.property_id);
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE connecting_rooms
-            SET name = COALESCE(?, name),
-                inventory_logic = COALESCE(?, inventory_logic),
-                pricing_strategy = COALESCE(?, pricing_strategy),
-                fixed_price = COALESCE(?, fixed_price),
-                status = COALESCE(?, status),
-                component_rooms_json = COALESCE(?, component_rooms_json),
+            SET name = COALESCE($1, name),
+                inventory_logic = COALESCE($2, inventory_logic),
+                pricing_strategy = COALESCE($3, pricing_strategy),
+                fixed_price = COALESCE($4, fixed_price),
+                status = COALESCE($5, status),
+                component_rooms_json = COALESCE($6, component_rooms_json),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $7;
+        `, [
             body.name || null,
             body.inventoryLogic || null,
             body.pricingStrategy || null,
@@ -170,7 +171,7 @@ router.put('/:id', async (req: Request, res: Response) => {
             body.status || null,
             body.componentRooms ? JSON.stringify(body.componentRooms) : null,
             id
-        );
+        ]);
 
         // Sync physical rooms
         if (propertyId) {
@@ -187,10 +188,11 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const existing = await db.prepare('SELECT property_id FROM connecting_rooms WHERE id = ?').get(id) as any;
+        const existingRes = await pgPool.query('SELECT property_id FROM connecting_rooms WHERE id = $1', [id]);
+        const existing = existingRes.rows[0];
         const propertyId = Number(existing?.property_id);
 
-        await db.prepare('DELETE FROM connecting_rooms WHERE id = ?').run(id);
+        await pgPool.query('DELETE FROM connecting_rooms WHERE id = $1', [id]);
 
         // Sync physical rooms
         if (propertyId) {

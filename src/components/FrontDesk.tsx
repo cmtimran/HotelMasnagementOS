@@ -4,7 +4,8 @@ import {
     DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, Monitor,
     BedDouble, Key, Printer, Calendar,
     Plus, RefreshCw, CreditCard, Wallet, Check,
-    AlertTriangle, Sparkles, Car, Plane, Utensils, Gift, Edit3, MoreVertical
+    AlertTriangle, Sparkles, Car, Plane, Utensils, Gift, Edit3, MoreVertical,
+    Zap, Luggage
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
@@ -25,7 +26,10 @@ import {
     getRoomSmokingPolicy,
     isRoomUnassigned
 } from '../utils/roomInventoryEngine';
+import { areDatesSequential } from '../utils/reservationNumbering';
 import { toast } from '../context/ToastContext';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -38,6 +42,7 @@ import type {
 } from '../types/reservationServices';
 import { getRoomBundleTotal } from '../types/reservationServices';
 import { getActivePropertyId } from '../utils/apiUrl';
+import { getStatusColorStyle } from '../utils/statusColorEngine';
 import PageHeader from './common/PageHeader';
 
 export interface FrontDeskGuestRecord {
@@ -82,6 +87,18 @@ export interface FrontDeskGuestRecord {
     smokingPolicy?: string;
     smokingPolicyText?: string;
     smokingClause?: string;
+    is_pre_checked_in?: boolean;
+    kyc_verified?: boolean;
+    pre_checkin_eta?: string;
+    luggage_tag_number?: string;
+    arrived_early_at?: string;
+    holdType?: string;
+    holdUntil?: string;
+    holdReason?: string;
+    depositRequired?: number;
+    channel?: string;
+    groupRoomsList?: any[];
+    roomsList?: any[];
 }
 
 const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [];
@@ -97,7 +114,8 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
 
         if (rooms && rooms.length > 1) {
             return rooms.map((rm: any, subIdx: number) => {
-                const subNo = rm.subBookingNumber || `${item.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`;
+                const isItemSplitStay = Boolean((item as any).isSplitStay) || (!item.isGroup && !item.groupCode && areDatesSequential(rooms));
+                const subNo = rm.subBookingNumber || (isItemSplitStay ? `${item.reservationNumber}-L${subIdx + 1}` : `${item.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`);
                 const regNo = rm.registrationNumber || (item.status === 'in-house' || item.status === 'arrived' ? (rm.registrationNumber || `REG-${subNo.replace(/^RES-/, '')}`) : undefined);
                 const folioNo = rm.folioNumber || `FOL-${subNo.replace(/^RES-/, '')}`;
                 const rTariff = Number(rm.totalAmount || rm.amount || (Number(item.totalAmount) / rooms.length)) || 0;
@@ -144,12 +162,17 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
                     customAddons: rm.customAddons || item.customAddons || [],
                     smokingPolicy: rm.smokingPolicy || item.smokingPolicy,
                     smokingPolicyText: rm.smokingPolicyText || item.smokingPolicyText,
-                    smokingClause: rm.smokingClause || item.smokingClause
+                    smokingClause: rm.smokingClause || item.smokingClause,
+                    is_pre_checked_in: Boolean(item.is_pre_checked_in || item.isPreCheckedIn),
+                    kyc_verified: Boolean(item.kyc_verified || item.kycVerified),
+                    pre_checkin_eta: item.pre_checkin_eta || item.preCheckinEta,
+                    luggage_tag_number: item.luggage_tag_number || item.luggageTagNumber,
+                    arrived_early_at: item.arrived_early_at || item.arrivedEarlyAt
                 };
             });
         }
 
-        const subNo = item.subBookingNumber || (item.reservationNumber ? `${item.reservationNumber}-01` : undefined);
+        const subNo = item.subBookingNumber || item.reservationNumber;
         const regNo = item.registrationNumber || (item.status === 'in-house' || item.status === 'arrived' ? (item.registrationNumber || `REG-${(subNo || item.reservationNumber || '').replace(/^RES-/, '')}`) : undefined);
         const folioNo = item.folioNumber || `FOL-${(subNo || item.reservationNumber || '').replace(/^RES-/, '')}`;
         const st = (item.status === 'in-house' || item.status === 'arrived' ? 'in-house' : item.status === 'checked-out' ? 'checked-out' : item.status === 'hold' ? 'hold' : 'confirmed');
@@ -166,7 +189,7 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
             phone: item.phone,
             email: item.email,
             roomNumber: String(item.roomNumber || (item.allocatedRooms && item.allocatedRooms[0]) || 'Unassigned'),
-            roomType: item.roomType || 'Standard Single',
+            roomType: item.roomType || (item.specialRequests?.match(/Category:\s*([^|]+)/i)?.[1]?.trim()) || 'Deluxe Suite',
             roomStatus: 'clean' as const,
             checkIn: item.checkIn || item.arrivalDate,
             checkOut: item.checkOut || item.departureDate,
@@ -179,7 +202,19 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
             dueAmount: Number(item.dueAmount) || 0,
             status: st,
             source: item.source || 'Direct',
+            channel: item.channel,
+            holdType: item.holdType,
+            holdUntil: item.holdUntil,
+            holdReason: item.holdReason,
+            depositRequired: item.depositRequired,
+            groupRoomsList: item.groupRoomsList,
+            roomsList: item.roomsList,
             vip: (item.vip && String(item.vip).toUpperCase() !== 'NONE' && String(item.vip).toUpperCase() !== 'REGULAR') ? item.vip : 'None',
+            is_pre_checked_in: Boolean(item.is_pre_checked_in || item.isPreCheckedIn),
+            kyc_verified: Boolean(item.kyc_verified || item.kycVerified),
+            pre_checkin_eta: item.pre_checkin_eta || item.preCheckinEta,
+            luggage_tag_number: item.luggage_tag_number || item.luggageTagNumber,
+            arrived_early_at: item.arrived_early_at || item.arrivedEarlyAt,
             specialRequests: item.specialRequests || '',
             servicesBundle: item.servicesBundle,
             extraBed: item.extraBed || item.servicesBundle?.extraBed || null,
@@ -199,6 +234,7 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
 
 export const FrontDesk: React.FC = () => {
     const { setActivePage } = useNavigation();
+    const { currencySymbol, currencyCode } = useActiveCurrency();
 
     // Data State (synced with localStorage & database)
     const [reservations, setReservations] = useState<FrontDeskGuestRecord[]>(() => {
@@ -354,7 +390,7 @@ export const FrontDesk: React.FC = () => {
 
         persistReservations(updated);
         setActionLog(prev => [
-            `[${new Date().toLocaleTimeString()}] Services updated for Room ${targetRecord.roomNumber} (${targetRecord.guestName}) - Svc total: ৳${newAddonsTotal.toLocaleString()}`,
+            `[${new Date().toLocaleTimeString()}] Services updated for Room ${targetRecord.roomNumber} (${targetRecord.guestName}) - Svc total: ${currencySymbol}${newAddonsTotal.toLocaleString()}`,
             ...prev
         ]);
         setServiceModalConfig({ isOpen: false, guestRecord: null, initialTab: 'pickup' });
@@ -516,6 +552,28 @@ export const FrontDesk: React.FC = () => {
         const activeFolioNo = checkInModalRecord.folioNumber || generateFolioNumber(checkInModalRecord.subBookingNumber || checkInModalRecord.reservationNumber);
 
         persistReservations(updated, { id: checkInModalRecord.id, status: 'in-house' });
+        
+        // Automated Keycard Hardware / Cloud Encoder Integration
+        fetch(`${getApiBaseUrl()}/api/keycard/issue`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                propertyId: 1,
+                roomNumber: checkInModalRecord.roomNumber,
+                guestName: checkInModalRecord.guestName,
+                validFrom: new Date().toISOString(),
+                validUntil: checkInModalRecord.checkOut || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+                encoderType: 'RFID_GENERIC'
+            })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                toast.success(`Keycard (${res.cardUid || checkInKeyCard}) encoded for Room ${checkInModalRecord.roomNumber}!`);
+            }
+        })
+        .catch(err => console.warn('Keycard encoder notice:', err));
+
         setActionLog(prev => [
             `[IN-HOUSE] Guest ${checkInModalRecord.guestName} checked into Room ${checkInModalRecord.roomNumber}. Reg #: ${activeRegNo} | KeyCard: ${checkInKeyCard} | Folio: ${activeFolioNo}.`,
             ...prev
@@ -527,11 +585,45 @@ export const FrontDesk: React.FC = () => {
         setCheckOutModalRecord(record);
     };
 
-    const handleConfirmCheckOut = (paymentMethod: 'Cash' | 'Card' | 'bKash') => {
+    const handleConfirmCheckOut = async (paymentMethod: 'Cash' | 'Card' | 'bKash') => {
         if (!checkOutModalRecord) return;
+        const targetRecord = checkOutModalRecord;
+        const API_BASE = getApiBaseUrl();
+
+        // 1. If there is an outstanding balance, settle it via the Authoritative Accounting API
+        if (targetRecord.dueAmount > 0) {
+            try {
+                const folioRes = await fetch(`${API_BASE}/api/accounting/folios?reservationNumber=${encodeURIComponent(targetRecord.reservationNumber)}`);
+                const folioJson = await folioRes.json();
+                if (folioJson.success && Array.isArray(folioJson.data) && folioJson.data.length > 0) {
+                    const activeFolio = folioJson.data[0];
+                    await fetch(`${API_BASE}/api/accounting/folios/${activeFolio.id}/payments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            propertyId: 1,
+                            amount: targetRecord.dueAmount,
+                            paymentMethod: paymentMethod === 'Cash' ? 'CASH' : paymentMethod === 'Card' ? 'CARD' : 'MOBILE_BANKING',
+                            referenceCode: `CHECKOUT_${paymentMethod.toUpperCase()}_${targetRecord.reservationNumber}`
+                        })
+                    });
+                }
+            } catch (payErr) {
+                console.warn('Accounting payment post notice on checkout:', payErr);
+            }
+        }
+
+        // 2. Perform checkout status mutation in Database with Zero-Balance validation
+        const success = await updateReservationStatusInDB(targetRecord.id, 'checked-out', {
+            closedBy: 'Front Desk'
+        });
+
+        if (!success) {
+            return;
+        }
 
         const updated = reservations.map(r => {
-            if (r.id === checkOutModalRecord.id) {
+            if (r.id === targetRecord.id) {
                 return {
                     ...r,
                     status: 'checked-out' as const,
@@ -543,9 +635,27 @@ export const FrontDesk: React.FC = () => {
             return r;
         });
 
-        persistReservations(updated, { id: checkOutModalRecord.id, status: 'checked-out' });
+        persistReservations(updated, { id: targetRecord.id, status: 'checked-out' });
+
+        // 3. Revoke RFID / Smart Lock Keycard
+        fetch(`${API_BASE}/api/keycard/revoke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                propertyId: 1,
+                roomNumber: targetRecord.roomNumber
+            })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                toast.success(`Keycard for Room ${targetRecord.roomNumber} revoked & recycled.`);
+            }
+        })
+        .catch(err => console.warn('Keycard revoke notice:', err));
+
         setActionLog(prev => [
-            `[CHECK-OUT] Room ${checkOutModalRecord.roomNumber} vacated by ${checkOutModalRecord.guestName}. Balance of BDT ${checkOutModalRecord.dueAmount} settled via ${paymentMethod}. Room flagged DIRTY for housekeeping.`,
+            `[CHECK-OUT] Room ${targetRecord.roomNumber} vacated by ${targetRecord.guestName}. Balance of ${currencyCode} ${targetRecord.dueAmount} settled via ${paymentMethod}. Room flagged DIRTY with priority turnover cleaning task.`,
             ...prev
         ]);
         setCheckOutModalRecord(null);
@@ -902,24 +1012,36 @@ export const FrontDesk: React.FC = () => {
                                     currentTabList.map(item => {
                                         const earlyEval = evaluateEarlyCheckIn(item.eta || '12:00');
                                         const isDueDeparture = item.checkOut <= systemDateISO && (item.status === 'in-house' || item.status === 'arrived');
-                                        const isCheckedOut = item.status === 'checked-out';
+                                        const statusStyle = getStatusColorStyle(item.status);
 
                                         return (
                                             <tr key={item.id} className="hover:bg-blue-50/20 transition-colors">
                                                 {/* Guest & Reference */}
                                                 <td className="py-2.5 px-3.5">
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs flex-shrink-0 ${item.status === 'in-house' || item.status === 'arrived'
-                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                                            : isCheckedOut
-                                                                ? 'bg-slate-100 text-slate-600'
-                                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                            }`}>
+                                                        <div
+                                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs flex-shrink-0 font-bold border shadow-2xs"
+                                                            style={{
+                                                                backgroundColor: `${statusStyle.backgroundColor}20`,
+                                                                color: statusStyle.backgroundColor,
+                                                                borderColor: `${statusStyle.borderColor}40`
+                                                            }}
+                                                        >
                                                             {item.guestName.charAt(0)}
                                                         </div>
                                                         <div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-slate-900">{item.guestName}</span>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="text-slate-900 font-semibold">{item.guestName}</span>
+                                                                <span
+                                                                    className="px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase tracking-wider border shadow-2xs"
+                                                                    style={{
+                                                                        backgroundColor: statusStyle.backgroundColor,
+                                                                        color: statusStyle.color,
+                                                                        borderColor: statusStyle.borderColor
+                                                                    }}
+                                                                >
+                                                                    {item.status}
+                                                                </span>
                                                                 {item.vip && item.vip !== 'None' && item.vip.toUpperCase() !== 'NONE' && item.vip !== 'Regular' && item.vip.toUpperCase() !== 'REGULAR' && (
                                                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300">
                                                                         {item.vip}
@@ -928,6 +1050,18 @@ export const FrontDesk: React.FC = () => {
                                                             </div>
                                                             <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 mt-0.5 flex-wrap">
                                                                 <span className="font-mono text-blue-700 font-semibold">{item.reservationNumber}</span>
+                                                                {item.is_pre_checked_in && (
+                                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300" title="15-Second Fast-Pass Verified">
+                                                                        <Zap size={9} className="text-emerald-600 fill-emerald-600" />
+                                                                        <span>Fast-Pass</span>
+                                                                    </span>
+                                                                )}
+                                                                {item.luggage_tag_number && (
+                                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-blue-100 text-blue-800 border border-blue-200" title={`Luggage Stored: Tag #${item.luggage_tag_number}`}>
+                                                                        <Luggage size={9} />
+                                                                        <span>#{item.luggage_tag_number}</span>
+                                                                    </span>
+                                                                )}
                                                                 {item.groupCode && (
                                                                     <span className="font-mono text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200 text-[9.5px]" title="Group Booking Code">
                                                                         {item.groupCode}
@@ -1114,12 +1248,12 @@ export const FrontDesk: React.FC = () => {
                                                 {/* Tariff & Balance */}
                                                 <td className="py-2.5 px-3 text-right whitespace-nowrap">
                                                     <div className="font-mono text-slate-900 text-xs">
-                                                        ৳{item.totalAmount.toLocaleString()}
+                                                        {currencySymbol}{item.totalAmount.toLocaleString()}
                                                     </div>
                                                     <div className="mt-0.5">
                                                         {item.dueAmount > 0 ? (
                                                             <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
-                                                                Due: ৳{item.dueAmount.toLocaleString()}
+                                                                Due: {currencySymbol}{item.dueAmount.toLocaleString()}
                                                             </span>
                                                         ) : (
                                                             <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -1150,12 +1284,18 @@ export const FrontDesk: React.FC = () => {
                                                                     className={`h-7 px-3 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-2xs whitespace-nowrap ${
                                                                         unassigned
                                                                             ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                                                                            : item.is_pre_checked_in
+                                                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer font-bold'
                                                                             : 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
                                                                     }`}
-                                                                    title={unassigned ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In'}
+                                                                    title={unassigned ? 'Cannot check in: Room is unassigned. Assign a room first.' : item.is_pre_checked_in ? '15-Second Fast-Pass Check In' : 'Check In'}
                                                                 >
-                                                                    <LogIn size={11} className="stroke-[2.5]" />
-                                                                    <span>Check In</span>
+                                                                    {item.is_pre_checked_in ? (
+                                                                        <Zap size={11} className="stroke-[2.5] text-amber-300 fill-amber-300" />
+                                                                    ) : (
+                                                                        <LogIn size={11} className="stroke-[2.5]" />
+                                                                    )}
+                                                                    <span>{item.is_pre_checked_in ? 'Fast-Pass (15s)' : 'Check In'}</span>
                                                                     {unassigned && (
                                                                         <span className="text-[8px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold ml-0.5">
                                                                             Unassigned
@@ -1319,6 +1459,16 @@ export const FrontDesk: React.FC = () => {
                             </button>
                         </div>
 
+                        {checkInModalRecord.is_pre_checked_in && (
+                            <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 flex items-center space-x-2 text-xs text-emerald-900 font-semibold shadow-2xs">
+                                <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600 flex-shrink-0" />
+                                <div>
+                                    <span>Fast-Pass Pre-Check-in Verified</span>
+                                    <p className="text-[10px] text-emerald-700 font-normal">Digital KYC & signature received. Fast-track keycard handoff.</p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Guest Summary Card */}
                         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200/80 space-y-1.5 text-xs">
                             <div className="flex justify-between">
@@ -1340,7 +1490,7 @@ export const FrontDesk: React.FC = () => {
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Outstanding Balance:</span>
                                 <strong className="text-rose-700 font-mono font-bold">
-                                    BDT {checkInModalRecord.dueAmount.toLocaleString()}
+                                    {currencySymbol} {checkInModalRecord.dueAmount.toLocaleString()}
                                 </strong>
                             </div>
                         </div>
@@ -1509,15 +1659,15 @@ export const FrontDesk: React.FC = () => {
                         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200/80 space-y-2 text-xs">
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Gross Tariff &amp; Charges:</span>
-                                <span className="font-mono text-slate-900">BDT {checkOutModalRecord.totalAmount.toLocaleString()}</span>
+                                <span className="font-mono text-slate-900">{currencySymbol} {checkOutModalRecord.totalAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Paid to Date:</span>
-                                <span className="font-mono text-emerald-700 font-bold">BDT {checkOutModalRecord.paidAmount.toLocaleString()}</span>
+                                <span className="font-mono text-emerald-700 font-bold">{currencySymbol} {checkOutModalRecord.paidAmount.toLocaleString()}</span>
                             </div>
                             <div className="border-t border-slate-200 pt-1.5 flex justify-between text-sm">
                                 <span className="text-slate-800">Final Balance Due:</span>
-                                <span className="font-mono font-black text-rose-700">BDT {checkOutModalRecord.dueAmount.toLocaleString()}</span>
+                                <span className="font-mono font-black text-rose-700">{currencySymbol} {checkOutModalRecord.dueAmount.toLocaleString()}</span>
                             </div>
                         </div>
 

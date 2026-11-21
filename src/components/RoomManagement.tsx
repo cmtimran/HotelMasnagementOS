@@ -10,6 +10,7 @@ import OutOfOrderModal from './modals/OutOfOrderModal';
 import BulkRoomGeneratorModal from './modals/BulkRoomGeneratorModal';
 import { getStoredOOOBlocks } from '../utils/outOfOrderEngine';
 import { toast } from '../context/ToastContext';
+import { confirmModal } from '../context/ConfirmModalContext';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -270,26 +271,32 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
         const target = rooms.find(r => r.id === id);
         if (!target) return;
 
-        if (window.confirm(`Are you sure you want to delete Room "${target.number}" from hotel inventory?`)) {
-            try {
-                const targetKey = target.id || target.number;
-                const res = await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(targetKey)}?propertyId=${activePropId}`, {
-                    method: 'DELETE'
-                });
-                const json = await res.json();
-                if (!json.success) {
-                    toast.error(json.error || 'Failed to delete room.');
-                    return;
-                }
+        const confirmed = await confirmModal({
+            title: `Delete Room ${target.number}?`,
+            message: `Are you sure you want to permanently delete Room "${target.number}" from hotel inventory? Active reservations assigned to this room will need reallocation.`,
+            confirmText: 'Delete Room',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
 
-                const updated = rooms.filter(r => r.id !== id);
-                persistRooms(updated);
-                toast.success(`Room ${target.number} removed from hotel inventory.`);
-                await syncRoomTypesAndRoomsFromDB(activePropId);
-                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-            } catch (err: any) {
-                toast.error(`Delete failed: ${err.message}`);
+        try {
+            const targetKey = target.id || target.number;
+            const res = await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(targetKey)}?propertyId=${activePropId}`, {
+                method: 'DELETE'
+            });
+            const json = await res.json();
+            if (!json.success) {
+                toast.error(json.error || 'Failed to delete room.');
+                return;
             }
+
+            const updated = rooms.filter(r => r.id !== id);
+            persistRooms(updated);
+            toast.success(`Room ${target.number} removed from hotel inventory.`);
+            await syncRoomTypesAndRoomsFromDB(activePropId);
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch (err: any) {
+            toast.error(`Delete failed: ${err.message}`);
         }
     };
 
@@ -676,7 +683,7 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                     ) : displayMode === 'dense' ? (
                         <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
+                                <table className="w-full min-w-[850px] text-left text-xs">
                                     <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
                                         <tr>
                                             <th className="py-2.5 px-3">Room #</th>

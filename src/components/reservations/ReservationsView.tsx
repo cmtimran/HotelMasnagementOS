@@ -29,7 +29,7 @@ import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
-import { getCurrencySymbol } from '../../utils/currencyUtils';
+import { useActiveCurrency } from '../../utils/currencyUtils';
 import { toast } from '../../context/ToastContext';
 import {
     syncReservationsFromDB,
@@ -43,10 +43,14 @@ import {
     getConnectingPartnerMap,
     isRoomUnassigned
 } from '../../utils/roomInventoryEngine';
+import { areDatesSequential } from '../../utils/reservationNumbering';
 
 export interface ReservationItem {
     id: number;
     reservationNumber: string;
+    otaBookingReference?: string;
+    channelBookingRef?: string;
+    specialRequests?: string;
     groupCode?: string;
     subBookingNumber?: string;
     registrationNumber?: string;
@@ -77,7 +81,7 @@ export interface ReservationItem {
 
 
 export const ReservationsView: React.FC = () => {
-    const currencySymbol = useMemo(() => getCurrencySymbol(), []);
+    const { currencySymbol } = useActiveCurrency();
     const { setActivePage } = useNavigation();
     
     // Active Tab: 'reservations' (Active Bookings), 'arrivals', 'departures', 'checked-out', 'in-house', 'cancelled'
@@ -123,7 +127,7 @@ export const ReservationsView: React.FC = () => {
     };
 
     const allRooms = useMemo(() => {
-        return getCanonicalRooms().map(r => ({
+        return getCanonicalRooms().filter(r => !isRoomUnassigned(r.number)).map(r => ({
             id: String(r.id),
             roomNumber: r.number,
             type: r.roomTypeName || 'Standard Room',
@@ -197,11 +201,22 @@ export const ReservationsView: React.FC = () => {
         if (!Array.isArray(rawList)) return [];
         const opDate = getOperatingSystemDate();
         return rawList.flatMap((r: any, idx: number) => {
-            const isConnectingSuite = Boolean(
+            const isResSplitStay = !r.isGroup && !r.groupCode && (
+                Boolean(r.isSplitStay) ||
+                (r.roomsList && r.roomsList.length > 1 && r.roomsList.some((rm: any) => {
+                    const first = r.roomsList[0];
+                    const rmIn = rm.checkInDate || rm.checkIn;
+                    const rmOut = rm.checkOutDate || rm.checkOut;
+                    const fIn = first.checkInDate || first.checkIn;
+                    const fOut = first.checkOutDate || first.checkOut;
+                    return (rmIn && fIn && rmIn !== fIn) || (rmOut && fOut && rmOut !== fOut);
+                }))
+            );
+
+            const isConnectingSuite = !isResSplitStay && Boolean(
                 r.isConnectingSuite ||
                 (r.roomType && (r.roomType.toLowerCase().includes('connecting') || r.roomType.toLowerCase().includes('interconnecting'))) ||
-                (typeof r.roomNumber === 'string' && r.roomNumber.includes('+')) ||
-                (Array.isArray(r.allocatedRooms) && r.allocatedRooms.length > 1 && (r.allocatedRooms.includes('101') || r.allocatedRooms.includes('102')))
+                (typeof r.roomNumber === 'string' && r.roomNumber.includes('+'))
             );
 
             const rooms = (r.roomsList && r.roomsList.length > 0)
@@ -212,7 +227,9 @@ export const ReservationsView: React.FC = () => {
 
             if (!isConnectingSuite && rooms && rooms.length > 1) {
                 return rooms.map((rm: any, subIdx: number) => {
-                    const subNum = rm.subBookingNumber || `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`;
+                    // Split Stay Rule: non-group multi-room segments keep the master reservation number
+                    const isResSplitStay = Boolean((r as any).isSplitStay) || (!r.isGroup && !r.groupCode && areDatesSequential(rooms));
+                    const subNum = rm.subBookingNumber || (isResSplitStay ? `${r.reservationNumber}-L${subIdx + 1}` : `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`);
                     const regNo = rm.registrationNumber || r.registrationNumber;
                     const folioNo = rm.folioNumber || r.folioNumber || `FOL-${subNum.replace(/^RES-/, '')}`;
                     const rIn = rm.checkInDate || rm.checkIn || r.checkIn;
@@ -272,10 +289,15 @@ export const ReservationsView: React.FC = () => {
                     ? r.roomNumber
                     : (isConnectingSuite ? dynamicConnDisplay : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned')));
 
+            const parsedOtaRef = (r as any).otaBookingReference || (r as any).channelBookingRef || (r.specialRequests ? ((r.specialRequests.match(/OTA-REF:\s*([^\s\.]+)/)?.[1]) || (r.specialRequests.match(/Ref:\s*([^\s\|]+)/)?.[1])) : undefined);
+
             return [{
                 id: r.id || idx + 1,
                 reservationNumber: r.reservationNumber,
-                subBookingNumber: isConnectingSuite ? undefined : (r.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-01` : 'RES-01')),
+                otaBookingReference: parsedOtaRef,
+                channelBookingRef: parsedOtaRef,
+                specialRequests: r.specialRequests || '',
+                subBookingNumber: isConnectingSuite ? undefined : (r.subBookingNumber || r.reservationNumber),
                 groupCode: isConnectingSuite ? undefined : r.groupCode,
                 registrationNumber: r.registrationNumber,
                 folioNumber: r.folioNumber || `FOL-${(r.reservationNumber || '').replace(/^RES-/, '')}`,
@@ -349,19 +371,36 @@ export const ReservationsView: React.FC = () => {
         setOpenActionMenuId(null);
     };
 
-    // Handle check in / check out actions with direct PostgreSQL DB persistence
-    const handleStatusChange = (id: number, nextStatus: ReservationItem['status']) => {
+    // Handle check in / check out actions with direct PostgreSQL DB persistence & Zero-Balance Guard
+    const handleStatusChange = async (id: number, nextStatus: ReservationItem['status']) => {
+        const target = reservations.find(r => r.id === id);
         if (nextStatus === 'in-house') {
-            const target = reservations.find(r => r.id === id);
             if (target && isRoomUnassigned(target.roomNumber, target.allocatedRooms)) {
                 toast.error(`Cannot check in ${target.guestName}: Room is unassigned. Please assign a room number first.`);
                 return;
             }
         }
-        setReservations(prev =>
-            prev.map(r => r.id === id ? { ...r, status: nextStatus } : r)
-        );
-        updateReservationStatusInDB(id, nextStatus);
+        if (nextStatus === 'checked-out') {
+            if (target && Number(target.dueAmount || 0) > 0.01) {
+                toast.error(`Cannot Check Out ${target.guestName}: Outstanding folio balance of ${currencySymbol}${Number(target.dueAmount || 0).toLocaleString()} must be settled or transferred to City Ledger.`);
+                // Open Reservation Action Drawer for instant cashier payment / folio settlement
+                openDrawerForReservation(target);
+                return;
+            }
+        }
+        const success = await updateReservationStatusInDB(id, nextStatus);
+        if (success) {
+            setReservations(prev =>
+                prev.map(r => r.id === id ? { 
+                    ...r, 
+                    status: nextStatus,
+                    paidAmount: nextStatus === 'checked-out' ? (r.totalAmount || r.paidAmount) : r.paidAmount,
+                    dueAmount: nextStatus === 'checked-out' ? 0 : r.dueAmount
+                } : r)
+            );
+            toast.success(`Reservation status updated to ${nextStatus.toUpperCase()}`);
+            loadReservationsFromDB();
+        }
     };
 
     // Toggle Selection of row in grouping mode
@@ -432,14 +471,23 @@ export const ReservationsView: React.FC = () => {
                 guestFilter === 'single' ? !r.isGroup :
                 Boolean(r.isGroup);
 
-            // 3. Search Query
+            // 3. Search Query (Comprehensive guest, res #, room, group, phone, email, OTA reference, special requests)
+            const q = searchQuery.toLowerCase().trim();
+            const rawOta = String(r.otaBookingReference || (r as any).channelBookingRef || '');
+            const parsedOta = r.specialRequests ? (r.specialRequests.match(/OTA-REF:\s*([^\s\.]+)/)?.[1] || r.specialRequests.match(/Ref:\s*([^\s\|]+)/)?.[1] || '') : '';
+            const combinedOta = `${rawOta} ${parsedOta}`.toLowerCase();
             const matchesQuery =
-                !searchQuery.trim() ||
-                r.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                r.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                r.roomNumber.includes(searchQuery) ||
-                r.phone.includes(searchQuery) ||
-                (r.groupName && r.groupName.toLowerCase().includes(searchQuery.toLowerCase()));
+                !q ||
+                Boolean(r.guestName && r.guestName.toLowerCase().includes(q)) ||
+                Boolean(r.reservationNumber && r.reservationNumber.toLowerCase().includes(q)) ||
+                Boolean(r.roomNumber && String(r.roomNumber).toLowerCase().includes(q)) ||
+                Boolean(r.phone && String(r.phone).toLowerCase().includes(q)) ||
+                Boolean((r as any).email && String((r as any).email).toLowerCase().includes(q)) ||
+                Boolean(r.groupName && r.groupName.toLowerCase().includes(q)) ||
+                Boolean(r.specialRequests && r.specialRequests.toLowerCase().includes(q)) ||
+                combinedOta.includes(q) ||
+                Boolean((r as any).channel && String((r as any).channel).toLowerCase().includes(q)) ||
+                Boolean((r as any).source && String((r as any).source).toLowerCase().includes(q));
 
             // 4. Date Range Filter
             let matchesDate = true;
@@ -1109,6 +1157,11 @@ export const ReservationsView: React.FC = () => {
                                                 {r.registrationNumber && (
                                                     <div className="text-[10px] text-emerald-700 font-mono font-bold bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded inline-block mt-0.5" title="Registration Number (GRC)">
                                                         {r.registrationNumber}
+                                                    </div>
+                                                )}
+                                                {r.otaBookingReference && (
+                                                    <div className="text-[9.5px] text-purple-700 font-mono font-semibold bg-purple-50 border border-purple-200 px-1 py-0.5 rounded inline-block mt-0.5" title={`Inbound OTA Booking Reference: ${r.otaBookingReference}`}>
+                                                        OTA: {r.otaBookingReference}
                                                     </div>
                                                 )}
                                             </td>

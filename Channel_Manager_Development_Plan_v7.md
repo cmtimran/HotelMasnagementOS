@@ -114,7 +114,7 @@ B. Error Code Catalog
 C. Permission Matrix (RBAC)
 D. Email/SMS/WhatsApp Template Library
 E. Standard Hotel Report Catalog (35+ reports)
-F. Migration Templates (OPERA, eZee, IDS Next)
+F. Migration Templates (OPERA, Legacy PMS, IDS Next)
 G. Bangladesh Mushak 6.3 Invoice Spec
 H. India GST Invoice Spec
 I. OTA XML Sample Payloads
@@ -3606,7 +3606,7 @@ Looking forward to seeing you! 🌴
 - Mapping: provided template
 - Test import via dry-run
 
-### From eZee Absolute
+### From Legacy PMS Platform
 - API pull
 - Mapping wizard
 
@@ -6913,7 +6913,7 @@ Year-end                          → P&L close → Retained Earnings
 | **Zoho Payroll / RazorpayX Payroll / Khaitan Payroll** | Section 94 — Full Payroll module |
 | **Loginext / SafeAddress / Lokit GPS** | Section 95 — Transportation module |
 | **SAP Ariba / Coupa (procurement)** | Section 96 — Procurement & Stock |
-| **OPERA / Cloudbeds / eZee Absolute (PMS)** | Sections 22-30 — Full PMS |
+| **OPERA / Cloudbeds / Legacy PMS Platform (PMS)** | Sections 22-30 — Full PMS |
 | **SiteMinder / RateGain (Channel Manager)** | Section 31 — Channel Sync Engine |
 | **TrustYou / Revinate (Reputation)** | Section 6.8 — Reputation Management |
 | **IDeaS / Atomize (Revenue Management)** | Section 5.10, 4.7 — Pricing/Yield |

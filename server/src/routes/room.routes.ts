@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { roomController } from '../controllers/room.controller.js';
 import { requirePermission } from '../middleware/rbacGuard.js';
 import { requirePropertyScope } from '../middleware/propertyScope.js';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 
 const router = Router();
 
@@ -43,14 +43,15 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
             return res.status(400).json({ success: false, error: 'buildingId, floorId, and roomTypeId are required' });
         }
 
-        const result = await db.prepare(`
+        const result = await pgPool.query(`
             INSERT INTO rooms (
                 property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status, remarks,
                 phone_ext, lock_id, is_connecting, connected_to, smoking_status, near_elevator,
                 bed_type, bed_count, is_bed_convertible, current_bed_setup, view_type, is_accessible, connecting_door_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+            RETURNING id
+        `, [
             propertyId,
             buildingId,
             floorId,
@@ -73,11 +74,11 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
             body.viewType || body.view_type || 'City View',
             Boolean(body.isAccessible || body.is_accessible),
             body.connectingDoorStatus || body.connecting_door_status || 'LOCKED'
-        );
+        ]);
 
         res.status(201).json({
             success: true,
-            data: { id: Number(result.lastInsertRowid), roomNumber, name, status },
+            data: { id: Number(result.rows[0]?.id), roomNumber, name, status },
             message: `Room ${roomNumber} created successfully`
         });
     } catch (e: any) {
@@ -120,21 +121,24 @@ router.post('/bulk-generate', requirePermission('frontdesk.access'), async (req:
         if (!targetBuildingId) {
             const bName = buildingName || 'Main Tower';
             const bCode = (bName.slice(0, 4) + '-' + propertyId).toUpperCase();
-            const existingB = await db.prepare('SELECT id FROM buildings WHERE property_id = ? LIMIT 1').get(propertyId) as any;
+            const existingBRes = await pgPool.query('SELECT id FROM buildings WHERE property_id = $1 LIMIT 1', [propertyId]);
+            const existingB = existingBRes.rows[0] as any;
             if (existingB) {
                 targetBuildingId = existingB.id;
             } else {
-                const bResult = await db.prepare(`
+                const bResult = await pgPool.query(`
                     INSERT INTO buildings (property_id, code, name, total_floors)
-                    VALUES (?, ?, ?, ?)
-                `).run(propertyId, bCode, bName, Math.max(1, Number(floorEnd)));
-                targetBuildingId = Number(bResult.lastInsertRowid);
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id
+                `, [propertyId, bCode, bName, Math.max(1, Number(floorEnd))]);
+                targetBuildingId = Number(bResult.rows[0]?.id);
             }
         }
 
         // 2. Resolve or Create Floors
         const floorMap = new Map<number, number>();
-        const existingFloors = await db.prepare('SELECT id, floor_number FROM floors WHERE building_id = ?').all(targetBuildingId) as any[];
+        const existingFloorsRes = await pgPool.query('SELECT id, floor_number FROM floors WHERE building_id = $1', [targetBuildingId]);
+        const existingFloors = existingFloorsRes.rows as any[];
         for (const ef of existingFloors) {
             floorMap.set(Number(ef.floor_number), Number(ef.id));
         }
@@ -145,18 +149,20 @@ router.post('/bulk-generate', requirePermission('frontdesk.access'), async (req:
         for (let fl = Number(floorStart); fl <= Number(floorEnd); fl++) {
             if (skipSet.has(fl)) continue;
             if (!floorMap.has(fl)) {
-                const fResult = await db.prepare(`
+                const fResult = await pgPool.query(`
                     INSERT INTO floors (building_id, floor_number, name, sort_order)
-                    VALUES (?, ?, ?, ?)
-                `).run(targetBuildingId, fl, `Floor ${fl}`, fl);
-                floorMap.set(fl, Number(fResult.lastInsertRowid));
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id
+                `, [targetBuildingId, fl, `Floor ${fl}`, fl]);
+                floorMap.set(fl, Number(fResult.rows[0]?.id));
                 floorsCreatedCount++;
             }
         }
 
         // 3. Resolve fallback Room Type if none provided in distribution
         let defaultRoomTypeId = 0;
-        const availableRTs = await db.prepare('SELECT id, default_bed_type, bed_type FROM room_types WHERE property_id = ?').all(propertyId) as any[];
+        const availableRTsRes = await pgPool.query('SELECT id, default_bed_type, bed_type FROM room_types WHERE property_id = $1', [propertyId]);
+        const availableRTs = availableRTsRes.rows as any[];
         if (availableRTs.length > 0) {
             defaultRoomTypeId = Number(availableRTs[0].id);
         }
@@ -218,22 +224,22 @@ router.post('/bulk-generate', requirePermission('frontdesk.access'), async (req:
         let createdRoomsCount = 0;
         let skippedExistingCount = 0;
 
-        const insertStmt = db.prepare(`
+        const insertQuery = `
             INSERT INTO rooms (
                 property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status,
                 phone_ext, lock_id, is_connecting, smoking_status, bed_type, bed_count, view_type, is_accessible, connecting_door_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        `;
 
         for (const r of roomsToInsert) {
             try {
-                const existing = await db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propertyId, r.roomNumber);
-                if (existing) {
+                const exRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propertyId, r.roomNumber]);
+                if (exRes.rows[0]) {
                     skippedExistingCount++;
                     continue;
                 }
-                await insertStmt.run(
+                await pgPool.query(insertQuery, [
                     r.propertyId,
                     r.buildingId,
                     r.floorId,
@@ -251,7 +257,7 @@ router.post('/bulk-generate', requirePermission('frontdesk.access'), async (req:
                     r.viewType,
                     r.isAccessible,
                     r.connectingDoorStatus
-                );
+                ]);
                 createdRoomsCount++;
             } catch {
                 skippedExistingCount++;
@@ -285,27 +291,30 @@ router.post('/bulk-import', requirePermission('frontdesk.access'), async (req: R
             return res.status(400).json({ success: false, error: 'No room rows provided for import' });
         }
 
-        const buildings = await db.prepare('SELECT id, name, code FROM buildings WHERE property_id = ?').all(propertyId) as any[];
-        const floors = await db.prepare('SELECT f.id, f.floor_number, f.name, f.building_id FROM floors f JOIN buildings b ON b.id = f.building_id WHERE b.property_id = ?').all(propertyId) as any[];
-        const roomTypes = await db.prepare('SELECT id, code, name FROM room_types WHERE property_id = ?').all(propertyId) as any[];
+        const buildingsRes = await pgPool.query('SELECT id, name, code FROM buildings WHERE property_id = $1', [propertyId]);
+        const buildings = buildingsRes.rows as any[];
+        const floorsRes = await pgPool.query('SELECT f.id, f.floor_number, f.name, f.building_id FROM floors f JOIN buildings b ON b.id = f.building_id WHERE b.property_id = $1', [propertyId]);
+        const floors = floorsRes.rows as any[];
+        const roomTypesRes = await pgPool.query('SELECT id, code, name FROM room_types WHERE property_id = $1', [propertyId]);
+        const roomTypes = roomTypesRes.rows as any[];
 
         let defaultBuildingId = buildings[0]?.id;
         if (!defaultBuildingId) {
-            const bRes = await db.prepare('INSERT INTO buildings (property_id, code, name, total_floors) VALUES (?, ?, ?, ?)').run(propertyId, 'TOWER-1', 'Main Tower', 5);
-            defaultBuildingId = Number(bRes.lastInsertRowid);
+            const bRes = await pgPool.query('INSERT INTO buildings (property_id, code, name, total_floors) VALUES ($1, $2, $3, $4) RETURNING id', [propertyId, 'TOWER-1', 'Main Tower', 5]);
+            defaultBuildingId = Number(bRes.rows[0]?.id);
         }
 
         let importedCount = 0;
         let skippedCount = 0;
         const errors: string[] = [];
 
-        const insertStmt = db.prepare(`
+        const importInsertQuery = `
             INSERT INTO rooms (
                 property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status,
                 phone_ext, lock_id, is_connecting, smoking_status, bed_type, bed_count, view_type, is_accessible, connecting_door_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        `;
 
         for (let idx = 0; idx < rows.length; idx++) {
             const row = rows[idx];
@@ -316,8 +325,8 @@ router.post('/bulk-import', requirePermission('frontdesk.access'), async (req: R
                 continue;
             }
 
-            const existing = await db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propertyId, roomNo);
-            if (existing) {
+            const exRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propertyId, roomNo]);
+            if (exRes.rows[0]) {
                 skippedCount++;
                 continue;
             }
@@ -333,13 +342,13 @@ router.post('/bulk-import', requirePermission('frontdesk.access'), async (req: R
             const flNum = Number(row.floor || row.floorNumber) || 1;
             let matchedFloor = floors.find(f => f.floor_number === flNum && f.building_id === defaultBuildingId);
             if (!matchedFloor) {
-                const fRes = await db.prepare('INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, ?, ?, ?)').run(defaultBuildingId, flNum, `Floor ${flNum}`, flNum);
-                matchedFloor = { id: Number(fRes.lastInsertRowid), floor_number: flNum, building_id: defaultBuildingId };
+                const fRes = await pgPool.query('INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES ($1, $2, $3, $4) RETURNING id', [defaultBuildingId, flNum, `Floor ${flNum}`, flNum]);
+                matchedFloor = { id: Number(fRes.rows[0]?.id), floor_number: flNum, building_id: defaultBuildingId };
                 floors.push(matchedFloor);
             }
 
             try {
-                await insertStmt.run(
+                await pgPool.query(importInsertQuery, [
                     propertyId,
                     defaultBuildingId,
                     matchedFloor.id,
@@ -357,7 +366,7 @@ router.post('/bulk-import', requirePermission('frontdesk.access'), async (req: R
                     row.viewType || 'City View',
                     Boolean(row.isAccessible),
                     'LOCKED'
-                );
+                ]);
                 importedCount++;
             } catch (err: any) {
                 errors.push(`Row ${idx + 1} (${roomNo}): ${err.message}`);
@@ -385,11 +394,12 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
         }
 
         const isNumeric = !isNaN(Number(identifier)) && Number(identifier) > 0;
-        const targetRoom = await db.prepare(`
+        const targetRes = await pgPool.query(`
             SELECT id, room_number FROM rooms 
-            WHERE property_id = ? AND (id = ? OR room_number = ?)
+            WHERE property_id = $1 AND (id = $2 OR room_number = $3)
             LIMIT 1
-        `).get(propertyId, isNumeric ? Number(identifier) : -1, identifier) as any;
+        `, [propertyId, isNumeric ? Number(identifier) : -1, identifier]);
+        const targetRoom = targetRes.rows[0] as any;
 
         if (!targetRoom) {
             return res.status(404).json({ success: false, error: `Room '${identifier}' not found in property inventory` });
@@ -400,10 +410,10 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
 
         // If room number changed, verify it doesn't collide with another room in this property
         if (newRoomNumber && newRoomNumber !== targetRoom.room_number) {
-            const conflict = await db.prepare(`
-                SELECT id FROM rooms WHERE property_id = ? AND room_number = ? AND id != ? LIMIT 1
-            `).get(propertyId, newRoomNumber, targetRoom.id) as any;
-            if (conflict) {
+            const confRes = await pgPool.query(`
+                SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 AND id != $3 LIMIT 1
+            `, [propertyId, newRoomNumber, targetRoom.id]);
+            if (confRes.rows[0]) {
                 return res.status(400).json({ success: false, error: `Room number '${newRoomNumber}' already exists in this property.` });
             }
         }
@@ -419,32 +429,32 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
         const rawHk = body.housekeepingStatus || '';
         const hkStatus = rawHk.toUpperCase() === 'DIRTY' ? 'DIRTY' : rawHk.toUpperCase() === 'INSPECTED' ? 'INSPECTED' : rawHk ? 'CLEAN' : null;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms
-            SET room_number = COALESCE(?, room_number),
-                name = COALESCE(?, name),
-                building_id = COALESCE(?, building_id),
-                floor_id = COALESCE(?, floor_id),
-                room_type_id = COALESCE(?, room_type_id),
-                status = COALESCE(?, status),
-                housekeeping_status = COALESCE(?, housekeeping_status),
-                remarks = COALESCE(?, remarks),
-                phone_ext = COALESCE(?, phone_ext),
-                lock_id = COALESCE(?, lock_id),
-                is_connecting = COALESCE(?, is_connecting),
-                connected_to = COALESCE(?, connected_to),
-                smoking_status = COALESCE(?, smoking_status),
-                near_elevator = COALESCE(?, near_elevator),
-                bed_type = COALESCE(?, bed_type),
-                bed_count = COALESCE(?, bed_count),
-                is_bed_convertible = COALESCE(?, is_bed_convertible),
-                current_bed_setup = COALESCE(?, current_bed_setup),
-                view_type = COALESCE(?, view_type),
-                is_accessible = COALESCE(?, is_accessible),
-                connecting_door_status = COALESCE(?, connecting_door_status),
+            SET room_number = COALESCE($1, room_number),
+                name = COALESCE($2, name),
+                building_id = COALESCE($3, building_id),
+                floor_id = COALESCE($4, floor_id),
+                room_type_id = COALESCE($5, room_type_id),
+                status = COALESCE($6, status),
+                housekeeping_status = COALESCE($7, housekeeping_status),
+                remarks = COALESCE($8, remarks),
+                phone_ext = COALESCE($9, phone_ext),
+                lock_id = COALESCE($10, lock_id),
+                is_connecting = COALESCE($11, is_connecting),
+                connected_to = COALESCE($12, connected_to),
+                smoking_status = COALESCE($13, smoking_status),
+                near_elevator = COALESCE($14, near_elevator),
+                bed_type = COALESCE($15, bed_type),
+                bed_count = COALESCE($16, bed_count),
+                is_bed_convertible = COALESCE($17, is_bed_convertible),
+                current_bed_setup = COALESCE($18, current_bed_setup),
+                view_type = COALESCE($19, view_type),
+                is_accessible = COALESCE($20, is_accessible),
+                connecting_door_status = COALESCE($21, connecting_door_status),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `).run(
+            WHERE id = $22
+        `, [
             newRoomNumber || null,
             name,
             buildingId,
@@ -467,9 +477,10 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
             body.isAccessible !== undefined ? Boolean(body.isAccessible || body.is_accessible) : null,
             body.connectingDoorStatus || body.connecting_door_status || null,
             targetRoom.id
-        );
+        ]);
 
-        const updatedRoom = await db.prepare('SELECT * FROM rooms WHERE id = ?').get(targetRoom.id);
+        const updatedRoomRes = await pgPool.query('SELECT * FROM rooms WHERE id = $1', [targetRoom.id]);
+        const updatedRoom = updatedRoomRes.rows[0];
 
         res.json({ success: true, message: `Room ${newRoomNumber} updated successfully`, data: updatedRoom });
     } catch (e: any) {
@@ -490,11 +501,12 @@ router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Req
         }
 
         const isNumeric = !isNaN(Number(identifier)) && Number(identifier) > 0;
-        const targetRoom = await db.prepare(`
+        const targetRes = await pgPool.query(`
             SELECT id, room_number FROM rooms 
-            WHERE property_id = ? AND (id = ? OR room_number = ?)
+            WHERE property_id = $1 AND (id = $2 OR room_number = $3)
             LIMIT 1
-        `).get(propertyId, isNumeric ? Number(identifier) : -1, identifier) as any;
+        `, [propertyId, isNumeric ? Number(identifier) : -1, identifier]);
+        const targetRoom = targetRes.rows[0] as any;
 
         if (!targetRoom) {
             return res.status(404).json({ success: false, error: `Room '${identifier}' not found in inventory` });
@@ -504,13 +516,14 @@ router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Req
         const roomNo = targetRoom.room_number;
 
         // Check if there are active in-house reservations
-        const activeStays = await db.prepare(`
+        const activeRes = await pgPool.query(`
             SELECT r.id, r.reservation_number 
             FROM reservation_rooms rr
             JOIN reservations r ON r.id = rr.reservation_id
-            WHERE rr.room_id = ? AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
+            WHERE rr.room_id = $1 AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
             LIMIT 1
-        `).get(roomId) as any;
+        `, [roomId]);
+        const activeStays = activeRes.rows[0] as any;
 
         if (activeStays) {
             return res.status(400).json({
@@ -520,15 +533,15 @@ router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Req
         }
 
         // Clean up dependent child records to prevent FK constraints from blocking deletion
-        await db.prepare('DELETE FROM keycard_logs WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo).catch(() => {});
-        await db.prepare('DELETE FROM room_maintenance_blocks WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo).catch(() => {});
-        await db.prepare('DELETE FROM housekeeping_tasks WHERE room_id = ?').run(roomId).catch(() => {});
-        await db.prepare('DELETE FROM room_amenities WHERE room_id = ?').run(roomId).catch(() => {});
-        await db.prepare('DELETE FROM reservation_rooms WHERE room_id = ?').run(roomId).catch(() => {});
+        await pgPool.query('DELETE FROM keycard_logs WHERE property_id = $1 AND room_number = $2', [propertyId, roomNo]).catch(() => {});
+        await pgPool.query('DELETE FROM room_maintenance_blocks WHERE property_id = $1 AND room_number = $2', [propertyId, roomNo]).catch(() => {});
+        await pgPool.query('DELETE FROM housekeeping_tasks WHERE room_id = $1', [roomId]).catch(() => {});
+        await pgPool.query('DELETE FROM room_amenities WHERE room_id = $1', [roomId]).catch(() => {});
+        await pgPool.query('DELETE FROM reservation_rooms WHERE room_id = $1', [roomId]).catch(() => {});
 
         // Delete room
-        const info = await db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
-        if (info.rowCount === 0) {
+        const info = await pgPool.query('DELETE FROM rooms WHERE id = $1', [roomId]);
+        if ((info.rowCount ?? 0) === 0) {
             return res.status(404).json({ success: false, error: `Room ${roomNo} not found` });
         }
 
@@ -559,23 +572,23 @@ router.get('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Req
                    status, return_to_status as "returnToStatus", extension_notes as "extensionNotes",
                    created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
             FROM room_maintenance_blocks
-            WHERE property_id = ?
+            WHERE property_id = $1
         `;
         const params: any[] = [propertyId];
 
         if (status !== 'all') {
-            query += ` AND status = ?`;
             params.push(status);
+            query += ` AND status = $${params.length}`;
         }
         if (roomNo) {
-            query += ` AND room_number = ?`;
             params.push(roomNo);
+            query += ` AND room_number = $${params.length}`;
         }
 
         query += ` ORDER BY start_date DESC, id DESC`;
 
-        const rows = await db.prepare(query).all(params);
-        res.json({ success: true, data: rows });
+        const rowsRes = await pgPool.query(query, params);
+        res.json({ success: true, data: rowsRes.rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch OOO blocks' });
     }
@@ -617,13 +630,14 @@ router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Re
             LEFT JOIN guests g ON r.booker_guest_id = g.id
             JOIN reservation_rooms rr ON rr.reservation_id = r.id
             JOIN rooms rm ON rr.room_id = rm.id
-            WHERE r.property_id = ?
-              AND rm.room_number = ?
+            WHERE r.property_id = $1
+              AND rm.room_number = $2
               AND r.status NOT IN ('CANCELLED', 'VOIDED', 'CHECKED_OUT', 'COMPLETED')
-              AND rr.check_in_date < ?
-              AND rr.check_out_date > ?
+              AND rr.check_in_date < $3
+              AND rr.check_out_date > $4
         `;
-        const conflicts = await db.prepare(conflictSql).all(propertyId, roomNumber, endDate, startDate);
+        const conflictsRes = await pgPool.query(conflictSql, [propertyId, roomNumber, endDate, startDate]);
+        const conflicts = conflictsRes.rows;
 
         if (conflicts.length > 0 && !force) {
             return res.status(409).json({
@@ -635,13 +649,14 @@ router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Re
         }
 
         // 2. Insert maintenance block
-        const insertResult = await db.prepare(`
+        const insertResult = await pgPool.query(`
             INSERT INTO room_maintenance_blocks (
                 property_id, room_number, room_type, block_type, start_date, end_date,
                 reason_category, description, assigned_to, status, return_to_status, created_by
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
-        `).run(
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11)
+            RETURNING id
+        `, [
             propertyId,
             roomNumber,
             roomType,
@@ -653,23 +668,23 @@ router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Re
             assignedTo,
             returnToStatus,
             createdBy
-        );
+        ]);
 
         // 3. If today falls in [startDate, endDate], sync room status in rooms table
         const todayStr = new Date().toISOString().slice(0, 10);
         if (todayStr >= startDate && todayStr <= endDate) {
             const targetStatus = blockType === 'OOO' ? 'OUT_OF_ORDER' : 'MAINTENANCE';
-            await db.prepare(`
+            await pgPool.query(`
                 UPDATE rooms
-                SET status = ?, housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
-                WHERE property_id = ? AND room_number = ?
-            `).run(targetStatus, propertyId, roomNumber);
+                SET status = $1, housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+                WHERE property_id = $2 AND room_number = $3
+            `, [targetStatus, propertyId, roomNumber]);
         }
 
         res.status(201).json({
             success: true,
             data: {
-                id: insertResult.lastInsertRowid,
+                id: insertResult.rows[0]?.id,
                 roomNumber,
                 roomType,
                 blockType,
@@ -706,7 +721,8 @@ router.put('/ooo-blocks/:id/extend', requirePermission('frontdesk.access'), asyn
             return res.status(400).json({ success: false, error: 'newEndDate is required' });
         }
 
-        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        const blockRes = await pgPool.query('SELECT * FROM room_maintenance_blocks WHERE id = $1 AND property_id = $2', [id, propertyId]);
+        const block = blockRes.rows[0];
         if (!block) {
             return res.status(404).json({ success: false, error: 'Maintenance block not found' });
         }
@@ -714,11 +730,11 @@ router.put('/ooo-blocks/:id/extend', requirePermission('frontdesk.access'), asyn
         const noteEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Extended from ${block.end_date} to ${newEndDate} by ${extendedBy}. Reason: ${reason || 'N/A'}`;
         const updatedNotes = block.extension_notes ? `${block.extension_notes}\n${noteEntry}` : noteEntry;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE room_maintenance_blocks
-            SET end_date = ?, status = 'extended', extension_notes = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(newEndDate, updatedNotes, id, propertyId);
+            SET end_date = $1, status = 'extended', extension_notes = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3 AND property_id = $4
+        `, [newEndDate, updatedNotes, id, propertyId]);
 
         res.json({
             success: true,
@@ -743,7 +759,8 @@ router.put('/ooo-blocks/:id/release', requirePermission('frontdesk.access'), asy
         const releasedBy = String(body.releasedBy || 'Manager').trim();
         const notes = String(body.notes || '').trim();
 
-        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        const blockRes = await pgPool.query('SELECT * FROM room_maintenance_blocks WHERE id = $1 AND property_id = $2', [id, propertyId]);
+        const block = blockRes.rows[0];
         if (!block) {
             return res.status(404).json({ success: false, error: 'Maintenance block not found' });
         }
@@ -751,19 +768,19 @@ router.put('/ooo-blocks/:id/release', requirePermission('frontdesk.access'), asy
         const releaseEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Released by ${releasedBy} with status ${returnStatus}. Note: ${notes || 'Work completed'}`;
         const updatedNotes = block.extension_notes ? `${block.extension_notes}\n${releaseEntry}` : releaseEntry;
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE room_maintenance_blocks
-            SET status = 'completed', return_to_status = ?, extension_notes = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(returnStatus, updatedNotes, id, propertyId);
+            SET status = 'completed', return_to_status = $1, extension_notes = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3 AND property_id = $4
+        `, [returnStatus, updatedNotes, id, propertyId]);
 
         // Transition room back to ACTIVE with returned Housekeeping status
         const hkEnum = returnStatus.toUpperCase() === 'INSPECTED' ? 'INSPECTED' : returnStatus.toUpperCase() === 'CLEAN' ? 'CLEAN' : 'DIRTY';
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms
-            SET status = 'ACTIVE', housekeeping_status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE property_id = ? AND room_number = ?
-        `).run(hkEnum, propertyId, block.room_number);
+            SET status = 'ACTIVE', housekeeping_status = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE property_id = $2 AND room_number = $3
+        `, [hkEnum, propertyId, block.room_number]);
 
         res.json({
             success: true,
@@ -784,23 +801,24 @@ router.delete('/ooo-blocks/:id', requirePermission('frontdesk.access'), async (r
             return res.status(400).json({ success: false, error: 'Property ID is required' });
         }
 
-        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        const blockRes = await pgPool.query('SELECT * FROM room_maintenance_blocks WHERE id = $1 AND property_id = $2', [id, propertyId]);
+        const block = blockRes.rows[0];
         if (!block) {
             return res.status(404).json({ success: false, error: 'Maintenance block not found' });
         }
 
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE room_maintenance_blocks
             SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(id, propertyId);
+            WHERE id = $1 AND property_id = $2
+        `, [id, propertyId]);
 
         // If room is currently OUT_OF_ORDER or MAINTENANCE, revert to ACTIVE
-        await db.prepare(`
+        await pgPool.query(`
             UPDATE rooms
             SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-            WHERE property_id = ? AND room_number = ? AND status IN ('OUT_OF_ORDER', 'MAINTENANCE')
-        `).run(propertyId, block.room_number);
+            WHERE property_id = $1 AND room_number = $2 AND status IN ('OUT_OF_ORDER', 'MAINTENANCE')
+        `, [propertyId, block.room_number]);
 
         res.json({ success: true, message: `Maintenance block cancelled for Room ${block.room_number}` });
     } catch (e: any) {

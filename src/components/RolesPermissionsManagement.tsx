@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { confirmModal } from '../context/ConfirmModalContext';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -462,11 +463,17 @@ export default function RolesPermissionsManagement() {
     };
 
     // Delete Role
-    const handleDelete = (id: string, name: string) => {
-        if (confirm(`Are you sure you want to delete role "${name}"? Staff assigned to this role will need to be reassigned.`)) {
-            setRoles(prev => prev.filter(r => r.id !== id));
-            showToast('Role deleted');
-        }
+    const handleDelete = async (id: string, name: string) => {
+        const confirmed = await confirmModal({
+            title: `Delete Role "${name}"?`,
+            message: `Are you sure you want to delete role "${name}"? Staff assigned to this role will need to be reassigned to another role.`,
+            confirmText: 'Delete Role',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        setRoles(prev => prev.filter(r => r.id !== id));
+        showToast(`Role "${name}" deleted.`);
     };
 
     // Color badges helper

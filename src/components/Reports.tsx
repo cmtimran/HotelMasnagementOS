@@ -1,12 +1,8 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, LayoutDashboard, ArrowRight } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
-
 
 // --- Generic Report Engine ---
 
@@ -15,7 +11,7 @@ type ReportRow = Record<string, string | number | null | undefined>;
 // 1. Report Configuration: Defines columns for each report
 const REPORT_CONFIG: Record<string, { columns: string[] }> = {
     // Reservation Reports
-    'Arrival List': { columns: ["Res. No", "Guest", "Room", "Rate ($)", "Arrival", "Departure", "Pax", "Pick Up", "Drop Off", "Res. Type", "Company", "User"] },
+    'Arrival List': { columns: ["Res. No", "Guest", "Room", "Rate", "Arrival", "Departure", "Pax", "Pick Up", "Drop Off", "Res. Type", "Company", "User"] },
     'Cancelled Reservation': { columns: ["Res. No", "Booking Date", "Guest", "Rate Type", "Arr.", "Dpt", "Folio No", "ADR", "Can. Revenue", "Source", "Can. By", "Can Date", "Remarks"] },
     'Country Wise Reservation Statistics': { columns: ["Country", "Total Res.", "Total Nights", "Total Revenue", "Total Pax"] },
     'Departure List': { columns: ["Res. no", "Guest Name", "Room", "Rate", "Rate Type", "Arrival", "Departure", "Pax", "Business Source", "Res.Type", "User"] },
@@ -98,6 +94,7 @@ interface ReportsProps {
 }
 
 const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
+    const { currencySymbol, currencyCode } = useActiveCurrency();
     const { activeReport, navigateToReport } = useNavigation();
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
@@ -1031,7 +1028,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                         </div>
@@ -1051,7 +1048,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                         </div>
@@ -1112,7 +1109,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
@@ -1180,7 +1177,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                         </div>
@@ -1447,7 +1444,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                         </div>
@@ -2152,7 +2149,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <div className="grid grid-cols-3 items-center">
                                     <label className="font-medium text-slate-700 text-xs">Currency</label>
                                     <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                        <option>$</option>
+                                        <option>{currencyCode} ({currencySymbol})</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
@@ -2396,7 +2393,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <div className="grid grid-cols-3 items-center">
                                 <label className="font-medium text-slate-700 text-xs">Currency</label>
                                 <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
-                                    <option>$</option>
+                                    <option>{currencyCode} ({currencySymbol})</option>
                                 </select>
                             </div>
                         </div>
@@ -3661,9 +3658,14 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
         return generateGenericMockData(activeReport);
     }, [activeReport]);
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         const config = REPORT_CONFIG[activeReport];
         if (!config) return;
+
+        const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+            import('jspdf'),
+            import('jspdf-autotable')
+        ]);
 
         const doc = new jsPDF({
             orientation: orientation,
@@ -3720,9 +3722,11 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
         setShowExportMenu(false);
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const config = REPORT_CONFIG[activeReport];
         if (!config || !reportData.length) return;
+
+        const XLSX = await import('xlsx');
 
         const ws = XLSX.utils.json_to_sheet(reportData);
         const wb = XLSX.utils.book_new();
@@ -3734,6 +3738,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
     const handleExportJPG = async () => {
         const element = document.getElementById('report-content');
         if (element) {
+            const { default: html2canvas } = await import('html2canvas');
             const canvas = await html2canvas(element, { scale: 2 });
             const data = canvas.toDataURL('image/jpeg');
             const link = document.createElement('a');

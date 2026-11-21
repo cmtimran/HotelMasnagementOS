@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import type { FolioData } from '../folioTypes';
@@ -71,16 +72,16 @@ export const TaxExemptionModal: React.FC<TaxExemptionModalProps> = ({
 
     const activeCharges = currentFolio?.charges?.filter(c => !c.is_voided && c.is_tax_applicable) || [];
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/25 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
             {/* Slide-out Drawer Panel (Right Side) */}
-            <div className="fixed inset-y-0 right-0 w-80 sm:w-[440px] bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-[440px] bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
                 {/* Header */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <div className="flex items-center gap-2">
@@ -106,7 +107,7 @@ export const TaxExemptionModal: React.FC<TaxExemptionModalProps> = ({
                         )}
 
                         <div className="bg-teal-50 border border-teal-200/80 rounded-lg p-2.5 text-[11px] text-teal-900 space-y-1">
-                            <span className="font-bold">Official Exemption Policy (Yanolja Freshdesk 9000274726):</span>
+                            <span className="font-bold">Official Statutory Exemption Policy:</span>
                             <p className="text-teal-800">
                                 Apply VAT, Service Charge & City Tax exemption for diplomatic missions, military personnel, UN agencies, or verified NGOs.
                             </p>
@@ -193,6 +194,7 @@ export const TaxExemptionModal: React.FC<TaxExemptionModalProps> = ({
                     </div>
                 </form>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

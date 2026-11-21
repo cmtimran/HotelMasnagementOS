@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, DollarSign, Users, Calendar, ArrowUp, ArrowDown, Percent } from 'lucide-react';
 import PageHeader from './common/PageHeader';
+import { useActiveCurrency } from '../utils/currencyUtils';
 import {
     getAllStoredReservations,
     getCanonicalRooms,
@@ -12,6 +13,7 @@ import {
 } from '../utils/roomInventoryEngine';
 
 const RevenueDashboard = () => {
+    const { currencySymbol } = useActiveCurrency();
     const [reservations, setReservations] = useState(() => getAllStoredReservations());
     const [rooms, setRooms] = useState(() => getCanonicalRooms());
     const [roomTypes, setRoomTypes] = useState(() => getDynamicRoomTypes());
@@ -174,7 +176,7 @@ const RevenueDashboard = () => {
                 <div className="card-container flex items-center justify-between">
                     <div>
                         <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Daily Revenue</p>
-                        <p className="text-2xl text-slate-900 mt-1">৳{stats.todayRevenue.toLocaleString()}</p>
+                        <p className="text-2xl text-slate-900 mt-1">{currencySymbol}{stats.todayRevenue.toLocaleString()}</p>
                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
                             {stats.todayGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.todayGrowth)}% vs previous period
@@ -188,7 +190,7 @@ const RevenueDashboard = () => {
                 <div className="card-container flex items-center justify-between">
                     <div>
                         <p className="text-[11px] text-slate-400 uppercase tracking-wider">Current Month Revenue</p>
-                        <p className="text-2xl text-slate-900 mt-1">৳{stats.monthRevenue.toLocaleString()}</p>
+                        <p className="text-2xl text-slate-900 mt-1">{currencySymbol}{stats.monthRevenue.toLocaleString()}</p>
                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
                             {stats.monthGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.monthGrowth)}% monthly pacing
@@ -202,7 +204,7 @@ const RevenueDashboard = () => {
                 <div className="card-container flex items-center justify-between">
                     <div>
                         <p className="text-[11px] text-slate-400 uppercase tracking-wider">Cumulative Folio Revenue</p>
-                        <p className="text-2xl text-slate-900 mt-1">৳{stats.yearRevenue.toLocaleString()}</p>
+                        <p className="text-2xl text-slate-900 mt-1">{currencySymbol}{stats.yearRevenue.toLocaleString()}</p>
                         <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 mt-1">
                             {stats.yearGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.yearGrowth)}% annual growth
@@ -238,7 +240,7 @@ const RevenueDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[11px] text-slate-500 font-semibold uppercase">ADR (Avg Daily Rate)</p>
-                            <p className="text-xl text-slate-900">৳{stats.adr.toLocaleString()}</p>
+                            <p className="text-xl text-slate-900">{currencySymbol}{stats.adr.toLocaleString()}</p>
                         </div>
                     </div>
                     <p className="text-[11px] text-slate-400">Average realized rate per occupied room</p>
@@ -251,7 +253,7 @@ const RevenueDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[11px] text-slate-500 font-semibold uppercase">RevPAR</p>
-                            <p className="text-xl text-slate-900">৳{stats.revpar.toLocaleString()}</p>
+                            <p className="text-xl text-slate-900">{currencySymbol}{stats.revpar.toLocaleString()}</p>
                         </div>
                     </div>
                     <p className="text-[11px] text-slate-400">Revenue per available physical room</p>
@@ -267,7 +269,7 @@ const RevenueDashboard = () => {
                             <div key={idx}>
                                 <div className="flex items-center justify-between mb-1.5 text-xs">
                                     <span className="font-semibold text-slate-700">{dept.name}</span>
-                                    <span className="text-slate-900">৳{dept.amount.toLocaleString()} ({dept.percentage}%)</span>
+                                    <span className="text-slate-900">{currencySymbol}{dept.amount.toLocaleString()} ({dept.percentage}%)</span>
                                 </div>
                                 <div className="w-full bg-slate-100 rounded-full h-2">
                                     <div className={`bg-gradient-to-r ${dept.color} h-2 rounded-full transition-all`} style={{ width: `${dept.percentage}%` }} />
@@ -286,7 +288,7 @@ const RevenueDashboard = () => {
                                 <div className="w-full bg-primary rounded-t-lg transition-all hover:bg-[#0063ba] cursor-pointer relative group"
                                     style={{ height: `${Math.max(10, (month.revenue / maxRevenue) * 100)}%` }}>
                                     <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                        ৳{month.revenue.toLocaleString()}
+                                        {currencySymbol}{month.revenue.toLocaleString()}
                                     </div>
                                 </div>
                                 <span className="text-[11px] font-semibold text-slate-600">{month.month}</span>
@@ -316,9 +318,9 @@ const RevenueDashboard = () => {
                             {topRoomTypes.map((room, idx) => (
                                 <tr key={idx} className="hover:bg-primary-subtle/30 transition-colors">
                                     <td className="text-slate-900">{room.type}</td>
-                                    <td className="text-emerald-600">৳{room.revenue.toLocaleString()}</td>
+                                    <td className="text-emerald-600">{currencySymbol}{room.revenue.toLocaleString()}</td>
                                     <td className="font-semibold text-slate-700">{room.bookings}</td>
-                                    <td className="font-semibold text-slate-700">৳{room.avgRate.toLocaleString()}</td>
+                                    <td className="font-semibold text-slate-700">{currencySymbol}{room.avgRate.toLocaleString()}</td>
                                     <td className="w-40">
                                         <div className="w-full bg-slate-100 rounded-full h-1.5">
                                             <div className="bg-emerald-500 h-1.5 rounded-full"

@@ -1,4 +1,4 @@
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 import { broadcastServerEvent } from '../routes/realtime.routes.js';
 
 export interface RoomRecord {
@@ -40,7 +40,7 @@ export const roomService = {
       return [];
     }
 
-    const rows = await db.prepare(`
+    const rowsRes = await pgPool.query(`
       SELECT 
         r.id,
         r.room_number as "roomNo",
@@ -65,7 +65,7 @@ export const roomService = {
           FROM reservation_rooms rr 
           JOIN reservations res ON res.id = rr.reservation_id 
           WHERE rr.room_id = r.id 
-            AND res.property_id = ?
+            AND res.property_id = $1
             AND res.status IN ('CONFIRMED', 'IN_HOUSE', 'confirmed', 'in-house', 'arrived')
             AND CURRENT_DATE >= (rr.check_in_date)::date
             AND CURRENT_DATE < (rr.check_out_date)::date
@@ -76,7 +76,7 @@ export const roomService = {
           FROM reservation_rooms rr 
           JOIN reservations res ON res.id = rr.reservation_id 
           WHERE rr.room_id = r.id 
-            AND res.property_id = ?
+            AND res.property_id = $2
             AND res.status IN ('IN_HOUSE', 'in-house', 'arrived')
           ORDER BY rr.id DESC LIMIT 1
         ) as is_due_out
@@ -84,11 +84,13 @@ export const roomService = {
       JOIN buildings b ON b.id = r.building_id
       JOIN floors f ON f.id = r.floor_id
       JOIN room_types rt ON rt.id = r.room_type_id
-      WHERE r.property_id = ?
+      WHERE r.property_id = $3
+        AND UPPER(TRIM(r.room_number)) NOT IN ('UNASSIGNED', 'UNASSIGN', 'TBA', 'TBD', 'NONE')
       ORDER BY f.floor_number ASC, 
                CASE WHEN r.room_number ~ '^[0-9]+$' THEN CAST(r.room_number AS INTEGER) ELSE 99999 END ASC, 
                r.room_number ASC
-    `).all(propId, propId, propId) as any[];
+    `, [propId, propId, propId]);
+    const rows = rowsRes.rows as any[];
 
     const result: RoomRecord[] = rows.map(row => {
       // 1. Housekeeping status mapping
@@ -183,15 +185,15 @@ export const roomService = {
       dbStatus = 'ACTIVE';
     }
 
-    const info = await db.prepare(`
+    const info = await pgPool.query(`
       UPDATE rooms
-      SET housekeeping_status = ?,
-          status = ?,
+      SET housekeeping_status = $1,
+          status = $2,
           updated_at = CURRENT_TIMESTAMP
-      WHERE property_id = ? AND room_number = ?
-    `).run(dbHk, dbStatus, propId, String(roomNo));
+      WHERE property_id = $3 AND room_number = $4
+    `, [dbHk, dbStatus, propId, String(roomNo)]);
 
-    if (info.rowCount === 0) {
+    if ((info.rowCount ?? 0) === 0) {
       return null;
     }
 

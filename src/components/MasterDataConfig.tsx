@@ -282,8 +282,38 @@ interface MasterDataConfigProps {
 export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
     initialTab = 'currency',
 }) => {
-    const [activeTab, setActiveTab] = useState<MasterDataTabType>(initialTab);
+    const getInitialTab = (): MasterDataTabType => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const qTab = params.get('tab') as MasterDataTabType;
+            if (qTab) return qTab;
+        } catch {}
+        return initialTab;
+    };
+
+    const [activeTab, setActiveTabState] = useState<MasterDataTabType>(() => getInitialTab());
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    const setActiveTab = (tab: MasterDataTabType) => {
+        setActiveTabState(tab);
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState({ tab }, '', url.toString());
+        } catch {}
+    };
+
+    useEffect(() => {
+        const handlePopState = () => {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const qTab = params.get('tab') as MasterDataTabType;
+                if (qTab) setActiveTabState(qTab);
+            } catch {}
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -291,7 +321,12 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
     };
 
     useEffect(() => {
-        setActiveTab(initialTab);
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.get('tab')) {
+                setActiveTab(initialTab);
+            }
+        } catch {}
     }, [initialTab]);
 
     // Local Storage Hydration & State
@@ -386,6 +421,70 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 ? 'border-blue-400 bg-blue-50 text-blue-800'
                                 : 'border-amber-400 bg-amber-50 text-amber-800',
                         status: 'Active'
+                    })));
+                }
+            })
+            .catch(() => {});
+
+        // Fetch master currencies from PostgreSQL
+        fetch(`${base}/api/master-data/currencies`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setCurrencies(json.data.map((c: any) => ({
+                        id: Number(c.id),
+                        code: c.code,
+                        name: c.name,
+                        symbol: c.symbol,
+                        exchangeRate: Number(c.exchange_rate),
+                        isBase: Boolean(c.is_base),
+                        isActive: Boolean(c.is_active)
+                    })));
+                }
+            })
+            .catch(() => {});
+
+        // Fetch master extra charges from PostgreSQL
+        fetch(`${base}/api/master-data/extra-charges`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setExtraCharges(json.data.map((c: any) => ({
+                        id: Number(c.id),
+                        code: c.code,
+                        name: c.name,
+                        category: 'Housekeeping',
+                        pricingRule: c.charge_type === 'flat' ? 'Flat Amount' : 'Percentage of Room Tariff',
+                        basePrice: Number(c.amount),
+                        taxApplicable: Boolean(c.taxable),
+                        serviceChargeApplicable: true,
+                        revenueLedgerCode: 'GL-4050 - Extra Surcharges',
+                        autoPostTrigger: 'On Demand / Manual',
+                        active: Boolean(c.is_active)
+                    })));
+                }
+            })
+            .catch(() => {});
+
+        // Fetch master discounts from PostgreSQL
+        fetch(`${base}/api/master-data/discounts`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setDiscounts(json.data.map((d: any) => ({
+                        id: Number(d.id),
+                        code: d.code,
+                        name: d.title,
+                        category: 'Promotional Public',
+                        type: d.discount_type === 'percentage' ? 'Percentage (%)' : 'Flat Amount (BDT)',
+                        value: Number(d.value),
+                        maxCapBDT: 10000,
+                        minSpendBDT: 2000,
+                        applicableOn: (d.applies_to || 'Rooms').split(',') as any,
+                        requiresManagerPin: false,
+                        reasonRequired: true,
+                        contraRevenueGlCode: 'GL-4990 - Room Revenue Allowances',
+                        active: Boolean(d.is_active)
                     })));
                 }
             })
@@ -559,14 +658,19 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
 
     // 1. Currency Actions (Set Default Base Currency, Add, Edit, Delete)
     const handleSetDefaultCurrency = (targetCode: string) => {
-        setCurrencies(prev =>
-            prev.map(c => ({
+        const cleanCode = targetCode.trim().slice(0, 3).toUpperCase();
+        setCurrencies(prev => {
+            const updated = prev.map(c => ({
                 ...c,
-                isBase: c.code === targetCode
-            }))
-        );
-        const selected = currencies.find(c => c.code === targetCode);
-        showToast(`${selected ? selected.name : targetCode} is now the Hotel Default Base Currency.`);
+                isBase: c.code === cleanCode
+            }));
+            localStorage.setItem('hotel_master_currencies_v1', JSON.stringify(updated));
+            return updated;
+        });
+        localStorage.setItem('hotel_active_property_currency', cleanCode);
+        window.dispatchEvent(new CustomEvent('hotel_currency_changed', { detail: { currency: cleanCode } }));
+        const selected = currencies.find(c => c.code === cleanCode);
+        showToast(`${selected ? selected.name : cleanCode} is now the Hotel Default Base Currency.`);
     };
 
     const handleOpenAddCurrency = () => {

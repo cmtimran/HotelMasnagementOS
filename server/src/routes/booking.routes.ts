@@ -15,6 +15,8 @@ router.put('/:id', requirePermission('reservation.manage'), bookingController.up
 router.patch('/:id', requirePermission('reservation.manage'), bookingController.updateBooking);
 router.post('/group/link', requirePermission('reservation.manage'), bookingController.linkGroup);
 router.post('/group/unlink', requirePermission('reservation.manage'), bookingController.unlinkGroup);
+router.get('/:id/communications', requirePermission('reservation.view'), bookingController.getCommunications);
+router.post('/:id/send-confirmation', requirePermission('reservation.manage'), bookingController.sendConfirmation);
 router.patch('/:id/amend', requirePermission('reservation.manage'), bookingController.amendBooking);
 router.post('/:id/move', requirePermission('reservation.manage'), bookingController.moveRoom);
 router.post('/:id/stop-room-move', requirePermission('reservation.manage'), bookingController.stopRoomMove);

@@ -17,5 +17,5 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/database/schema.postgres.sql ./dist/database/schema.postgres.sql
 
-EXPOSE 3001
+EXPOSE 3002
 CMD ["node", "dist/server.js"]

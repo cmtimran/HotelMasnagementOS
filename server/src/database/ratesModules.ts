@@ -352,7 +352,12 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             'ALTER TABLE floors ADD COLUMN IF NOT EXISTS has_ice_machine BOOLEAN DEFAULT FALSE;',
             'ALTER TABLE floors ADD COLUMN IF NOT EXISTS amenity_ids_json TEXT;',
             'ALTER TABLE floors ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT \'Open\';',
-            'ALTER TABLE floors ADD COLUMN IF NOT EXISTS description TEXT;'
+            'ALTER TABLE floors ADD COLUMN IF NOT EXISTS description TEXT;',
+            'ALTER TABLE rate_calendar_overrides ADD COLUMN IF NOT EXISTS room_type_id BIGINT REFERENCES room_types(id) ON DELETE CASCADE;',
+            'ALTER TABLE reservations ADD COLUMN IF NOT EXISTS is_overbooked BOOLEAN NOT NULL DEFAULT FALSE;',
+            'ALTER TABLE reservations ADD COLUMN IF NOT EXISTS overbooking_status VARCHAR(32) DEFAULT \'NONE\';',
+            'ALTER TABLE channel_bookings ADD COLUMN IF NOT EXISTS is_overbooked BOOLEAN NOT NULL DEFAULT FALSE;',
+            'ALTER TABLE channel_bookings ADD COLUMN IF NOT EXISTS overbooking_status VARCHAR(32) DEFAULT \'NONE\';'
         ];
 
         for (const colSql of safeColumns) {
@@ -363,7 +368,101 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             }
         }
 
-        // 7. Dynamic schema verification completed
+        // 7. Relational Connecting Room Components
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS connecting_room_components (
+                id BIGSERIAL PRIMARY KEY,
+                suite_id BIGINT NOT NULL REFERENCES connecting_rooms(id) ON DELETE CASCADE,
+                room_id BIGINT REFERENCES rooms(id) ON DELETE CASCADE,
+                room_number VARCHAR(32) NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(suite_id, room_number)
+            );
+            CREATE INDEX IF NOT EXISTS idx_conn_comp_suite ON connecting_room_components(suite_id);
+            CREATE INDEX IF NOT EXISTS idx_conn_comp_room ON connecting_room_components(room_number);
+        `);
+
+        // 8. Relational Meal Entitlements Table (POS & Restaurant KOT synchronization)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS reservation_meal_entitlements (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                reservation_id BIGINT NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+                room_number VARCHAR(32),
+                guest_name VARCHAR(255),
+                meal_plan_code VARCHAR(32) NOT NULL DEFAULT 'CP',
+                entitlement_date DATE NOT NULL,
+                meal_type VARCHAR(32) NOT NULL,
+                pax_adults INT NOT NULL DEFAULT 1,
+                pax_children INT NOT NULL DEFAULT 0,
+                is_consumed BOOLEAN NOT NULL DEFAULT FALSE,
+                consumed_at TIMESTAMPTZ,
+                pos_order_id VARCHAR(64),
+                server_staff_name VARCHAR(128),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_meal_entitlements_date ON reservation_meal_entitlements(property_id, entitlement_date, room_number, is_consumed);
+        `);
+
+        // 9. Holiday Rate Adjustments & Peak Surcharges
+        try {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS holiday_rate_adjustments (
+                    id BIGSERIAL PRIMARY KEY,
+                    holiday_id VARCHAR(64) REFERENCES holidays(id) ON DELETE CASCADE,
+                    property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                    surcharge_percentage NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+                    flat_surcharge_amount NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+                    min_length_of_stay INT NOT NULL DEFAULT 1,
+                    stop_sell BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_holiday_rate_prop ON holiday_rate_adjustments(property_id, holiday_id);
+            `);
+        } catch (err: any) {
+            console.warn('Notice: holiday_rate_adjustments table create notice:', err.message);
+        }
+
+        // 10. Dedicated Guest Security Deposits Ledger (Escrow Account 21020-01)
+        try {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS guest_security_deposits (
+                    id BIGSERIAL PRIMARY KEY,
+                    property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                    reservation_id BIGINT NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+                    folio_id BIGINT REFERENCES folios(id) ON DELETE SET NULL,
+                    amount NUMERIC(12,2) NOT NULL,
+                    payment_method VARCHAR(64) NOT NULL DEFAULT 'CASH',
+                    receipt_number VARCHAR(64),
+                    status VARCHAR(32) NOT NULL DEFAULT 'HELD',
+                    held_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    refunded_at TIMESTAMPTZ,
+                    refund_amount NUMERIC(12,2),
+                    damage_deduction_amount NUMERIC(12,2) DEFAULT 0.00,
+                    damage_reason TEXT,
+                    received_by VARCHAR(128) NOT NULL DEFAULT 'Front Desk Cashier',
+                    refunded_by VARCHAR(128),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_sec_deposit_res ON guest_security_deposits(property_id, reservation_id, status);
+            `);
+        } catch (err: any) {
+            console.warn('Notice: guest_security_deposits table create notice:', err.message);
+        }
+
+        // Backfill room_type_id in rate_calendar_overrides
+        try {
+            await client.query(`
+                UPDATE rate_calendar_overrides rco
+                SET room_type_id = rt.id
+                FROM room_types rt
+                WHERE rco.room_type_id IS NULL AND LOWER(rco.room_type_name) = LOWER(rt.name);
+            `);
+        } catch {}
+
+        // 11. Dynamic schema verification completed
         // (Automatic re-seeding disabled to ensure clean single-property architecture)
     } finally {
         client.release();

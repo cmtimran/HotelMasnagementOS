@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, X, Save, CheckCircle2, AlertCircle, DollarSign } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Building2, Plus, Edit, Trash2, Search, X, Save, CheckCircle2, AlertCircle, DollarSign, RefreshCw } from 'lucide-react';
 import { toast } from '../context/ToastContext';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 interface CorporateProfile {
     id: number;
@@ -100,6 +101,7 @@ const CorporateProfileManagement = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [showForm, setShowForm] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [editingProfile, setEditingProfile] = useState<CorporateProfile | null>(null);
     const [formData, setFormData] = useState<Partial<CorporateProfile>>({
         companyName: '',
@@ -119,25 +121,71 @@ const CorporateProfileManagement = () => {
         specialTerms: ''
     });
 
+    const fetchProfilesFromApi = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/corporate-profiles`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                setProfiles(json.data);
+                localStorage.setItem('hotel_corporate_profiles_v1', JSON.stringify(json.data));
+            } else {
+                const saved = localStorage.getItem('hotel_corporate_profiles_v1');
+                if (saved) setProfiles(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.warn('API fetch corporate profiles fallback to cache:', e);
+            const saved = localStorage.getItem('hotel_corporate_profiles_v1');
+            if (saved) setProfiles(JSON.parse(saved));
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchProfilesFromApi();
+
+        const handleSync = (e: any) => {
+            if (e.detail?.entity === 'corporate-profiles' || e.detail?.type === 'MASTER_DATA_UPDATED') {
+                fetchProfilesFromApi();
+            }
+        };
+        window.addEventListener('pms_network_sync', handleSync);
+        return () => window.removeEventListener('pms_network_sync', handleSync);
+    }, [fetchProfilesFromApi]);
+
     const filteredProfiles = profiles.filter(p =>
         p.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.companyName || !formData.billingEmail) {
             toast.error('Company name and billing email are required!');
             return;
         }
 
-        if (editingProfile) {
-            setProfiles(profiles.map(p => p.id === editingProfile.id ? { ...editingProfile, ...formData } : p));
-        } else {
-            const newProfile: CorporateProfile = {
-                ...formData,
-                id: Date.now(),
-            } as CorporateProfile;
-            setProfiles([...profiles, newProfile]);
+        try {
+            const url = editingProfile
+                ? `${getApiBaseUrl()}/api/master-data/corporate-profiles/${editingProfile.id}`
+                : `${getApiBaseUrl()}/api/master-data/corporate-profiles`;
+            const method = editingProfile ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                toast.success(editingProfile ? 'Corporate profile updated in database!' : 'Corporate profile created in database!');
+                fetchProfilesFromApi();
+            } else {
+                toast.error(json.error || 'Failed to save corporate profile');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Network error saving corporate profile');
         }
 
         resetForm();
@@ -149,9 +197,36 @@ const CorporateProfileManagement = () => {
         setShowForm(true);
     };
 
-    const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this corporate profile?')) {
-            setProfiles(profiles.filter(p => p.id !== id));
+    const handleDelete = async (id: number) => {
+        if (!confirm('Are you sure you want to delete this corporate profile?')) return;
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/corporate-profiles/${id}`, {
+                method: 'DELETE'
+            });
+            const json = await res.json();
+            if (json.success) {
+                toast.success('Corporate profile removed from database');
+                fetchProfilesFromApi();
+            } else {
+                toast.error(json.error || 'Failed to delete');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Error deleting profile');
+        }
+    };
+
+    const handleToggleBlacklist = async (id: number) => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/corporate-profiles/${id}/blacklist`, {
+                method: 'POST'
+            });
+            const json = await res.json();
+            if (json.success) {
+                toast.success(`Blacklist status updated to ${json.data.is_blacklisted ? 'Blacklisted' : 'Active'}`);
+                fetchProfilesFromApi();
+            }
+        } catch (err: any) {
+            toast.error('Failed to toggle blacklist status');
         }
     };
 
@@ -193,14 +268,26 @@ const CorporateProfileManagement = () => {
                 subtitle="B2B corporate accounts, negotiated contract rates & direct billing credit limits"
                 icon={<Building2 size={20} />}
                 actions={
-                    <button
-                        type="button"
-                        onClick={() => setShowForm(true)}
-                        className="btn-primary"
-                    >
-                        <Plus size={14} className="stroke-[2.5]" />
-                        <span>Add Corporate Profile</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => { fetchProfilesFromApi(); toast.info('Profiles refreshed from database.'); }}
+                            disabled={isLoading}
+                            className="btn-secondary"
+                            title="Refresh from Database"
+                        >
+                            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                            <span>Refresh</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowForm(true)}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>Add Corporate Profile</span>
+                        </button>
+                    </div>
                 }
             />
 
@@ -336,6 +423,14 @@ const CorporateProfileManagement = () => {
                                         </td>
                                         <td className="text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleBlacklist(profile.id)}
+                                                    className={`btn-icon ${profile.isBlacklisted ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50'}`}
+                                                    title={profile.isBlacklisted ? "Restore Active Status" : "Blacklist Account"}
+                                                >
+                                                    <AlertCircle size={13} />
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleEdit(profile)}

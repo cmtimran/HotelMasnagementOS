@@ -1,7 +1,7 @@
 /**
  * Housekeeping Settings & Operations Engine
  * 
- * Implements Yanolja Cloud Solution (eZee PMS) and International Hospitality Standards:
+ * Implements HotelManagementOS Global Hospitality Standards:
  * 1. Automation & Turnover Rules (Auto Dirty on Checkout / Night Audit, Strict Check-In Guard).
  * 2. Long-Stay Cleaning Schedules & Frequencies (Stayover clean, Linen change cycles, Deep Clean).
  * 3. Housekeeper (Maid) Workload Management (Room Credits per type, Max Shift Credits, Auto-allocation).
@@ -34,7 +34,7 @@ export interface HousekeepingSettings {
     showGuestRequestsInHousekeeping: boolean;
     enableInspectionChecklist: boolean;
 
-    // 5. Room Status Configuration & Colors (eZee / YCS Standard)
+    // 5. Room Status Configuration & Colors (Hospitality Standard)
     statusColors: {
         clean: string;
         inspected: string;
@@ -92,10 +92,12 @@ export const DEFAULT_HOUSEKEEPING_SETTINGS: HousekeepingSettings = {
 
 export const DEFAULT_HOUSEKEEPERS: Housekeeper[] = [];
 
-import { getActivePropertyId } from './apiUrl';
+import { getActivePropertyId, getApiBaseUrl } from './apiUrl';
 
 export const STORAGE_KEY_HK_SETTINGS = 'hotel_housekeeping_settings_v1';
 export const STORAGE_KEY_HOUSEKEEPERS = 'hotel_housekeepers_roster_v1';
+
+const API_BASE = getApiBaseUrl();
 
 /**
  * Retrieve current Housekeeping Settings (scoped per property)
@@ -113,6 +115,124 @@ export const getHousekeepingSettings = (propertyId?: number): HousekeepingSettin
         console.warn('Failed to load housekeeping settings', e);
     }
     return DEFAULT_HOUSEKEEPING_SETTINGS;
+};
+
+/**
+ * Fetch Housekeeping Settings from PostgreSQL API
+ */
+export const fetchHousekeepingSettingsFromDB = async (propertyId?: number): Promise<HousekeepingSettings> => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        const res = await fetch(`${API_BASE}/api/housekeeping/settings`, {
+            headers: { 'x-property-id': String(propId) }
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+            const row = json.data;
+            const mapped: HousekeepingSettings = {
+                autoDirtyOnCheckout: row.auto_dirty_on_checkout ?? true,
+                autoDirtyOnNightAudit: row.auto_dirty_on_night_audit ?? true,
+                requireInspectionBeforeCheckIn: row.require_inspection_before_checkin ?? true,
+                autoMarkCleanOnInspection: row.auto_mark_clean_on_inspection ?? true,
+                defaultStayoverFrequency: row.default_stayover_frequency || 'daily',
+                linenChangeFrequencyDays: row.linen_change_frequency_days || 3,
+                deepCleanIntervalDays: row.deep_clean_interval_days || 30,
+                towelPolicy: 'eco',
+                creditPerStandardRoom: parseFloat(row.credit_per_standard_room) || 1.0,
+                creditPerSuite: parseFloat(row.credit_per_suite) || 2.0,
+                creditPerConnectingSuite: parseFloat(row.credit_per_connecting_suite) || 3.0,
+                maxCreditsPerHousekeeper: parseFloat(row.max_credits_per_housekeeper) || 14.0,
+                autoAssignStrategy: row.auto_assign_strategy || 'by-credits',
+                rushRoomAlertMinutes: row.rush_room_alert_minutes || 120,
+                dndMaxHoursAlert: row.dnd_max_hours_alert || 24,
+                showGuestRequestsInHousekeeping: true,
+                enableInspectionChecklist: true,
+                statusColors: DEFAULT_HOUSEKEEPING_SETTINGS.statusColors,
+                statusWorkflow: row.status_workflow || 'standard'
+            };
+            if (typeof window !== 'undefined') {
+                const key = `${STORAGE_KEY_HK_SETTINGS}_prop_${propId}`;
+                localStorage.setItem(key, JSON.stringify(mapped));
+            }
+            return mapped;
+        }
+    } catch (err) {
+        console.warn('Failed to fetch housekeeping settings from API:', err);
+    }
+    return getHousekeepingSettings(propId);
+};
+
+/**
+ * Save Housekeeping Settings to PostgreSQL API
+ */
+export const saveHousekeepingSettingsToDB = async (
+    updated: Partial<HousekeepingSettings>,
+    propertyId?: number
+): Promise<HousekeepingSettings> => {
+    const propId = propertyId || getActivePropertyId();
+    const current = getHousekeepingSettings(propId);
+    const merged = { ...current, ...updated };
+
+    try {
+        const res = await fetch(`${API_BASE}/api/housekeeping/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-property-id': String(propId)
+            },
+            body: JSON.stringify(merged)
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+            console.log('Housekeeping settings synced to PostgreSQL');
+        }
+    } catch (err) {
+        console.warn('Failed to persist housekeeping settings to API:', err);
+    }
+
+    return saveHousekeepingSettings(updated, propId);
+};
+
+/**
+ * Retrieve Housekeepers roster
+ */
+export const getHousekeepersList = (propertyId?: number): Housekeeper[] => {
+    try {
+        if (typeof window === 'undefined') return [];
+        const propId = propertyId || getActivePropertyId();
+        const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propId}`;
+        const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HOUSEKEEPERS);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {
+        console.warn('Failed to load housekeepers', e);
+    }
+    return [];
+};
+
+/**
+ * Fetch Housekeepers roster from PostgreSQL employees API
+ */
+export const fetchHousekeepersListFromDB = async (propertyId?: number): Promise<Housekeeper[]> => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        const res = await fetch(`${API_BASE}/api/housekeeping/roster`, {
+            headers: { 'x-property-id': String(propId) }
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            if (typeof window !== 'undefined') {
+                const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propId}`;
+                localStorage.setItem(key, JSON.stringify(json.data));
+            }
+            return json.data;
+        }
+    } catch (err) {
+        console.warn('Failed to fetch housekeepers from API:', err);
+    }
+    return getHousekeepersList(propId);
 };
 
 /**
@@ -138,25 +258,6 @@ export const saveHousekeepingSettings = (
         console.warn('Failed to save housekeeping settings', e);
     }
     return merged;
-};
-
-/**
- * Retrieve Housekeepers roster
- */
-export const getHousekeepersList = (propertyId?: number): Housekeeper[] => {
-    try {
-        if (typeof window === 'undefined') return [];
-        const propId = propertyId || getActivePropertyId();
-        const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propId}`;
-        const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HOUSEKEEPERS);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-    } catch (e) {
-        console.warn('Failed to load housekeepers', e);
-    }
-    return [];
 };
 
 /**

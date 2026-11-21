@@ -13,6 +13,14 @@ export const isRedisConnected = (): boolean => redisActive;
  * Initialize Redis Pub/Sub cluster bus
  */
 export async function initRedis(onMessageCallback?: (event: any) => void): Promise<boolean> {
+    const isServerless = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+    const isLocalhostRedis = !process.env.REDIS_URL || process.env.REDIS_URL.includes('localhost') || process.env.REDIS_URL.includes('127.0.0.1');
+
+    if (isServerless && isLocalhostRedis) {
+        console.log('ℹ️ [Vercel Serverless] Redis skipped (no remote REDIS_URL configured). In-memory fallback active.');
+        return false;
+    }
+
     try {
         pubClient = new Redis(REDIS_URL, {
             lazyConnect: true,

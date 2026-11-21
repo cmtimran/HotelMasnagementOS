@@ -43,7 +43,65 @@ services:
       retries: 5
 
   # ============================================================================
-  # 3. HotelManagementOS Backend API Gateway & SSE Realtime Broadcaster
+  # 3. Ollama AI Vision Engine - High-Security Local KYC Model Daemon
+  # ============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: hotel_pms_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Server with NVIDIA GPU acceleration (Uncomment if GPU is available on host):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # ============================================================================
+  # 4. Ollama Zero-Touch Auto-Provisioner (Compiles 'hotel-id-extractor')
+  # Runs once at startup, pulls base vision model, compiles Modelfile, then exits cleanly
+  # ============================================================================
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: hotel_pms_ollama_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./Modelfile:/Modelfile:ro
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=========================================================="
+        echo ">> [Ollama Init] Checking models in repository..."
+        if ollama list | grep -q "hotel-id-extractor"; then
+          echo ">> [Ollama Init] Custom model 'hotel-id-extractor' is already installed!"
+        else
+          echo ">> [Ollama Init] Pulling base model 'llama3.2-vision'..."
+          ollama pull llama3.2-vision
+          echo ">> [Ollama Init] Compiling 'hotel-id-extractor' from /Modelfile..."
+          ollama create hotel-id-extractor -f /Modelfile
+          echo ">> [Ollama Init] Custom AI KYC model built successfully!"
+        fi
+        echo ">> [Ollama Init] Ready models:"
+        ollama list
+        echo "=========================================================="
+    restart: "no"
+
+  # ============================================================================
+  # 5. HotelManagementOS Backend API Gateway & AI KYC Controller
   # ============================================================================
   server:
     build:
@@ -52,20 +110,24 @@ services:
     container_name: hotel_pms_api
     restart: always
     environment:
-      PORT: 3001
+      PORT: 3002
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_pms
       REDIS_URL: redis://redis:6379
+      OLLAMA_HOST: http://ollama:11434
+      JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "3001:3001"
+      - "3002:3002"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
 
   # ============================================================================
-  # 4. HotelManagementOS Frontend SPA (React 19 + TypeScript + Vite)
+  # 6. HotelManagementOS Frontend SPA (React 19 + TypeScript + Vite + Nginx)
   # ============================================================================
   web:
     build:
@@ -76,7 +138,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_BASE_URL: http://localhost:3001
+      VITE_API_BASE_URL: http://localhost:3002
     depends_on:
       - server
 
@@ -84,4 +146,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  ollama_data:
     driver: local

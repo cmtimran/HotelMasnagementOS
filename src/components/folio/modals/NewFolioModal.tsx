@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Check, RefreshCw, AlertCircle, FilePlus2 } from 'lucide-react';
 import { getApiBaseUrl } from '../../../utils/apiUrl';
 import type { FolioData } from '../folioTypes';
@@ -163,16 +164,16 @@ export const NewFolioModal: React.FC<NewFolioModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100004] bg-black/25 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
+                className="fixed inset-0 z-[100010] bg-black/40 backdrop-blur-2xs transition-opacity animate-in fade-in duration-100"
                 onClick={onClose}
             />
 
-            {/* Slide-out Drawer Panel (Right Side) matching Screenshot 1908f04f.png */}
-            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100005] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
+            {/* Slide-out Drawer Panel (Right Side) */}
+            <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-white shadow-2xl z-[100011] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 text-gray-800 text-xs font-sans">
                 {/* Header */}
                 <div className="bg-[#1e3a8a] text-white px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-xs">
                     <div className="flex items-center gap-2">
@@ -273,6 +274,7 @@ export const NewFolioModal: React.FC<NewFolioModalProps> = ({
                     </div>
                 </form>
             </div>
-        </>
+        </>,
+        document.body
     );
 };

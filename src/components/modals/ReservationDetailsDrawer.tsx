@@ -9,7 +9,6 @@ import {
     Calendar,
     Layers,
     Home,
-    Printer,
     DollarSign,
     Calculator,
     CreditCard,
@@ -23,9 +22,12 @@ import {
     DoorClosed,
     Cigarette,
     CigaretteOff,
-    Clock
+    Clock,
+    Tag,
+    MessageSquare,
+    Globe
 } from 'lucide-react';
-import { getRoomSmokingPolicy } from '../../utils/roomInventoryEngine';
+import { getRoomSmokingPolicy, sanitizeRatePlanName } from '../../utils/roomInventoryEngine';
 import type { AmendBookingData } from './AmendStayModal';
 
 export interface ReservationDrawerActions {
@@ -253,32 +255,57 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
 
                 {/* 2. Drawer Body Content: Starts directly with Compact Cards */}
                 <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 bg-[#0e3592]">
-                    {/* Row 1: Reservation # and Status */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5 shadow-2xs">
-                            <div className="w-7 h-7 rounded-lg bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs flex-shrink-0">
+                    {/* Row 1: Reservation #, Booking Channel & Status */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                            <div className="w-6 h-6 rounded-lg bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs flex-shrink-0 font-bold">
                                 #
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
+                                <div className="text-[8.5px] uppercase text-blue-200 tracking-wider">
                                     Reservation #
                                 </div>
-                                <div className="text-xs text-white truncate font-mono">
+                                <div className="text-[11px] text-white truncate font-mono font-bold">
                                     {booking.reservationNumber}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5 shadow-2xs">
-                            <div className="w-7 h-7 rounded-lg bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
-                                <Layers size={13} />
+                        {/* Dedicated Booking Channel & Origin Card */}
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0 ${
+                                (booking.source?.toUpperCase() === 'WHATSAPP' || (booking as any)?.channel?.toUpperCase() === 'WHATSAPP' || booking.specialRequests?.includes('AI Inbound'))
+                                    ? 'bg-emerald-500/30 text-emerald-300'
+                                    : 'bg-indigo-500/30 text-indigo-200'
+                            }`}>
+                                {(booking.source?.toUpperCase() === 'WHATSAPP' || (booking as any)?.channel?.toUpperCase() === 'WHATSAPP' || booking.specialRequests?.includes('AI Inbound')) ? (
+                                    <MessageSquare size={12} />
+                                ) : (
+                                    <Globe size={12} />
+                                )}
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
+                                <div className="text-[8.5px] uppercase text-blue-200 tracking-wider">
+                                    Channel
+                                </div>
+                                <div className="text-[11px] text-white truncate font-bold" title={booking.source || 'Direct'}>
+                                    {(booking.source?.toUpperCase() === 'WHATSAPP' || (booking as any)?.channel?.toUpperCase() === 'WHATSAPP' || booking.specialRequests?.includes('AI Inbound'))
+                                        ? 'WhatsApp AI'
+                                        : (booking.source || 'Direct')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                            <div className="w-6 h-6 rounded-lg bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
+                                <Layers size={12} />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="text-[8.5px] uppercase text-blue-200 tracking-wider">
                                     Status
                                 </div>
                                 <div className="mt-0.5">
-                                    <span className="bg-white text-emerald-600 font-black text-[9.5px] px-2 py-0.5 rounded shadow-2xs uppercase">
+                                    <span className="bg-white text-emerald-600 font-black text-[9px] px-1.5 py-0.5 rounded shadow-2xs uppercase">
                                         {booking.status || 'CONFIRMED'}
                                     </span>
                                 </div>
@@ -338,21 +365,24 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                     Room Details
                                 </div>
                                 <div className="text-xs text-white truncate">
-                                    {booking.roomNumber} ({booking.roomType || 'Winter Rate Plan'})
+                                    {booking.roomNumber} ({booking.roomType || 'Standard Room'})
                                 </div>
                             </div>
                         </div>
 
                         <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5 shadow-2xs">
                             <div className="w-7 h-7 rounded-lg bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
-                                <Printer size={13} />
+                                <Tag size={13} />
                             </div>
-                            <div className="min-w-0">
-                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
-                                    Rate Plan
+                            <div className="min-w-0 flex-1">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider flex items-center justify-between">
+                                    <span>Rate Plan</span>
+                                    <span className="text-[7.5px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-semibold">
+                                        BAR
+                                    </span>
                                 </div>
-                                <div className="text-xs text-white truncate">
-                                    {booking.ratePlan || 'Summer Vacation'}
+                                <div className="text-xs text-white font-bold truncate" title={sanitizeRatePlanName(booking.ratePlan)}>
+                                    {sanitizeRatePlanName(booking.ratePlan)}
                                 </div>
                             </div>
                         </div>

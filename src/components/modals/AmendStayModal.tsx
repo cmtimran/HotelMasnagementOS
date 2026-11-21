@@ -12,7 +12,6 @@ import {
     Wallet,
     Layers,
     Home,
-    Printer,
     Settings,
     CalendarPlus,
     CalendarX,
@@ -22,10 +21,11 @@ import {
     DoorOpen,
     DoorClosed,
     ShieldCheck,
-    Clock
+    Clock,
+    Tag
 } from 'lucide-react';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
-import { getStandardDailyRateForRoom } from '../../utils/roomInventoryEngine';
+import { getStandardDailyRateForRoom, sanitizeRatePlanName } from '../../utils/roomInventoryEngine';
 
 export interface AmendBookingData {
     id: string;
@@ -33,6 +33,9 @@ export interface AmendBookingData {
     groupCode?: string;
     subBookingNumber?: string;
     isGroup?: boolean;
+    isSplitStay?: boolean;
+    splitSegmentIndex?: number;
+    splitSegmentTotal?: number;
     registrationNumber?: string;
     registeredAt?: string;
     folioNumber?: string;
@@ -70,6 +73,8 @@ export interface AmendBookingData {
     companyName?: string;
     vip?: string;
     source?: string;
+    channel?: string;
+    specialRequests?: string;
     adults?: number;
     children?: number;
     childrenAges?: number[];
@@ -445,14 +450,17 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
 
                             <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
                                 <div className="w-6 h-6 rounded bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
-                                    <Printer size={13} />
+                                    <Tag size={13} />
                                 </div>
-                                <div className="min-w-0">
-                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
-                                        Rate Plan
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider flex items-center justify-between">
+                                        <span>Rate Plan</span>
+                                        <span className="text-[7.5px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-semibold">
+                                            BAR
+                                        </span>
                                     </div>
-                                    <div className="text-xs text-white truncate">
-                                        {booking.ratePlan || 'Summer Vacation'}
+                                    <div className="text-xs text-white font-bold truncate" title={sanitizeRatePlanName(booking.ratePlan)}>
+                                        {sanitizeRatePlanName(booking.ratePlan)}
                                     </div>
                                 </div>
                             </div>

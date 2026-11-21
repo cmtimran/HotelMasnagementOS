@@ -205,25 +205,35 @@ export class NightAuditService {
                 }
             }
 
-            // 4. Atomic Posting of Room Tariff + Taxes to all IN_HOUSE folios
+            // 4. Atomic Posting of Room Tariff + Taxes + USALI Departmental Split to all IN_HOUSE folios
             const inHouseQuery = await client.query(`
                 SELECT 
                     r.id as reservation_id,
                     r.reservation_number,
+                    r.special_requests,
                     f.id as folio_id,
+                    g.first_name,
+                    g.last_name,
                     COALESCE(SUM(rr.room_rate), 0) as total_rate,
-                    COUNT(rr.id) as room_count
+                    COUNT(rr.id) as room_count,
+                    COALESCE(MAX(rr.adults), 2) as adults,
+                    COALESCE(MAX(rr.children), 0) as children,
+                    COALESCE(MAX(rm.room_number), 'UNASSIGNED') as assigned_room_number
                 FROM reservations r
                 JOIN folios f ON f.reservation_id = r.id AND f.status = 'OPEN'
                 JOIN reservation_rooms rr ON rr.reservation_id = r.id
+                LEFT JOIN rooms rm ON rm.id = rr.room_id
+                LEFT JOIN guests g ON g.id = r.booker_guest_id
                 WHERE r.property_id = $1
                   AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
-                GROUP BY r.id, r.reservation_number, f.id;
+                GROUP BY r.id, r.reservation_number, r.special_requests, f.id, g.first_name, g.last_name;
             `, [propertyId]);
 
             let totalRoomRentPosted = 0;
+            let totalFbRevenuePosted = 0;
             let totalVatPosted = 0;
             let totalServiceChargePosted = 0;
+            let totalCityTaxPosted = 0;
             let foliosChargedCount = 0;
 
             for (const item of inHouseQuery.rows) {
@@ -234,29 +244,86 @@ export class NightAuditService {
                 `, [item.folio_id, currentBusinessDate]);
 
                 if (checkRes.rows.length === 0) {
-                    const rent = Number(item.total_rate) || 0;
-                    const vat = Math.round(rent * 0.15);
-                    const sc = Math.round(rent * 0.10);
-                    const totalCharge = rent + vat + sc;
+                    const grossRent = Number(item.total_rate) || 0;
+                    if (grossRent > 0) {
+                        // USALI Departmental Accrual: Check for Meal Plan (CP, MAP, AP)
+                        let mealCode = 'EP';
+                        let fbPortion = 0;
+                        const spec = item.special_requests || '';
+                        const adultPax = Number(item.adults) || 1;
 
-                    if (rent > 0) {
-                        // Room tariff
+                        if (/MAP|Half\s*Board/i.test(spec)) {
+                            mealCode = 'MAP';
+                            fbPortion = Math.min(Math.round(grossRent * 0.30), 1800 * adultPax);
+                        } else if (/AP|Full\s*Board/i.test(spec)) {
+                            mealCode = 'AP';
+                            fbPortion = Math.min(Math.round(grossRent * 0.40), 2800 * adultPax);
+                        } else if (/CP|Breakfast/i.test(spec)) {
+                            mealCode = 'CP';
+                            fbPortion = Math.min(Math.round(grossRent * 0.15), 800 * adultPax);
+                        }
+
+                        const netRoomRent = Math.max(0, grossRent - fbPortion);
+
+                        // Bangladesh NBR Compound Taxes: 10% SC, 15% VAT on (Base + SC), 1% City Tax
+                        const sc = Math.round(grossRent * 0.10 * 100) / 100;
+                        const vat = Math.round((grossRent + sc) * 0.15 * 100) / 100;
+                        const cityTax = Math.round(grossRent * 0.01 * 100) / 100;
+                        const totalCharge = grossRent + sc + vat + cityTax;
+
+                        // 1. Post Room Accommodation Tariff
                         await client.query(`
                             INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
                             VALUES ($1, 'ROOM_TARIFF', $2, $3, 0, $3, $4::date);
-                        `, [item.folio_id, `Daily Room Accommodation Tariff - ${currentBusinessDate}`, rent, currentBusinessDate]);
+                        `, [item.folio_id, `Daily Room Accommodation Tariff - ${currentBusinessDate}`, netRoomRent, currentBusinessDate]);
 
-                        // VAT 15%
+                        // 2. Post F&B Meal Plan Accrual (if bundled)
+                        if (fbPortion > 0) {
+                            await client.query(`
+                                INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
+                                VALUES ($1, 'FB_MEAL_PLAN', $2, $3, 0, $3, $4::date);
+                            `, [item.folio_id, `Included Meal Plan Allocation (${mealCode}) - ${currentBusinessDate}`, fbPortion, currentBusinessDate]);
+
+                            // Issue Daily Meal Entitlement in database for POS synchronization
+                            try {
+                                await client.query(`
+                                    INSERT INTO reservation_meal_entitlements (
+                                        property_id, reservation_id, room_number, guest_name, meal_plan_code,
+                                        entitlement_date, meal_type, pax_adults, pax_children, is_consumed
+                                    ) VALUES ($1, $2, $3, $4, $5, $6::date, 'BREAKFAST', $7, $8, FALSE)
+                                    ON CONFLICT DO NOTHING;
+                                `, [
+                                    propertyId,
+                                    item.reservation_id,
+                                    item.assigned_room_number,
+                                    `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Guest',
+                                    mealCode,
+                                    currentBusinessDate,
+                                    adultPax,
+                                    Number(item.children) || 0
+                                ]);
+                            } catch {}
+                        }
+
+                        // 3. Post VAT 15% (Compound Mushak-6.3 Output Tax)
                         await client.query(`
                             INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
-                            VALUES ($1, 'GOVT_VAT', 'Govt VAT 15% (Mushak-6.3 Output Tax)', 0, $2, $2, $3::date);
+                            VALUES ($1, 'GOVT_VAT', 'Govt VAT 15% (Mushak-6.3 Output Tax on Tariff + SC)', 0, $2, $2, $3::date);
                         `, [item.folio_id, vat, currentBusinessDate]);
 
-                        // Service Charge 10%
+                        // 4. Post Service Charge 10%
                         await client.query(`
                             INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
                             VALUES ($1, 'SERVICE_CHARGE', 'Hotel Service Charge 10% Pool', 0, $2, $2, $3::date);
                         `, [item.folio_id, sc, currentBusinessDate]);
+
+                        // 5. Post City Tax 1%
+                        if (cityTax > 0) {
+                            await client.query(`
+                                INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
+                                VALUES ($1, 'CITY_TAX', 'City Tourism Development Levy 1%', 0, $2, $2, $3::date);
+                            `, [item.folio_id, cityTax, currentBusinessDate]);
+                        }
 
                         // Update folio balance
                         await client.query(`
@@ -267,53 +334,63 @@ export class NightAuditService {
                             WHERE id = $2;
                         `, [totalCharge, item.folio_id]);
 
-                        totalRoomRentPosted += rent;
+                        totalRoomRentPosted += netRoomRent;
+                        totalFbRevenuePosted += fbPortion;
                         totalVatPosted += vat;
                         totalServiceChargePosted += sc;
+                        totalCityTaxPosted += cityTax;
                         foliosChargedCount++;
                     }
                 }
             }
 
             // 5. Post Balanced Double-Entry Journal Entry in USALI General Ledger
-            const totalAR = totalRoomRentPosted + totalVatPosted + totalServiceChargePosted;
+            const totalAR = totalRoomRentPosted + totalFbRevenuePosted + totalVatPosted + totalServiceChargePosted + totalCityTaxPosted;
             let journalEntryNumber = 'NONE';
 
             if (totalAR > 0) {
                 journalEntryNumber = `JV-NA-${Date.now().toString().slice(-6)}`;
                 const jeRes = await client.query(`
                     INSERT INTO journal_entries (property_id, entry_number, entry_date, description, is_posted)
-                    VALUES ($1, $2, $3::date, 'Automated Night Audit EOD Posting & Revenue Realization', TRUE)
+                    VALUES ($1, $2, $3::date, 'Automated Night Audit EOD Posting & USALI Revenue Realization', TRUE)
                     RETURNING id;
                 `, [propertyId, journalEntryNumber, currentBusinessDate]);
                 const jeId = jeRes.rows[0].id;
 
-                // Lookup accounts
+                // Lookup USALI Chart of Accounts
                 const getAcc = async (code: string) => {
                     const r = await client.query('SELECT id FROM chart_of_accounts WHERE account_code = $1 LIMIT 1', [code]);
                     return r.rows[0]?.id;
                 };
 
                 const arId = await getAcc('11010-01');
-                const revId = await getAcc('10010-01');
+                const roomRevId = await getAcc('10010-01');
+                const fbRevId = await getAcc('10020-01');
                 const vatId = await getAcc('22010-01');
                 const scId = await getAcc('22020-01');
+                const cityTaxId = await getAcc('22030-01');
 
                 if (arId) {
-                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES ($1, $2, $3, 0, 'Guest Ledger A/R Debit')`, [jeId, arId, totalAR]);
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, $3, 0, 'Guest Ledger A/R Debit')`, [jeId, arId, totalAR]);
                 }
-                if (revId && totalRoomRentPosted > 0) {
-                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES ($1, $2, 0, $3, 'Master Room Rent Revenue')`, [jeId, revId, totalRoomRentPosted]);
+                if (roomRevId && totalRoomRentPosted > 0) {
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, 0, $3, 'Room Accommodation Revenue (10010-01)')`, [jeId, roomRevId, totalRoomRentPosted]);
+                }
+                if (fbRevId && totalFbRevenuePosted > 0) {
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, 0, $3, 'Included F&B Meal Plan Revenue (10020-01)')`, [jeId, fbRevId, totalFbRevenuePosted]);
                 }
                 if (vatId && totalVatPosted > 0) {
-                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES ($1, $2, 0, $3, 'Govt Output VAT (15%)')`, [jeId, vatId, totalVatPosted]);
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, 0, $3, 'Govt Output VAT 15% (22010-01)')`, [jeId, vatId, totalVatPosted]);
                 }
                 if (scId && totalServiceChargePosted > 0) {
-                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES ($1, $2, 0, $3, 'Hotel Service Charge (10%)')`, [jeId, scId, totalServiceChargePosted]);
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, 0, $3, 'Hotel Service Charge 10% (22020-01)')`, [jeId, scId, totalServiceChargePosted]);
+                }
+                if (cityTaxId && totalCityTaxPosted > 0) {
+                    await client.query(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, memo) VALUES ($1, $2, 0, $3, 'City Tourism Tax 1% (22030-01)')`, [jeId, cityTaxId, totalCityTaxPosted]);
                 }
             }
 
-            // 6. Housekeeping Stayover Turnover: Auto dirty occupied rooms
+            // 6. Housekeeping Stayover Turnover: Auto dirty occupied rooms & queue DAILY_CLEAN tasks
             if (options.autoDirtyRooms !== false) {
                 await client.query(`
                     UPDATE rooms 
@@ -326,6 +403,28 @@ export class NightAuditService {
                           WHERE r.property_id = $1 AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
                       );
                 `, [propertyId]).catch(() => {});
+
+                // Automatically generate stayover housekeeping tasks for in-house rooms
+                await client.query(`
+                    INSERT INTO housekeeping_tasks (
+                        property_id, room_id, task_type, priority, status,
+                        credit_value, reservation_id, guest_name, created_at
+                    )
+                    SELECT 
+                        $1, rr.room_id, 'DAILY_CLEAN', 'NORMAL', 'PENDING',
+                        0.50, r.id, g.name, CURRENT_TIMESTAMP
+                    FROM reservation_rooms rr
+                    JOIN reservations r ON r.id = rr.reservation_id
+                    JOIN guests g ON g.id = r.guest_id
+                    WHERE r.property_id = $1 AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
+                      AND NOT EXISTS (
+                          SELECT 1 FROM housekeeping_tasks ht 
+                          WHERE ht.room_id = rr.room_id 
+                            AND ht.status IN ('PENDING', 'IN_PROGRESS')
+                      );
+                `, [propertyId]).catch((err) => {
+                    console.warn('Stayover housekeeping tasks generation notice:', err.message);
+                });
             }
 
             // 7. Calculate Next Business Date & Advance System Date

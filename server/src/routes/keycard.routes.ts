@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { KeycardService } from '../services/keycard.service.js';
-import { db } from '../database/db.js';
+import { pgPool } from '../database/postgres.js';
 
 const router = Router();
 
@@ -78,12 +78,13 @@ router.get('/logs', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Property ID is required' });
         }
 
-        const logs = await db.prepare(`
+        const logsRes = await pgPool.query(`
             SELECT * FROM keycard_logs 
-            WHERE property_id = ? 
+            WHERE property_id = $1 
             ORDER BY created_at DESC 
             LIMIT 100
-        `).all(propertyId).catch(() => []) as any[];
+        `, [propertyId]).catch(() => ({ rows: [] }));
+        const logs = logsRes.rows as any[];
 
         res.json({ success: true, count: logs.length, data: logs });
     } catch (err: any) {

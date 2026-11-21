@@ -5,7 +5,8 @@ import {
     Layers, Check, QrCode, Utensils, ShieldAlert,
     ExternalLink, Activity, Lock, FileCheck, Compass,
     Receipt, Database, Briefcase, Printer, Plus, Trash2, X, Save,
-    Building, BedDouble, Camera, Upload, ChevronLeft, ChevronRight
+    Building, BedDouble, Camera, Upload, ChevronLeft, ChevronRight,
+    Users, FileText
 } from 'lucide-react';
 import SendEmailModal from './SendEmailModal';
 import { getAllStoredReservations, getOperatingSystemDate } from '../utils/roomInventoryEngine';
@@ -264,11 +265,11 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
         ? `${serverProperty.star_rating} Star Luxury`
         : (targetProperty?.grade || `${targetProperty?.star_rating || 5} Star Luxury`);
     const propRooms = propertyStats.totalRooms || 0;
-    const propCity = serverProperty?.city || targetProperty?.city || 'Dhaka';
-    const propCountry = serverProperty?.country || targetProperty?.country || 'Bangladesh';
-    const propAddress = serverProperty?.address || targetProperty?.address || 'Plot 12, Road 45, Gulshan-2, Dhaka';
-    const propPhone = serverProperty?.phone || targetProperty?.phone || '+880 2 9882200';
-    const propEmail = serverProperty?.email || targetProperty?.email || 'dhaka@grandhospitality.com';
+    const propCity = serverProperty?.city || targetProperty?.city || (settings as any)?.city || 'Dhaka';
+    const propCountry = serverProperty?.country || targetProperty?.country || (settings as any)?.country || 'Bangladesh';
+    const propAddress = serverProperty?.address || targetProperty?.address || (settings as any)?.address || 'Plot 12, Road 45, Gulshan-2, Dhaka';
+    const propPhone = serverProperty?.phone || targetProperty?.phone || (settings as any)?.phone || '+880 2 9882200';
+    const propEmail = serverProperty?.email || targetProperty?.email || (settings as any)?.email || 'dhaka@grandhospitality.com';
     const propCurrency = serverProperty?.currency || targetProperty?.currency || settings.baseCurrency || 'BDT';
 
     // Tabs definition with clean icons & space-optimized labels
@@ -353,6 +354,9 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                 // Update local storage cache
                 localStorage.setItem(`hotel_unified_settings_prop_${currentPropId}`, JSON.stringify(payload.settings));
                 localStorage.setItem('hotel_general_settings_v1', JSON.stringify(updatedSettings));
+                const activeCurr = (updatedSettings.baseCurrency || propCurrency || 'BDT').slice(0, 3).toUpperCase();
+                localStorage.setItem('hotel_active_property_currency', activeCurr);
+                window.dispatchEvent(new CustomEvent('hotel_currency_changed', { detail: { currency: activeCurr } }));
                 showToast('Hotel profile & operational settings saved to database successfully!');
                 await refreshProperties();
                 await loadPropertyDetails();
@@ -695,9 +699,9 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         <div className="min-w-0 flex-1 leading-tight">
                             <div className="flex items-center justify-between gap-1">
                                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Tax & Currency</span>
-                                <span className="text-[9px] text-slate-500 font-medium shrink-0">{settings.serviceChargePercentage}% SC</span>
+                                <span className="text-[9px] text-emerald-600 font-semibold shrink-0">{settings.isTaxInclusive ? 'Tax-Inclusive' : 'Tax-Exclusive'}</span>
                             </div>
-                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{propCurrency} (৳) • {settings.vatPercentage}% VAT</p>
+                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{propCurrency} (৳) • Taxes & VAT Module</p>
                         </div>
                     </div>
                 </div>
@@ -1614,26 +1618,34 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         </div>
 
                         {/* Prefix Cards Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                            {[
-                                { label: 'Reservation Prefix', prefix: settings.reservationPrefix || 'RES-', example: 'RES-2026-1001', icon: Clock },
-                                { label: 'Tax Invoice Prefix', prefix: settings.invoicePrefix || 'INV-', example: 'INV-2026-1001', icon: Receipt },
-                                { label: 'Guest Folio Prefix', prefix: settings.folioPrefix || 'FOL-', example: 'FOL-1001', icon: FileCheck },
-                                { label: 'Restaurant KOT', prefix: settings.kotPrefix || 'KOT-', example: 'KOT-5001', icon: Utensils },
-                                { label: 'Money Receipt', prefix: settings.receiptPrefix || 'REC-', example: 'RCT-2001', icon: CreditCard },
-                            ].map((doc) => {
-                                const DocIcon = doc.icon;
-                                return (
-                                    <div key={doc.label} className="bg-slate-50/60 hover:bg-slate-50 p-4 rounded-xl border border-slate-200/70 space-y-2 transition-colors">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</span>
-                                            <DocIcon size={14} className="text-blue-600" />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                            {(() => {
+                                const yyyy = new Date().getFullYear();
+                                const pad = Number(settings.sequencePadding) || 5;
+                                const docs = [
+                                    { label: 'Reservation Prefix', prefix: (settings.reservationPrefix || 'RES-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.reservationPrefix || 'RES-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy))}${String(settings.nextReservationNumber || 1001).padStart(pad, '0')}`, icon: Clock },
+                                    { label: 'Tax Invoice Prefix', prefix: (settings.invoicePrefix || 'INV-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.invoicePrefix || 'INV-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy))}${String(settings.nextInvoiceNumber || 1001).padStart(pad, '0')}`, icon: Receipt },
+                                    { label: 'Guest Folio Prefix', prefix: (settings.folioPrefix || 'FOL-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.folioPrefix || 'FOL-').replace(/\{YYYY\}/g, String(yyyy))}${String(settings.nextFolioNumber || 1001).padStart(pad, '0')}`, icon: FileCheck },
+                                    { label: 'Group Booking Code', prefix: (settings.groupPrefix || 'GRP-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.groupPrefix || 'GRP-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy))}001`, icon: Users },
+                                    { label: 'Registration Card', prefix: (settings.registrationPrefix || 'REG-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.registrationPrefix || 'REG-').replace(/\{YYYY\}/g, String(yyyy))}${String(1001).padStart(pad, '0')}`, icon: FileText },
+                                    { label: 'Credit Note / Refund', prefix: (settings.creditNotePrefix || 'CRN-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.creditNotePrefix || 'CRN-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy))}001`, icon: Receipt },
+                                    { label: 'Restaurant KOT', prefix: (settings.kotPrefix || 'KOT-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.kotPrefix || 'KOT-').replace(/\{YYYY\}/g, String(yyyy))}0042`, icon: Utensils },
+                                    { label: 'Money Receipt', prefix: (settings.receiptPrefix || 'RCT-').replace(/\{YYYY\}/g, String(yyyy)), example: `${(settings.receiptPrefix || 'RCT-').replace(/\{YYYY\}/g, String(yyyy))}${String(settings.nextReceiptNumber || 1001).padStart(pad, '0')}`, icon: CreditCard },
+                                ];
+                                return docs.map((doc) => {
+                                    const DocIcon = doc.icon;
+                                    return (
+                                        <div key={doc.label} className="bg-slate-50/60 hover:bg-slate-50 p-4 rounded-xl border border-slate-200/70 space-y-2 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</span>
+                                                <DocIcon size={14} className="text-blue-600" />
+                                            </div>
+                                            <p className="font-mono font-extrabold text-blue-700 text-sm truncate">{doc.example}</p>
+                                            <p className="text-[10px] text-slate-400 font-mono">Format: {doc.prefix}#</p>
                                         </div>
-                                        <p className="font-mono font-extrabold text-blue-700 text-base">{doc.example}</p>
-                                        <p className="text-[10px] text-slate-400 font-mono">Format: {doc.prefix}####</p>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                });
+                            })()}
                         </div>
 
                         {/* Preferences and Invoice Terms */}
@@ -1649,7 +1661,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                     </div>
                                     <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Show Itemized VAT & Service Charge Breakdown</span>
-                                        <span className="font-semibold text-emerald-700">Yes ({settings.vatPercentage}% VAT + {settings.serviceChargePercentage}% SC)</span>
+                                        <span className="font-semibold text-emerald-700">Yes (Itemized via Taxes & VAT Rules)</span>
                                     </div>
                                     <div className="flex items-center justify-between py-1">
                                         <span className="text-slate-500 font-medium">Send Checkout Folio e-Invoice</span>
@@ -1729,7 +1741,13 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                     </div>
                                     <div className="flex items-center justify-between py-1">
                                         <span className="text-slate-500 font-medium">Session Idle Auto-Lock</span>
-                                        <span className="font-semibold text-slate-800">{settings.sessionTimeoutMinutes || 30} Minutes</span>
+                                        <span className="font-semibold text-slate-800">
+                                            {settings.sessionTimeoutMinutes === 0
+                                                ? 'Disabled (Never)'
+                                                : settings.sessionTimeoutMinutes >= 60
+                                                    ? `${Math.round(settings.sessionTimeoutMinutes / 60)} Hours`
+                                                    : `${settings.sessionTimeoutMinutes || 720} Minutes`}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1921,25 +1939,22 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                             />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="font-semibold text-slate-700 block mb-1">Govt VAT Rate (%)</label>
-                                            <input
-                                                type="number"
-                                                value={settings.vatPercentage}
-                                                onChange={(e) => setSettings({ ...settings, vatPercentage: Number(e.target.value) })}
-                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="font-semibold text-slate-700 block mb-1">Hotel Service Charge (%)</label>
-                                            <input
-                                                type="number"
-                                                value={settings.serviceChargePercentage}
-                                                onChange={(e) => setSettings({ ...settings, serviceChargePercentage: Number(e.target.value) })}
-                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                                            />
-                                        </div>
+                                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center justify-between">
+                                        <span>VAT, GST & Service Charge rules are centrally managed in the <strong>Taxes & VAT</strong> module.</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsQuickEditOpen(false);
+                                                if (onManageProperty) {
+                                                    onManageProperty('finance');
+                                                } else if (typeof window !== 'undefined') {
+                                                    window.location.href = '/general-settings?tab=taxes-vat';
+                                                }
+                                            }}
+                                            className="text-blue-600 font-semibold underline hover:text-blue-700 text-[11px] cursor-pointer"
+                                        >
+                                            Manage Taxes & VAT →
+                                        </button>
                                     </div>
                                 </div>
                             )}

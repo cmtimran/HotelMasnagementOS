@@ -36,3 +36,6 @@ server/.env
 
 # OCR traineddata cache
 *.traineddata
+
+.agents
+skills-lock.json

@@ -5,13 +5,16 @@ import {
     Check, X, Info, DollarSign, Calendar,
     BedDouble, Users, ArrowLeft, Save, Eye, ToggleLeft,
     ToggleRight, AlertCircle, Zap, Shield, Gift, TrendingUp,
-    RefreshCw, AlertTriangle, CheckCircle2, Sparkles, Clock
+    RefreshCw, AlertTriangle, CheckCircle2, Sparkles, Clock, Ban
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
-import { getCurrencySymbol } from '../utils/currencyUtils';
-import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
+import { useActiveCurrency } from '../utils/currencyUtils';
+import { broadcastPMSEvent, getDynamicRoomTypes, getDynamicPackages } from '../utils/roomInventoryEngine';
+import { useProperty } from '../context/PropertyContext';
 import PageHeader from './common/PageHeader';
+import { confirmModal } from '../context/ConfirmModalContext';
+import { toast } from '../context/ToastContext';
 
 // ============================================================
 // DATA TYPES
@@ -236,7 +239,7 @@ export const normalizePackage = (raw: any): HotelPackage => {
 // ============================================================
 
 const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
-    const currencySymbol = getCurrencySymbol();
+    const { currencySymbol } = useActiveCurrency();
     const safePkg = normalizePackage(pkg);
     const rules: { icon: React.ReactNode; label: string; detail: string; code: string; dept: string }[] = [];
 
@@ -384,8 +387,13 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
 
 type FormTab = 'basic' | 'room' | 'meals' | 'recreation' | 'transport' | 'laundry' | 'outlets' | 'validity' | 'finance';
 
-const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
-    <button onClick={() => onChange(!checked)} className="flex-shrink-0">
+const Toggle = ({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) => (
+    <button 
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)} 
+        className={`flex-shrink-0 ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
         {checked
             ? <ToggleRight size={28} className="text-blue-500" />
             : <ToggleLeft size={28} className="text-gray-400" />}
@@ -419,23 +427,27 @@ const sel = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
 // MAIN COMPONENT
 // ============================================================
 
-const PKG_STORAGE_KEY = 'hotel_packages_v2';
-
 const PackageManagement = () => {
-    const currencySymbol = getCurrencySymbol();
+    const { currencySymbol } = useActiveCurrency();
+    const { activeProperty, activePropertyId } = useProperty();
+    const currentPropertyId = activeProperty?.id || activePropertyId || getActivePropertyId();
+
     const [packages, setPackages] = useState<HotelPackage[]>(() => {
+        const propId = getActivePropertyId() || 0;
+        const dyn = getDynamicPackages(propId);
+        if (Array.isArray(dyn) && dyn.length > 0) {
+            return dyn.map(normalizePackage);
+        }
         try {
-            const saved = localStorage.getItem(PKG_STORAGE_KEY);
+            const saved = (propId > 0 ? localStorage.getItem(`hotel_packages_prop_${propId}`) : null) || localStorage.getItem('hotel_packages_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) return parsed.map(normalizePackage);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizePackage);
             }
-        } catch {
-            // fallback
-        }
+        } catch {}
         return [];
     });
-    const dynamicRoomTypes = useMemo(() => getDynamicRoomTypes().map(t => t.name), []);
+    const dynamicRoomTypeObjects = useMemo(() => getDynamicRoomTypes(), []);
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingPackage, setEditingPackage] = useState<HotelPackage | null>(null);
     const [formData, setFormData] = useState<Omit<HotelPackage, 'id'>>(defaultPackage());
@@ -446,10 +458,14 @@ const PackageManagement = () => {
     const persistPackages = (updated: HotelPackage[]) => {
         const normalized = updated.map(normalizePackage);
         setPackages(normalized);
-        try {
-            localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(normalized));
-        } catch {
-            // fallback
+        const propId = currentPropertyId || getActivePropertyId();
+        if (propId > 0) {
+            try {
+                localStorage.setItem(`hotel_packages_prop_${propId}`, JSON.stringify(normalized));
+                localStorage.setItem('hotel_packages_v2', JSON.stringify(normalized));
+            } catch {
+                // fallback
+            }
         }
     };
 
@@ -462,18 +478,44 @@ const PackageManagement = () => {
     const existingCodes = useMemo(() => packages.map(p => p.shortCode), [packages]);
 
     useEffect(() => {
-        const propId = getActivePropertyId();
-        fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=${propId}`)
-            .then(res => res.json())
-            .then(json => {
-                if (json.success && Array.isArray(json.data)) {
+        const propId = currentPropertyId ?? getActivePropertyId() ?? 0;
+
+        const loadPackages = async () => {
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=${propId}`);
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
                     const normalized = json.data.map(normalizePackage);
                     setPackages(normalized);
-                    localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(normalized));
+                    if (propId > 0) localStorage.setItem(`hotel_packages_prop_${propId}`, JSON.stringify(normalized));
+                    localStorage.setItem('hotel_packages_v2', JSON.stringify(normalized));
+                    return;
                 }
-            })
-            .catch(() => {});
-    }, []);
+            } catch {}
+
+            // Fallback to local dynamic packages if backend fetch returns empty or fails
+            const local = getDynamicPackages(propId);
+            if (Array.isArray(local) && local.length > 0) {
+                const normalized = local.map(normalizePackage);
+                setPackages(normalized);
+                if (propId > 0) localStorage.setItem(`hotel_packages_prop_${propId}`, JSON.stringify(normalized));
+                localStorage.setItem('hotel_packages_v2', JSON.stringify(normalized));
+            }
+        };
+
+        loadPackages();
+
+        const handlePropChange = () => {
+            loadPackages();
+        };
+        window.addEventListener('hotel_active_property_changed', handlePropChange);
+        window.addEventListener('storage', handlePropChange);
+
+        return () => {
+            window.removeEventListener('hotel_active_property_changed', handlePropChange);
+            window.removeEventListener('storage', handlePropChange);
+        };
+    }, [currentPropertyId]);
 
     const openCreate = () => {
         setFormData(defaultPackage());
@@ -504,11 +546,12 @@ const PackageManagement = () => {
     const handleDuplicate = async (pkg: HotelPackage) => {
         const uniqueCode = generateUniqueShortCode(`${pkg.shortCode}-CPY`, existingCodes, { maxLength: 8 });
         let newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: uniqueCode, status: 'Draft' };
+        const propId = currentPropertyId || getActivePropertyId();
         try {
-            const res = await fetch(`${getApiBaseUrl()}/api/rates/packages`, {
+            const res = await fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=${propId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newPkg)
+                body: JSON.stringify({ ...newPkg, propertyId: propId })
             });
             const json = await res.json();
             if (json.success && json.data?.id) newPkg = { ...newPkg, id: json.data.id };
@@ -520,48 +563,59 @@ const PackageManagement = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this package? Linked bookings will keep existing line-item snapshots.')) {
-            try {
-                await fetch(`${getApiBaseUrl()}/api/rates/packages/${id}`, { method: 'DELETE' });
-            } catch {}
-            const updated = packages.filter(p => p.id !== id);
-            persistPackages(updated);
-            try {
-                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-            } catch {}
-        }
+        const target = packages.find(p => p.id === id);
+        const name = target?.name || 'this package';
+        const confirmed = await confirmModal({
+            title: `Delete Package "${name}"?`,
+            message: 'Are you sure you want to delete this package? Linked bookings will retain their existing line-item snapshots.',
+            confirmText: 'Delete Package',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        const propId = currentPropertyId || getActivePropertyId();
+        try {
+            await fetch(`${getApiBaseUrl()}/api/rates/packages/${id}?propertyId=${propId}`, { method: 'DELETE' });
+        } catch {}
+        const updated = packages.filter(p => p.id !== id);
+        persistPackages(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
+        toast.success(`Package "${name}" deleted.`);
     };
 
     const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
-            alert('Package Name and Short Code are required.');
+            toast.warning('Package Name and Short Code are required.');
             return;
         }
         const currentCode = editingPackage?.shortCode;
         if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
-            alert(`Short Code "${formData.shortCode}" is already in use by another package! Please provide a unique code.`);
+            toast.error(`Short Code "${formData.shortCode}" is already in use by another package! Please provide a unique code.`);
             return;
         }
 
         const API_BASE = getApiBaseUrl();
+        const propId = currentPropertyId || getActivePropertyId();
         let finalPkg: HotelPackage;
 
         if (editingPackage) {
             finalPkg = { ...formData, id: editingPackage.id } as HotelPackage;
             try {
-                await fetch(`${API_BASE}/api/rates/packages/${editingPackage.id}`, {
+                await fetch(`${API_BASE}/api/rates/packages/${editingPackage.id}?propertyId=${propId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(finalPkg)
+                    body: JSON.stringify({ ...finalPkg, propertyId: propId })
                 });
             } catch {}
         } else {
             finalPkg = { ...formData, id: Date.now() } as HotelPackage;
             try {
-                const res = await fetch(`${API_BASE}/api/rates/packages`, {
+                const res = await fetch(`${API_BASE}/api/rates/packages?propertyId=${propId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(finalPkg)
+                    body: JSON.stringify({ ...finalPkg, propertyId: propId })
                 });
                 const json = await res.json();
                 if (json.success && json.data?.id) finalPkg.id = json.data.id;
@@ -578,6 +632,7 @@ const PackageManagement = () => {
         try {
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
+        toast.success(editingPackage ? `Package "${finalPkg.name}" updated!` : `Package "${finalPkg.name}" created!`);
         setView('list');
     };
 
@@ -987,92 +1042,208 @@ const PackageManagement = () => {
                                 </div>
                             )}
 
-                            {/* ── TAB: ROOM CONFIG ── */}
+                            {/* ── TAB: ROOM CONFIG (3-PILLAR UNIFIED STRUCTURE) ── */}
                             {activeTab === 'room' && (
-                                <div className="space-y-5">
-                                <FormSection title="Applicable Room Types" icon={<BedDouble size={16} />}>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {dynamicRoomTypes.map(rt => (
-                                            <label key={rt} className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${fm.roomConfig.applicableRoomTypes.includes(rt) ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}>
-                                                <input type="checkbox" className="accent-blue-600"
-                                                    checked={fm.roomConfig.applicableRoomTypes.includes(rt)}
-                                                    onChange={e => {
-                                                        const list = fm.roomConfig.applicableRoomTypes;
-                                                        upd('roomConfig.applicableRoomTypes', e.target.checked ? [...list, rt] : list.filter(r => r !== rt));
-                                                    }} />
-                                                {rt}
-                                            </label>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-gray-400 mt-2">Leave all unchecked to apply to all room types</p>
-                                </FormSection>
+                                <div className="space-y-6">
+                                    {/* Pillar 1: Applicable Room Types & Physical Constraints */}
+                                    <FormSection title="1. Applicable Room Types & Physical Constraints" icon={<BedDouble size={16} />}>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {dynamicRoomTypeObjects.map(rt => {
+                                                const isSelected = fm.roomConfig.applicableRoomTypes.includes(rt.name);
+                                                const canFitExtraBed = rt.extraBedAllowed !== false && (Boolean(rt.extraBedAllowed) || Number(rt.extraBedRate) > 0);
 
-                                <FormSection title="Extra Occupancy Rules" icon={<Users size={16} />}>
-                                    <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-800">Extra Bed Allowed</div>
-                                            <div className="text-xs text-gray-500">Allow extra bed in room with this package</div>
+                                                return (
+                                                    <label 
+                                                        key={rt.name} 
+                                                        className={`flex flex-col gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                                            isSelected 
+                                                                ? 'border-blue-500 bg-blue-50/70 shadow-2xs' 
+                                                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    className="accent-blue-600 rounded"
+                                                                    checked={isSelected}
+                                                                    onChange={e => {
+                                                                        const list = fm.roomConfig.applicableRoomTypes;
+                                                                        upd('roomConfig.applicableRoomTypes', e.target.checked ? [...list, rt.name] : list.filter(r => r !== rt.name));
+                                                                    }} 
+                                                                />
+                                                                <span className="font-bold text-xs text-gray-900">{rt.name}</span>
+                                                                <span className="text-[10px] font-mono text-gray-400 uppercase">({rt.code || 'STD'})</span>
+                                                            </div>
+                                                            {canFitExtraBed ? (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                                                    <Check size={10} /> Extra Bed OK
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                                                                    <Ban size={10} /> No Extra Bed
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">
+                                                            <span>Base: <strong>{rt.baseOccupancy || 1}A</strong></span>
+                                                            <span>Physical Max: <strong>{rt.maxAdults || 2}A, {rt.maxChildren || 0}C</strong></span>
+                                                            <span>Rack: <strong>{currencySymbol}{(rt.baseRate || 0).toLocaleString()}</strong></span>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
                                         </div>
-                                        <Toggle checked={fm.roomConfig.extraBedAllowed} onChange={v => upd('roomConfig.extraBedAllowed', v)} />
-                                    </div>
+                                        <p className="text-xs text-gray-400 mt-2">Leave all unchecked to automatically apply this package to all room categories.</p>
 
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <Field label="Extra Bed Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
-                                                <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraBedRate} onChange={e => upd('roomConfig.extraBedRate', +e.target.value)} disabled={!fm.roomConfig.extraBedAllowed} /></div>
-                                        </Field>
-                                        <Field label="Extra Adult Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
-                                                <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraAdultRate} onChange={e => upd('roomConfig.extraAdultRate', +e.target.value)} /></div>
-                                        </Field>
-                                        <Field label="Extra Child Rate" hint="/night">
-                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currencySymbol}</span>
-                                                <input type="number" className={inp + ' pl-7'} value={fm.roomConfig.extraChildRate} onChange={e => upd('roomConfig.extraChildRate', +e.target.value)} /></div>
-                                        </Field>
-                                        <Field label="Child Age From">
-                                            <input type="number" className={inp} value={fm.roomConfig.childAgeFrom} onChange={e => upd('roomConfig.childAgeFrom', +e.target.value)} />
-                                        </Field>
-                                        <Field label="Child Age To">
-                                            <input type="number" className={inp} value={fm.roomConfig.childAgeTo} onChange={e => upd('roomConfig.childAgeTo', +e.target.value)} />
-                                        </Field>
-                                        <Field label="Max Extra Beds">
-                                            <input type="number" className={inp} value={fm.roomConfig.maxExtraBeds} min={0} max={3} onChange={e => upd('roomConfig.maxExtraBeds', +e.target.value)} disabled={!fm.roomConfig.extraBedAllowed} />
-                                        </Field>
-                                    </div>
+                                        {/* Physical Conflict Governance Alert */}
+                                        {fm.roomConfig.extraBedAllowed && (() => {
+                                            const selectedList = fm.roomConfig.applicableRoomTypes.length > 0
+                                                ? dynamicRoomTypeObjects.filter(r => fm.roomConfig.applicableRoomTypes.includes(r.name))
+                                                : dynamicRoomTypeObjects;
+                                            const incompatible = selectedList.filter(r => r.extraBedAllowed === false || (!r.extraBedAllowed && Number(r.extraBedRate) <= 0 && r.name.toLowerCase().includes('single')));
 
-                                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between">
-                                        <div>
-                                            <div className="text-sm font-medium text-blue-800">Infant Free Policy</div>
-                                            <div className="text-xs text-blue-600">Children aged 0 to {fm.roomConfig.infantMaxAge} years — complimentary</div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <input type="number" className="w-16 px-2 py-1 border border-blue-300 rounded text-sm text-center" value={fm.roomConfig.infantMaxAge} onChange={e => upd('roomConfig.infantMaxAge', +e.target.value)} />
-                                            <span className="text-xs text-blue-600">yrs</span>
-                                            <Toggle checked={fm.roomConfig.infantFree} onChange={v => upd('roomConfig.infantFree', v)} />
-                                        </div>
-                                    </div>
+                                            if (incompatible.length > 0) {
+                                                return (
+                                                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
+                                                        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <strong>Physical Hardware Notice:</strong> The following room categories do not physically allow extra beds: <strong>{incompatible.map(i => i.name).join(', ')}</strong>. Rollaway bedding will be automatically blocked for reservations on these categories.
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </FormSection>
 
-                                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 grid grid-cols-2 gap-4">
-                                        <div className="col-span-2 text-xs text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-1">
-                                            <Gift size={14} /> Room Experience (ETC Info)
+                                    {/* Pillar 2: Package Extra Bedding Policies */}
+                                    <FormSection title="2. Package Extra Bedding Policies" icon={<BedDouble size={16} />}>
+                                        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                            <div>
+                                                <div className="text-xs font-bold text-gray-800">Extra Rollaway Bed Allowed for this Package</div>
+                                                <div className="text-[11px] text-gray-500">Enable rollaway extra bedding options on eligible room types for this package</div>
+                                            </div>
+                                            <Toggle checked={fm.roomConfig.extraBedAllowed} onChange={v => upd('roomConfig.extraBedAllowed', v)} />
                                         </div>
-                                        <Field label="Welcome Amenity">
-                                            <input className={inp} value={fm.roomConfig.welcomeAmenity} onChange={e => upd('roomConfig.welcomeAmenity', e.target.value)} placeholder="e.g. Fruit Basket" />
-                                        </Field>
-                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
-                                            <span className="text-xs font-medium">Late Checkout (2PM)</span>
-                                            <Toggle checked={fm.roomConfig.lateCheckoutAllowed} onChange={v => upd('roomConfig.lateCheckoutAllowed', v)} />
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <Field label="Extra Bed Package Rate" hint="/night">
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">{currencySymbol}</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className={inp + ' pl-7'} 
+                                                        value={fm.roomConfig.extraBedRate} 
+                                                        onChange={e => upd('roomConfig.extraBedRate', +e.target.value)} 
+                                                        disabled={!fm.roomConfig.extraBedAllowed} 
+                                                    />
+                                                </div>
+                                            </Field>
+                                            <Field label="Max Extra Beds per Room">
+                                                <input 
+                                                    type="number" 
+                                                    className={inp} 
+                                                    value={fm.roomConfig.maxExtraBeds} 
+                                                    min={0} 
+                                                    max={2} 
+                                                    onChange={e => upd('roomConfig.maxExtraBeds', +e.target.value)} 
+                                                    disabled={!fm.roomConfig.extraBedAllowed} 
+                                                />
+                                            </Field>
+                                            <div className="flex flex-col justify-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-gray-700">Extra Bed Meal Included?</span>
+                                                    <Toggle 
+                                                        checked={fm.roomConfig.extraBedMealIncluded || false} 
+                                                        onChange={v => upd('roomConfig.extraBedMealIncluded', v)}
+                                                        disabled={!fm.roomConfig.extraBedAllowed} 
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] text-gray-400 mt-1">Extra bed guest receives package breakfast</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
-                                            <span className="text-xs font-medium">Priority Check-in</span>
-                                            <Toggle checked={fm.roomConfig.priorityCheckin} onChange={v => upd('roomConfig.priorityCheckin', v)} />
+                                    </FormSection>
+
+                                    {/* Pillar 3: Package Pricing, Surcharges & Guest Age Rules */}
+                                    <FormSection title="3. Package Surcharges, Child & Guest Policies" icon={<Users size={16} />}>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <Field label="Extra Adult Surcharge" hint="/night above base occupancy">
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">{currencySymbol}</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className={inp + ' pl-7'} 
+                                                        value={fm.roomConfig.extraAdultRate} 
+                                                        onChange={e => upd('roomConfig.extraAdultRate', +e.target.value)} 
+                                                    />
+                                                </div>
+                                            </Field>
+                                            <Field label="Extra Child Surcharge" hint="/night above base children">
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">{currencySymbol}</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className={inp + ' pl-7'} 
+                                                        value={fm.roomConfig.extraChildRate} 
+                                                        onChange={e => upd('roomConfig.extraChildRate', +e.target.value)} 
+                                                    />
+                                                </div>
+                                            </Field>
                                         </div>
-                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
-                                            <span className="text-xs font-medium">Complimentary WiFi</span>
-                                            <Toggle checked={fm.roomConfig.wifiIncluded} onChange={v => upd('roomConfig.wifiIncluded', v)} />
+
+                                        <div className="grid grid-cols-2 gap-4 mt-2">
+                                            <Field label="Child Age From">
+                                                <input type="number" className={inp} value={fm.roomConfig.childAgeFrom} onChange={e => upd('roomConfig.childAgeFrom', +e.target.value)} />
+                                            </Field>
+                                            <Field label="Child Age To">
+                                                <input type="number" className={inp} value={fm.roomConfig.childAgeTo} onChange={e => upd('roomConfig.childAgeTo', +e.target.value)} />
+                                            </Field>
                                         </div>
-                                    </div>
-                                </FormSection>
+
+                                        {/* Infant Policy */}
+                                        <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-xs font-bold text-blue-900">Infant Complimentary Policy</div>
+                                                <div className="text-[11px] text-blue-700">Children aged 0 to {fm.roomConfig.infantMaxAge} years stay completely complimentary (৳0)</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <input 
+                                                    type="number" 
+                                                    className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-xs text-center font-bold bg-white" 
+                                                    value={fm.roomConfig.infantMaxAge} 
+                                                    onChange={e => upd('roomConfig.infantMaxAge', +e.target.value)} 
+                                                />
+                                                <span className="text-xs text-blue-700 font-semibold">yrs</span>
+                                                <Toggle checked={fm.roomConfig.infantFree} onChange={v => upd('roomConfig.infantFree', v)} />
+                                            </div>
+                                        </div>
+
+                                        {/* Room Experience & Privileges */}
+                                        <div className="p-4 bg-gray-50/70 rounded-xl border border-gray-100 space-y-3">
+                                            <div className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Gift size={14} className="text-blue-600" />
+                                                <span>Room Experience & Privileges</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <Field label="Welcome Amenity">
+                                                    <input className={inp} value={fm.roomConfig.welcomeAmenity} onChange={e => upd('roomConfig.welcomeAmenity', e.target.value)} placeholder="e.g. Fresh Fruit Basket & Welcome Drink" />
+                                                </Field>
+                                                <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
+                                                    <span className="text-xs font-medium text-gray-700">Late Checkout (2PM)</span>
+                                                    <Toggle checked={fm.roomConfig.lateCheckoutAllowed} onChange={v => upd('roomConfig.lateCheckoutAllowed', v)} />
+                                                </div>
+                                                <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
+                                                    <span className="text-xs font-medium text-gray-700">Priority Early Check-in</span>
+                                                    <Toggle checked={fm.roomConfig.priorityCheckin} onChange={v => upd('roomConfig.priorityCheckin', v)} />
+                                                </div>
+                                                <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100">
+                                                    <span className="text-xs font-medium text-gray-700">Complimentary Fiber WiFi</span>
+                                                    <Toggle checked={fm.roomConfig.wifiIncluded} onChange={v => upd('roomConfig.wifiIncluded', v)} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </FormSection>
                                 </div>
                             )}
 

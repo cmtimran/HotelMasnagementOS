@@ -70,6 +70,9 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return;
     }
 
+    const [pathOnly, queryAndHash] = target.split('?');
+    const queryString = queryAndHash ? `?${queryAndHash}` : '';
+
     if (target.startsWith('/reports')) {
       resolvedPanel = 'reports';
       resolvedPage = 'reports';
@@ -79,16 +82,16 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       resolvedPage = 'reports';
       resolvedSlug = '/reports';
     } else {
-      const bySlug = getRouteBySlug(target);
-      const byId = getRouteByPageId(target);
+      const bySlug = getRouteBySlug(pathOnly) || getRouteBySlug(target);
+      const byId = getRouteByPageId(pathOnly) || getRouteByPageId(target);
       const route = bySlug || byId;
       if (route) {
-        resolvedSlug = route.slug;
+        resolvedSlug = `${route.slug}${queryString}`;
         resolvedPage = route.id;
         resolvedPanel = route.panel;
       } else {
         resolvedSlug = target.startsWith('/') ? target : `/${target}`;
-        resolvedPage = target.replace(/^\//, '');
+        resolvedPage = pathOnly.replace(/^\//, '');
       }
     }
 

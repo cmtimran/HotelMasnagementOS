@@ -52,11 +52,19 @@ export const parseLocation = (): NavigationState => {
     const matchedRoute = getRouteBySlug(pathname) || getRouteByPageId(pathname.replace(/^\//, ''));
     if (matchedRoute) {
       return {
-        currentSlug: matchedRoute.slug,
+        currentSlug: `${matchedRoute.slug}${window.location.search || ''}`,
         activePanel: matchedRoute.panel,
         activePage: matchedRoute.id,
       };
     }
+
+    // Dynamic Resilience Fallback: If route is not explicitly in registry, preserve user's current URL and page!
+    const cleanId = pathname.replace(/^\//, '');
+    return {
+      currentSlug: `${pathname}${window.location.search || ''}`,
+      activePanel: 'main',
+      activePage: cleanId,
+    };
   }
 
   // 3. Check for Legacy Query Param: ?page=...
@@ -85,10 +93,11 @@ export const parseLocation = (): NavigationState => {
 };
 
 export const pushNavigation = (slug: string, options?: { replace?: boolean; title?: string }) => {
-  if (window.location.pathname === slug) return;
+  const currentFull = window.location.pathname + window.location.search + window.location.hash;
+  if (currentFull === slug || (window.location.pathname === slug && !slug.includes('?'))) return;
 
   if (options?.replace) {
-    window.history.replaceState({ slug }, options.title || '', slug);
+    window.history.replaceState({ slug }, options?.title || '', slug);
   } else {
     window.history.pushState({ slug }, options?.title || '', slug);
   }

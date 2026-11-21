@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
     ArrowLeft, Building2, Clock, CreditCard, Monitor, User,
     Briefcase, MapPin, Shield, Settings, Zap, CheckCircle2,
     LogIn, ShieldCheck, ShieldAlert, DollarSign, Calendar,
     AlertCircle, FileText, Image, Trash2, Plus,
     Globe, Receipt, Mail, Lock, Eye, Send, Database,
-    Layers, Sparkles, BedDouble, FolderKanban, Percent, Printer, Utensils, Building
+    Layers, Sparkles, BedDouble, FolderKanban, Percent, Printer, Utensils, Building, Palette
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useToast } from '../context/ToastContext';
@@ -19,6 +19,29 @@ import TaxVatManagement from './TaxVatManagement';
 import PrinterSettingsManagement from './PrinterSettingsManagement';
 import HolidayManagement from './HolidayManagement';
 import HousekeepingSettingsTab from './HousekeepingSettingsTab';
+import StatusColorManagement from './StatusColorManagement';
+import { OutletConfigurationTab } from './restaurant/outlets/OutletConfigurationTab';
+import { resolveCountryCodeFromNationalityOrName } from '../utils/holidayHelper';
+import { SearchableSelect, type SearchableOption } from './common/SearchableSelect';
+import {
+    COUNTRIES_DATABASE,
+    getCountryByName,
+    getCitiesForCountry,
+    getDialCodeForCountry,
+    getNationalityForCountry,
+    getAllNationalities,
+    getStatesForCountry,
+    TIMEZONES_DATABASE
+} from '../utils/geoData';
+
+function getCountryFlag(countryCode?: string): string {
+    if (!countryCode || countryCode.length !== 2) return '🌐';
+    const codePoints = countryCode
+        .toUpperCase()
+        .split('')
+        .map(char => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+}
 
 export interface AddPropertyProps {
     onBack?: () => void;
@@ -72,36 +95,49 @@ export interface SocialMediaLink {
     handle?: string;
 }
 
-export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
-    // 1. General & Location
-    legalEntity: 'Grand Hospitality Bangladesh PLC',
-    establishedYear: '2018',
-    website: 'www.grandhospitality.com',
-    bookingEngineUrl: 'https://book.grandhospitality.com',
-    defaultNationality: 'Bangladeshi',
-    stateProvince: targetProperty?.city?.includes('Cox') ? 'Chattogram Division' : 'Dhaka Division',
-    zipCode: targetProperty?.city?.includes('Cox') ? '4700' : '1212',
-    latitude: targetProperty?.city?.includes('Cox') ? '21.4272' : '23.7937',
-    longitude: targetProperty?.city?.includes('Cox') ? '91.9702' : '90.4066',
-    airportProximity: targetProperty?.city?.includes('Cox')
-        ? "Cox's Bazar Airport (4.2 km / 12 mins)"
-        : 'Hazrat Shahjalal Intl Airport (8.5 km / 25 mins)',
-    stationProximity: targetProperty?.city?.includes('Cox')
-        ? "Cox's Bazar Iconic Rail Station (5.0 km / 15 mins)"
-        : 'Kamalapur Railway Station (12.4 km / 35 mins)',
-    diplomaticProximity: targetProperty?.city?.includes('Cox')
-        ? 'Kolatoli Marine Drive Tourist Zone (0.5 km)'
-        : 'Gulshan-2 Diplomatic Zone (1.2 km / 5 mins)',
-    timezone: 'Asia/Dhaka (GMT+06:00)',
-    dateFormat: 'DD/MM/YYYY',
-    timeFormat: '12-Hour (AM/PM)',
-    fiscalYearStart: 'July - June',
-    primaryLanguage: 'English',
-    description:
-        'Five-star luxury hospitality property offering premium guest rooms, fine dining outlets, banquet facilities, and 24/7 concierge service.',
-    corporateAddress: 'Level 14, Gulshan Centre Point, Dhaka-1212, Bangladesh',
-    corporatePhone: '+880 2 9876540',
-    corporateEmail: 'corporate@grandhospitality.com',
+export const getDefaultUnifiedSettings = (targetProperty?: any) => {
+    const s = targetProperty?.settings || {};
+    const country = targetProperty?.country || s.country || 'Bangladesh';
+    const city = targetProperty?.city || s.city || '';
+    const isCox = city.toLowerCase().includes('cox');
+    const isDhaka = city.toLowerCase().includes('dhaka');
+
+    return {
+        // 1. General & Location
+        legalEntity: s.legalEntity || targetProperty?.organization_name || (targetProperty?.name ? `${targetProperty.name} PLC` : 'Grand Hospitality Operations'),
+        establishedYear: s.establishedYear || '2018',
+        website: s.website || 'www.grandhospitality.com',
+        bookingEngineUrl: s.bookingEngineUrl || 'https://book.grandhospitality.com',
+        defaultNationality: s.defaultNationality || getNationalityForCountry(country) || 'Bangladeshi',
+        stateProvince: s.stateProvince || (isCox ? 'Chattogram Division' : isDhaka ? 'Dhaka Division' : ''),
+        zipCode: s.zipCode || (isCox ? '4700' : isDhaka ? '1212' : ''),
+        latitude: s.latitude || (isCox ? '21.4272' : isDhaka ? '23.7937' : ''),
+        longitude: s.longitude || (isCox ? '91.9702' : isDhaka ? '90.4066' : ''),
+        airportProximity: s.airportProximity || (isCox
+            ? "Cox's Bazar Airport (4.2 km / 12 mins)"
+            : isDhaka
+            ? 'Hazrat Shahjalal Intl Airport (8.5 km / 25 mins)'
+            : ''),
+        stationProximity: s.stationProximity || (isCox
+            ? "Cox's Bazar Iconic Rail Station (5.0 km / 15 mins)"
+            : isDhaka
+            ? 'Kamalapur Railway Station (12.4 km / 35 mins)'
+            : ''),
+        diplomaticProximity: s.diplomaticProximity || (isCox
+            ? 'Kolatoli Marine Drive Tourist Zone (0.5 km)'
+            : isDhaka
+            ? 'Gulshan-2 Diplomatic Zone (1.2 km / 5 mins)'
+            : ''),
+        timezone: s.timezone || (country === 'Bangladesh' ? 'Asia/Dhaka (GMT+06:00)' : 'Asia/Dhaka (GMT+06:00)'),
+        dateFormat: s.dateFormat || 'DD/MM/YYYY',
+        timeFormat: s.timeFormat || '12-Hour (AM/PM)',
+        fiscalYearStart: s.fiscalYearStart || (country === 'Bangladesh' ? 'July - June' : 'January - December'),
+        primaryLanguage: s.primaryLanguage || 'English',
+        description:
+            s.description || 'Five-star luxury hospitality property offering premium guest rooms, fine dining outlets, banquet facilities, and 24/7 concierge service.',
+        corporateAddress: s.corporateAddress || targetProperty?.address || 'Level 14, Gulshan Centre Point, Dhaka-1212, Bangladesh',
+        corporatePhone: s.corporatePhone || targetProperty?.phone || '+880 2 9876540',
+        corporateEmail: s.corporateEmail || targetProperty?.email || 'corporate@grandhospitality.com',
 
     // 2. Operations & Policies
     checkInTime: targetProperty?.check_in_time || '14:00',
@@ -149,7 +185,7 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     childStayPolicy: 'Up to 2 children under 5 years stay free using existing bedding',
     visitorIdentityRule: 'Photo ID (NID / Passport) Required at Front Desk',
     enforceVisitorCurfew: true,
-    securityDepositLogic: 'Fixed Amount (BDT ৳)',
+    securityDepositLogic: 'Fixed Amount (BDT à§³)',
     securityDepositAmountBDT: 5000,
     staffAdjustmentLimitBDT: 2000,
     taxAdjustmentMode: 'Auto-Recalculate Tax with Tariff',
@@ -158,7 +194,7 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     mealPlanSyncMode: 'Sync with Restaurant POS & KOT',
     parkingSurchargeBDT: 0,
     minibarCheckinLogic: 'Daily Housekeeping Restock',
-    smokingPolicyText: 'Non-Smoking Property (৳ 20,000 Deep Cleaning Penalty)',
+    smokingPolicyText: 'Non-Smoking Property (à§³ 20,000 Deep Cleaning Penalty)',
     enforceSmokingPenalty: true,
     petPolicyText: 'Service Animals Only',
     enableWelfareChecks: true,
@@ -190,11 +226,20 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     fireSafetyCertNo: 'FSCD-CL-44109',
 
     // 4. Folio & Numbering
-    reservationPrefix: 'RES-2026-',
-    invoicePrefix: 'INV-2026-',
+    reservationPrefix: 'RES-{YYYY}-',
+    invoicePrefix: 'INV-{YYYY}-',
     folioPrefix: 'FOL-',
     kotPrefix: 'KOT-',
     receiptPrefix: 'RCT-',
+    groupPrefix: 'GRP-{YYYY}-',
+    registrationPrefix: 'REG-',
+    creditNotePrefix: 'CRN-{YYYY}-',
+    posPrefix: 'POS-',
+    nextReservationNumber: 1001,
+    nextInvoiceNumber: 1001,
+    nextFolioNumber: 1001,
+    nextReceiptNumber: 1001,
+    sequencePadding: 5,
     resetAnnually: true,
     invoiceNotes:
         'All bills are payable upon presentation at checkout. Government VAT (15%) and Service Charge (10%) apply as per regulations.',
@@ -246,9 +291,10 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     autoCloudBackup: true,
     backupFrequency: 'Daily at 04:00 AM',
     backupRetentionDays: 90,
-    sessionTimeoutMinutes: 15,
+    sessionTimeoutMinutes: targetProperty?.settings?.sessionTimeoutMinutes ?? 720,
     maintenanceMode: false
-});
+    };
+};
 
 const AddProperty: React.FC<AddPropertyProps> = ({
     onBack,
@@ -315,10 +361,13 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         'room-types',
         'rooms',
         'connecting-rooms',
+        'status-colors',
         'holidays',
         'taxes-vat',
         'printer-settings',
-        'housekeeping-settings'
+        'housekeeping-settings',
+        'payment-methods',
+        'outlets'
     ]), []);
     const isSelfManagedTab = SELF_MANAGED_TABS.has(activeTab);
 
@@ -347,22 +396,153 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         }
     }, [targetProperty?.id, propRooms]);
     const [propCity, setPropCity] = useState<string>(
-        isCreateMode ? 'Dhaka' : (targetProperty?.city || 'Dhaka')
+        isCreateMode ? '' : (targetProperty?.city || (targetProperty?.name?.includes('Dhaka') ? 'Dhaka' : ''))
     );
     const [propCountry, setPropCountry] = useState<string>(
         targetProperty?.country || 'Bangladesh'
     );
     const [propAddress, setPropAddress] = useState<string>(
-        isCreateMode ? '' : (targetProperty?.address || 'Plot 12, Road 45, Gulshan-2, Dhaka')
+        isCreateMode ? '' : (targetProperty?.address || (targetProperty?.name?.includes('Dhaka') ? 'Plot 12, Road 45, Gulshan-2, Dhaka' : ''))
     );
     const [propPhone, setPropPhone] = useState<string>(
-        isCreateMode ? '+880 ' : (targetProperty?.phone || '+880 2 9882200')
+        isCreateMode ? '+880 ' : (targetProperty?.phone || (targetProperty?.name?.includes('Dhaka') ? '+880 2 9882200' : '+880 '))
     );
     const [propEmail, setPropEmail] = useState<string>(
-        isCreateMode ? '' : (targetProperty?.email || 'dhaka@grandhospitality.com')
+        isCreateMode ? '' : (targetProperty?.email || (targetProperty?.name?.includes('Dhaka') ? 'dhaka@grandhospitality.com' : ''))
     );
 
     const [settings, setSettings] = useState(() => getDefaultUnifiedSettings(targetProperty));
+
+    // Dynamic Geography & Localization
+    const countryOptions = useMemo<SearchableOption[]>(() => {
+        return COUNTRIES_DATABASE.map(c => ({
+            value: c.name,
+            label: `${getCountryFlag(c.code)} ${c.name}`,
+            subLabel: `Dial: ${c.dialCode} • Code: ${c.code}`,
+            badge: c.code
+        }));
+    }, []);
+
+    const cityOptions = useMemo<SearchableOption[]>(() => {
+        const list = getCitiesForCountry(propCountry);
+        return list.map(city => ({
+            value: city,
+            label: city
+        }));
+    }, [propCountry]);
+
+    const stateOptions = useMemo<SearchableOption[]>(() => {
+        const list = getStatesForCountry(propCountry);
+        return list.map(st => ({
+            value: st,
+            label: st
+        }));
+    }, [propCountry]);
+
+    const nationalityOptions = useMemo<SearchableOption[]>(() => {
+        return getAllNationalities().map(n => ({
+            value: n.nationality,
+            label: `${getCountryFlag(n.code)} ${n.nationality}`,
+            subLabel: `Country: ${n.countryName} (${n.code})`,
+            badge: n.code
+        }));
+    }, []);
+
+    const timezoneOptions = useMemo<SearchableOption[]>(() => {
+        return TIMEZONES_DATABASE.map(tz => ({
+            value: tz.value,
+            label: tz.label,
+            subLabel: `${tz.region} • ${tz.offset}`,
+            group: tz.region
+        }));
+    }, []);
+
+    const activeDialCode = useMemo(() => {
+        return getDialCodeForCountry(propCountry) || '+880';
+    }, [propCountry]);
+
+    const handleNationalityChange = (newNat: string) => {
+        setSettings(prev => ({ ...prev, defaultNationality: newNat }));
+        const match = getAllNationalities().find(n => n.nationality.toLowerCase() === newNat.toLowerCase());
+        if (match && match.countryName) {
+            setPropCountry(match.countryName);
+            const cities = getCitiesForCountry(match.countryName);
+            if (cities.length > 0) setPropCity(cities[0]);
+            const cInfo = getCountryByName(match.countryName);
+            if (cInfo?.dialCode) {
+                setPropPhone(prev => {
+                    const local = prev.replace(/^\+\d+\s*/, '');
+                    return `${cInfo.dialCode} ${local}`.trim();
+                });
+            }
+        }
+    };
+
+    const handleCountryChange = (newCountryName: string) => {
+        setPropCountry(newCountryName);
+        const cInfo = getCountryByName(newCountryName);
+        const newDialCode = cInfo?.dialCode || '+880';
+        const newNat = cInfo?.nationality || 'Bangladeshi';
+
+        // Auto-update phone dial code prefix
+        setPropPhone(prev => {
+            const clean = prev.trim();
+            if (!clean || clean.startsWith('+')) {
+                const parts = clean.split(' ');
+                if (parts.length > 1) {
+                    return `${newDialCode} ${parts.slice(1).join(' ')}`;
+                }
+                return `${newDialCode} `;
+            }
+            return `${newDialCode} ${clean}`;
+        });
+
+        // Cities for the newly chosen country
+        const cities = getCitiesForCountry(newCountryName);
+        const topCity = cities.length > 0 ? cities[0] : '';
+        setPropCity(topCity);
+
+        // Best matching timezone
+        const tzMatch = TIMEZONES_DATABASE.find(t =>
+            t.value.toLowerCase().includes(newCountryName.toLowerCase()) ||
+            t.label.toLowerCase().includes(newCountryName.toLowerCase()) ||
+            (cInfo?.code === 'US' && t.value.includes('New_York')) ||
+            (cInfo?.code === 'GB' && t.value.includes('London')) ||
+            (cInfo?.code === 'AE' && t.value.includes('Dubai')) ||
+            (cInfo?.code === 'SA' && t.value.includes('Riyadh')) ||
+            (cInfo?.code === 'IN' && t.value.includes('Kolkata'))
+        );
+
+        setSettings(prev => ({
+            ...prev,
+            defaultNationality: newNat,
+            timezone: tzMatch ? tzMatch.value : prev.timezone,
+            stateProvince: '',
+            zipCode: ''
+        }));
+    };
+
+    const handleCityChange = (newCity: string) => {
+        setPropCity(newCity);
+        const clean = newCity.toLowerCase();
+        if (clean.includes('dhaka')) {
+            setSettings(s => ({ ...s, stateProvince: 'Dhaka Division', zipCode: '1212', latitude: '23.7937', longitude: '90.4066' }));
+        } else if (clean.includes('cox')) {
+            setSettings(s => ({ ...s, stateProvince: 'Chattogram Division', zipCode: '4700', latitude: '21.4272', longitude: '91.9702' }));
+        } else if (clean.includes('chittagong') || clean.includes('chattogram')) {
+            setSettings(s => ({ ...s, stateProvince: 'Chattogram Division', zipCode: '4000', latitude: '22.3569', longitude: '91.7832' }));
+        } else if (clean.includes('sylhet')) {
+            setSettings(s => ({ ...s, stateProvince: 'Sylhet Division', zipCode: '3100', latitude: '24.8949', longitude: '91.8687' }));
+        } else if (clean.includes('dubai')) {
+            setSettings(s => ({ ...s, stateProvince: 'Emirate of Dubai', zipCode: '00000', latitude: '25.2048', longitude: '55.2708' }));
+        } else if (clean.includes('riyadh')) {
+            setSettings(s => ({ ...s, stateProvince: 'Riyadh Province', zipCode: '11564', latitude: '24.7136', longitude: '46.6753' }));
+        } else if (clean.includes('london')) {
+            setSettings(s => ({ ...s, stateProvince: 'Greater London', zipCode: 'SW1A 1AA', latitude: '51.5074', longitude: '-0.1278' }));
+        } else if (clean.includes('new york')) {
+            setSettings(s => ({ ...s, stateProvince: 'New York', zipCode: '10001', latitude: '40.7128', longitude: '-74.0060' }));
+        }
+    };
 
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
         { id: '1', bankName: 'Standard Chartered Bank', accountName: 'Grand Hospitality Operations', accountNum: '01-8849201-01', swift: 'SCBLBDDX' },
@@ -431,11 +611,12 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             setPropType(p.property_type || p.type || 'Hotel');
             setPropGrade(p.star_rating ? `${p.star_rating} Star` : (p.grade || '5 Star'));
             setPropRooms(Number(p.total_rooms ?? p.rooms ?? 0));
-            setPropCity(p.city || 'Dhaka');
-            setPropCountry(p.country || 'Bangladesh');
-            setPropAddress(p.address || 'Plot 12, Road 45, Gulshan-2, Dhaka');
-            setPropPhone(p.phone || '+880 2 9882200');
-            setPropEmail(p.email || 'dhaka@grandhospitality.com');
+            const isDhakaProp = (p.name || '').toLowerCase().includes('dhaka') || (p.city || '').toLowerCase() === 'dhaka';
+            setPropCity(p.city || (isDhakaProp ? 'Dhaka' : ''));
+            setPropCountry(p.country || (isDhakaProp ? 'Bangladesh' : ''));
+            setPropAddress(p.address || (isDhakaProp ? 'Plot 12, Road 45, Gulshan-2, Dhaka' : ''));
+            setPropPhone(p.phone || (isDhakaProp ? '+880 2 9882200' : ''));
+            setPropEmail(p.email || (isDhakaProp ? 'dhaka@grandhospitality.com' : ''));
         }
 
         try {
@@ -443,6 +624,12 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             if (savedRaw) {
                 const parsed = JSON.parse(savedRaw);
                 if (parsed.settings) {
+                    if (parsed.settings.country) setPropCountry(parsed.settings.country);
+                    if (parsed.settings.city) setPropCity(parsed.settings.city);
+                    if (parsed.settings.phone) setPropPhone(parsed.settings.phone);
+                    if (parsed.settings.address) setPropAddress(parsed.settings.address);
+                    if (parsed.settings.email) setPropEmail(parsed.settings.email);
+
                     setSettings({
                         ...getDefaultUnifiedSettings(p),
                         ...parsed.settings,
@@ -526,6 +713,11 @@ const AddProperty: React.FC<AddPropertyProps> = ({
 
             const mergedSettings = {
                 ...settings,
+                country: propCountry.trim(),
+                city: propCity.trim(),
+                address: propAddress.trim(),
+                phone: propPhone.trim(),
+                email: propEmail.trim(),
                 facebookUrl: fbUrl,
                 instagramUrl: igUrl,
                 tripAdvisorUrl: taUrl,
@@ -669,7 +861,10 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         // 4. Housekeeping Operations
         { id: 'housekeeping-settings', label: 'Housekeeping', icon: <Sparkles size={15} />, group: 'Housekeeping & Operations' },
 
-        // 5. POS & Hardware
+        // 5. Front Office & Display
+        { id: 'status-colors', label: 'Status & Timeline Colors', icon: <Palette size={15} />, group: 'Front Office & Display' },
+
+        // 6. POS & Hardware
         { id: 'outlets', label: 'Outlet Configurations', icon: <Utensils size={15} />, group: 'Outlets & Peripherals' },
         { id: 'printer-settings', label: 'Printer Settings', icon: <Printer size={15} /> },
         { id: 'system', label: 'System & Channels', icon: <Monitor size={15} /> },
@@ -934,7 +1129,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                     <span className="text-[9px] bg-amber-100/80 px-1 py-0.2 rounded border border-amber-300">Sync</span>
                                                 </button>
                                             ) : (
-                                                <span className="text-emerald-600 font-medium text-[10px]">✓ Synced with {liveRoomsCount} physical rooms</span>
+                                                <span className="text-emerald-600 font-medium text-[10px]">âœ“ Synced with {liveRoomsCount} physical rooms</span>
                                             )
                                         }
                                     >
@@ -952,18 +1147,15 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             }
                                         />
                                     </FormField>
-                                    <FormField label="Default Nationality">
-                                        <Select
+                                    <FormField label="Default Nationality" hint="Default guest nationality & holiday calendar country">
+                                        <SearchableSelect
                                             value={settings.defaultNationality}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, defaultNationality: e.target.value })
-                                            }
-                                        >
-                                            <option value="Bangladeshi">Bangladeshi</option>
-                                            <option value="American">American</option>
-                                            <option value="British">British</option>
-                                            <option value="Indian">Indian</option>
-                                        </Select>
+                                            onChange={handleNationalityChange}
+                                            options={nationalityOptions}
+                                            placeholder="Select Default Nationality..."
+                                            searchPlaceholder="Search 195+ nationalities..."
+                                            compact
+                                        />
                                     </FormField>
                                 </div>
                             </div>
@@ -971,18 +1163,15 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                             <div>
                                 <SectionTitle icon={Globe} title="Regional & Localization Settings" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                                    <FormField label="Time Zone" required>
-                                        <Select
+                                    <FormField label="Time Zone" required hint="Hotel local operation clock">
+                                        <SearchableSelect
                                             value={settings.timezone}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, timezone: e.target.value })
-                                            }
-                                        >
-                                            <option value="Asia/Dhaka (GMT+06:00)">Asia/Dhaka (GMT+06:00)</option>
-                                            <option value="Asia/Kolkata (GMT+05:30)">Asia/Kolkata (GMT+05:30)</option>
-                                            <option value="Asia/Dubai (GMT+04:00)">Asia/Dubai (GMT+04:00)</option>
-                                            <option value="Europe/London (GMT+00:00)">Europe/London (GMT+00:00)</option>
-                                        </Select>
+                                            onChange={(tzVal) => setSettings({ ...settings, timezone: tzVal })}
+                                            options={timezoneOptions}
+                                            placeholder="Select Timezone..."
+                                            searchPlaceholder="Search timezone by city/country/offset..."
+                                            compact
+                                        />
                                     </FormField>
                                     <FormField label="Date Format">
                                         <Select
@@ -1034,15 +1223,28 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             />
                                         </FormField>
                                     </div>
-                                    <FormField label="City" required>
-                                        <Input value={propCity} onChange={(e: any) => setPropCity(e.target.value)} />
+                                    <FormField label="City" required hint={cityOptions.length > 0 ? `${cityOptions.length} cities found` : undefined}>
+                                        <SearchableSelect
+                                            value={propCity}
+                                            onChange={handleCityChange}
+                                            options={cityOptions}
+                                            placeholder="Select or enter city..."
+                                            searchPlaceholder={`Search ${propCountry || ''} cities or enter custom...`}
+                                            allowCustom={true}
+                                            customPromptText="Use custom city:"
+                                            compact
+                                        />
                                     </FormField>
                                     <FormField label="State / Division">
-                                        <Input
+                                        <SearchableSelect
                                             value={settings.stateProvince}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, stateProvince: e.target.value })
-                                            }
+                                            onChange={(st) => setSettings({ ...settings, stateProvince: st })}
+                                            options={stateOptions}
+                                            placeholder="Select or type State/Division..."
+                                            searchPlaceholder={`Search ${propCountry || ''} divisions/states...`}
+                                            allowCustom={true}
+                                            customPromptText="Use custom state:"
+                                            compact
                                         />
                                     </FormField>
                                     <FormField label="Postal / Zip Code">
@@ -1051,16 +1253,50 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             onChange={(e: any) =>
                                                 setSettings({ ...settings, zipCode: e.target.value })
                                             }
+                                            placeholder={
+                                                propCountry === 'Bangladesh' ? 'e.g. 1212' :
+                                                propCountry === 'United States' ? 'e.g. 90210' :
+                                                propCountry === 'United Kingdom' ? 'e.g. SW1A 1AA' :
+                                                propCountry === 'India' ? 'e.g. 110001' :
+                                                propCountry === 'United Arab Emirates' ? 'e.g. 00000' :
+                                                'Postal / Zip Code'
+                                            }
                                         />
                                     </FormField>
-                                    <FormField label="Country" required>
-                                        <Input
+                                    <FormField label="Country" required hint="195+ sovereign countries">
+                                        <SearchableSelect
                                             value={propCountry}
-                                            onChange={(e: any) => setPropCountry(e.target.value)}
+                                            onChange={handleCountryChange}
+                                            options={countryOptions}
+                                            placeholder="Select Country..."
+                                            searchPlaceholder="Search 195+ countries..."
+                                            allowCustom={false}
+                                            compact
                                         />
                                     </FormField>
-                                    <FormField label="Phone Number" required>
-                                        <Input value={propPhone} onChange={(e: any) => setPropPhone(e.target.value)} />
+                                    <FormField label="Phone Number" required hint={`Intl prefix: ${activeDialCode}`}>
+                                        <div className="flex items-center gap-1.5">
+                                            <span
+                                                className="inline-flex items-center gap-1 px-2.5 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 select-none shrink-0 shadow-sm"
+                                                title={`Country Dial Code: ${activeDialCode}`}
+                                            >
+                                                <span className="text-base leading-none">{getCountryFlag(getCountryByName(propCountry)?.code || 'BD')}</span>
+                                                <span>{activeDialCode}</span>
+                                            </span>
+                                            <Input
+                                                value={
+                                                    propPhone.startsWith(activeDialCode)
+                                                        ? propPhone.slice(activeDialCode.length).trimStart()
+                                                        : propPhone.replace(/^\+\d+\s*/, '')
+                                                }
+                                                onChange={(e: any) => {
+                                                    const localNumber = e.target.value.replace(/^\+\d+\s*/, '');
+                                                    setPropPhone(`${activeDialCode} ${localNumber}`.trim());
+                                                }}
+                                                placeholder="e.g. 2 9882200"
+                                                className="flex-1 font-mono"
+                                            />
+                                        </div>
                                     </FormField>
                                     <FormField label="Reservations Email" required>
                                         <Input
@@ -1202,11 +1438,23 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     )}
 
                     {/* ========================================================================
+                        STATUS & TIMELINE COLORS (StatusColorManagement)
+                       ======================================================================== */}
+                    {activeTab === 'status-colors' && (
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
+                            <StatusColorManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
                         HOLIDAY CALENDAR & SURCHARGES (HolidayManagement)
                        ======================================================================== */}
                     {activeTab === 'holidays' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <HolidayManagement />
+                            <HolidayManagement 
+                                propertyId={targetProperty?.id || activeProperty?.id}
+                                defaultCountryCode={resolveCountryCodeFromNationalityOrName(settings.defaultNationality || propCountry || activeProperty?.country)}
+                            />
                         </div>
                     )}
 
@@ -1220,130 +1468,16 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     )}
 
                     {/* ========================================================================
-                        OUTLET CONFIGURATIONS (POS Outlets & Revenue Centers)
+                        OUTLET CONFIGURATIONS (Enterprise PostgreSQL Multi-Outlet Hub)
                        ======================================================================== */}
                     {activeTab === 'outlets' && (
-                        <div className="p-4 sm:p-5 lg:p-6 space-y-6 animate-in fade-in duration-150">
-                            <div>
-                                <SectionTitle icon={Utensils} title="Food & Beverage Outlets, Spas & Revenue Centers" />
-                                <p className="text-xs text-gray-500 mb-4 -mt-2">
-                                    Configure restaurant dining rooms, rooftop lounges, banquets, and leisure facilities with POS & KOT routing.
-                                </p>
-                                <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-gray-100">
-                                    <h4 className="text-xs font-bold text-gray-800">Active Outlets Registry</h4>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setPosOutlets(prev => [
-                                                ...prev,
-                                                {
-                                                    id: Date.now().toString(),
-                                                    name: 'New Restaurant / Outlet',
-                                                    type: 'All-Day Dining',
-                                                    hours: '07:00 AM - 11:00 PM',
-                                                    capacity: '60 Seats',
-                                                    posStation: 'Main Kitchen KOT-1',
-                                                    status: 'Active'
-                                                }
-                                            ])
-                                        }
-                                        className="btn-primary text-xs flex items-center gap-1.5"
-                                    >
-                                        <Plus size={13} /> Add New Outlet
-                                    </button>
-                                </div>
-                                <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-3 overflow-x-auto">
-                                    <table className="w-full border-spacing-x-2 border-separate text-xs">
-                                        <thead>
-                                            <tr className="text-left">
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Outlet Name</th>
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Type</th>
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Operating Hours</th>
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Capacity</th>
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">POS / KOT Station</th>
-                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Status</th>
-                                                <th className="w-8"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {posOutlets.map((outlet, idx) => (
-                                                <tr key={outlet.id}>
-                                                    <td className="pb-1.5">
-                                                        <Input
-                                                            className="!h-7 !py-1 text-xs"
-                                                            value={outlet.name}
-                                                            onChange={(e: any) => {
-                                                                const updated = [...posOutlets];
-                                                                updated[idx].name = e.target.value;
-                                                                setPosOutlets(updated);
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <Input
-                                                            className="!h-7 !py-1 text-xs"
-                                                            value={outlet.type}
-                                                            onChange={(e: any) => {
-                                                                const updated = [...posOutlets];
-                                                                updated[idx].type = e.target.value;
-                                                                setPosOutlets(updated);
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <Input
-                                                            className="!h-7 !py-1 text-xs"
-                                                            value={outlet.hours}
-                                                            onChange={(e: any) => {
-                                                                const updated = [...posOutlets];
-                                                                updated[idx].hours = e.target.value;
-                                                                setPosOutlets(updated);
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <Input
-                                                            className="!h-7 !py-1 text-xs"
-                                                            value={outlet.capacity}
-                                                            onChange={(e: any) => {
-                                                                const updated = [...posOutlets];
-                                                                updated[idx].capacity = e.target.value;
-                                                                setPosOutlets(updated);
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <Input
-                                                            className="!h-7 !py-1 text-xs"
-                                                            value={outlet.posStation}
-                                                            onChange={(e: any) => {
-                                                                const updated = [...posOutlets];
-                                                                updated[idx].posStation = e.target.value;
-                                                                setPosOutlets(updated);
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                            {outlet.status || 'Active'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="pb-1.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setPosOutlets(prev => prev.filter((_, i) => i !== idx))}
-                                                            className="text-gray-400 hover:text-red-500 p-1"
-                                                            title="Delete Outlet"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        <div className="p-3 sm:p-5 lg:p-6 animate-in fade-in duration-150">
+                            <OutletConfigurationTab
+                                propertyId={targetProperty?.id || activeProperty?.id}
+                                propertyName={targetProperty?.name || activeProperty?.name}
+                                onNavigate={onNavigate}
+                                onSwitchTab={(tabId) => setActiveTab(tabId)}
+                            />
                         </div>
                     )}
 
@@ -1475,7 +1609,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                 >
                                                     <option value="First Night Charge (100%)">First Night Charge (100%)</option>
                                                     <option value="Full Stay Charge (100%)">Full Stay Charge (100%)</option>
-                                                    <option value="Flat Fee (৳ 3,500)">Flat Fee (৳ 3,500)</option>
+                                                    <option value="Flat Fee (à§³ 3,500)">Flat Fee (à§³ 3,500)</option>
                                                 </Select>
                                             </FormField>
                                             <div className="md:col-span-2">
@@ -1587,7 +1721,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                             setSettings({ ...settings, confirmationPaymentRule: e.target.value })
                                                         }
                                                     >
-                                                        <option value="any_payment">Any Advance Payment (&gt; ৳ 0)</option>
+                                                        <option value="any_payment">Any Advance Payment (&gt; à§³ 0)</option>
                                                         <option value="first_night">100% of First Night Room Tariff</option>
                                                         <option value="percentage">Fixed Percentage of Stay Total (%)</option>
                                                         <option value="full_payment">100% Full Payment of Stay Total</option>
@@ -1727,7 +1861,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                     <div className="space-y-5">
                                         <SectionTitle icon={Briefcase} title="2. Corporate & Group Reservations" />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                            <FormField label="Default City Ledger Credit Limit (BDT ৳)">
+                                            <FormField label="Default City Ledger Credit Limit (BDT à§³)">
                                                 <Input
                                                     type="number"
                                                     value={settings.cityLedgerLimitBDT}
@@ -1904,7 +2038,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                         }
                                                     >
                                                         <option value="50% Half-Night Charge">50% Half-Night Charge</option>
-                                                        <option value="Flat Fee (৳ 1,500)">Flat Fee (৳ 1,500)</option>
+                                                        <option value="Flat Fee (à§³ 1,500)">Flat Fee (à§³ 1,500)</option>
                                                     </Select>
                                                 </FormField>
                                                 <FormField label="10:00 AM - 02:00 PM">
@@ -1920,7 +2054,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                         <option value="Complimentary (If Room Ready)">
                                                             Complimentary (If Room Ready)
                                                         </option>
-                                                        <option value="Flat Fee (৳ 1,000)">Flat Fee (৳ 1,000)</option>
+                                                        <option value="Flat Fee (à§³ 1,000)">Flat Fee (à§³ 1,000)</option>
                                                     </Select>
                                                 </FormField>
                                             </div>
@@ -2045,11 +2179,11 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                         })
                                                     }
                                                 >
-                                                    <option value="Fixed Amount (BDT ৳)">Fixed Amount (BDT ৳)</option>
+                                                    <option value="Fixed Amount (BDT à§³)">Fixed Amount (BDT à§³)</option>
                                                     <option value="Percentage of Stay Total">% of Stay Total</option>
                                                 </Select>
                                             </FormField>
-                                            <FormField label="Default Deposit Amount (৳)">
+                                            <FormField label="Default Deposit Amount (à§³)">
                                                 <Input
                                                     type="number"
                                                     value={settings.securityDepositAmountBDT}
@@ -2061,7 +2195,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                     }
                                                 />
                                             </FormField>
-                                            <FormField label="Cashier Adjustment Limit (৳)">
+                                            <FormField label="Cashier Adjustment Limit (à§³)">
                                                 <Input
                                                     type="number"
                                                     value={settings.staffAdjustmentLimitBDT}
@@ -2145,7 +2279,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                     <option value="Printed Meal Vouchers">Printed Meal Vouchers</option>
                                                 </Select>
                                             </FormField>
-                                            <FormField label="Extra Parking Charge (৳)">
+                                            <FormField label="Extra Parking Charge (à§³)">
                                                 <Input
                                                     type="number"
                                                     value={settings.parkingSurchargeBDT}
@@ -2302,8 +2436,8 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     {activeTab === 'finance' && (
                         <div className="p-4 sm:p-5 lg:p-6 space-y-6 animate-in fade-in duration-150">
                             <div>
-                                <SectionTitle icon={CreditCard} title="Currency, VAT & Tax Configuration" />
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                                <SectionTitle icon={CreditCard} title="Currency & Billing Configuration" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                                     <FormField label="Base Currency" required>
                                         <Select
                                             value={settings.baseCurrency}
@@ -2349,27 +2483,6 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             <option value="PayPal">PayPal</option>
                                         </Select>
                                     </FormField>
-                                    <FormField label="VAT / GST (%)">
-                                        <Input
-                                            type="number"
-                                            value={settings.vatPercentage}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, vatPercentage: Number(e.target.value) })
-                                            }
-                                        />
-                                    </FormField>
-                                    <FormField label="Service Charge (%)">
-                                        <Input
-                                            type="number"
-                                            value={settings.serviceChargePercentage}
-                                            onChange={(e: any) =>
-                                                setSettings({
-                                                    ...settings,
-                                                    serviceChargePercentage: Number(e.target.value)
-                                                })
-                                            }
-                                        />
-                                    </FormField>
                                     <FormField label="Rounding Method">
                                         <Select
                                             value={settings.roundingRule}
@@ -2410,11 +2523,28 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                         }
                                     />
                                 </div>
+                                <div className="mt-3.5 p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                        <span className="p-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                                            <Percent size={14} />
+                                        </span>
+                                        <span>
+                                            <strong>Statutory Taxes & Service Charge:</strong> Centrally configured with multi-tier slabs, categories, and exemptions in the <button type="button" onClick={() => setActiveTab('taxes-vat')} className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-700 cursor-pointer">Taxes & VAT</button> module.
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('taxes-vat')}
+                                        className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg transition shrink-0 cursor-pointer"
+                                    >
+                                        Open Taxes & VAT Settings →
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Foreign Currency Exchange Rates */}
                             <div>
-                                <SectionTitle icon={DollarSign} title="Front Desk Foreign Exchange Rates (in BDT ৳)" />
+                                <SectionTitle icon={DollarSign} title="Front Desk Foreign Exchange Rates (in BDT à§³)" />
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                                     <FormField label="USD ($) Buy / Sell Rate">
                                         <div className="grid grid-cols-2 gap-2">
@@ -2436,7 +2566,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             />
                                         </div>
                                     </FormField>
-                                    <FormField label="EUR (€) Buy / Sell Rate">
+                                    <FormField label="EUR (â‚¬) Buy / Sell Rate">
                                         <div className="grid grid-cols-2 gap-2">
                                             <Input
                                                 type="number"
@@ -2456,7 +2586,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             />
                                         </div>
                                     </FormField>
-                                    <FormField label="GBP (£) Buy / Sell Rate">
+                                    <FormField label="GBP (Â£) Buy / Sell Rate">
                                         <div className="grid grid-cols-2 gap-2">
                                             <Input
                                                 type="number"
@@ -2603,37 +2733,84 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                             <div>
                                 <SectionTitle icon={Receipt} title="Document Numbering & Prefixes" />
 
-                                {/* Live Sequence Preview Banner */}
-                                <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 mb-4">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="size-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
-                                            <Receipt size={16} />
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-bold text-slate-800">Live Sequence Preview</div>
-                                            <div className="text-[11px] text-slate-500">Live preview of generated document numbers across PMS folios & POS</div>
-                                        </div>
+                                {/* Token Explanation Banner */}
+                                <div className="mb-3.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-slate-800">Dynamic Tokens:</span>
+                                        <span>Use <code className="bg-white px-1.5 py-0.5 border rounded text-blue-600 font-bold font-mono">{"{YYYY}"}</code> for 4-digit Year, <code className="bg-white px-1.5 py-0.5 border rounded text-blue-600 font-bold font-mono">{"{YY}"}</code> for 2-digit Year, <code className="bg-white px-1.5 py-0.5 border rounded text-blue-600 font-bold font-mono">{"{MM}"}</code> for Month.</span>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-blue-700 font-bold shadow-2xs">
-                                            Res: {settings.reservationPrefix || 'RES-'}00492
-                                        </span>
-                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 font-bold shadow-2xs">
-                                            Inv: {settings.invoicePrefix || 'INV-'}01842
-                                        </span>
-                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-purple-200 text-purple-700 font-bold shadow-2xs">
-                                            Folio: {settings.folioPrefix || 'FOL-'}8821
-                                        </span>
-                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-700 font-bold shadow-2xs">
-                                            KOT: {settings.kotPrefix || 'KOT-'}3920
-                                        </span>
+                                    <div className="text-[11px] text-slate-500 font-medium">
+                                        Tokens resolve dynamically every year without manual updates
                                     </div>
                                 </div>
+
+                                {/* Live Sequence Preview Banner */}
+                                {(() => {
+                                    const yyyy = new Date().getFullYear();
+                                    const pad = Number(settings.sequencePadding) || 5;
+                                    const resPr = (settings.reservationPrefix || 'RES-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const invPr = (settings.invoicePrefix || 'INV-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const folPr = (settings.folioPrefix || 'FOL-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const grpPr = (settings.groupPrefix || 'GRP-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const regPr = (settings.registrationPrefix || 'REG-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const crnPr = (settings.creditNotePrefix || 'CRN-{YYYY}-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const rctPr = (settings.receiptPrefix || 'RCT-').replace(/\{YYYY\}/g, String(yyyy));
+                                    const kotPr = (settings.kotPrefix || 'KOT-').replace(/\{YYYY\}/g, String(yyyy));
+
+                                    const resSample = `${resPr}${String(settings.nextReservationNumber || 1001).padStart(pad, '0')}`;
+                                    const invSample = `${invPr}${String(settings.nextInvoiceNumber || 1001).padStart(pad, '0')}`;
+                                    const folSample = `${folPr}${String(settings.nextFolioNumber || 1001).padStart(pad, '0')}`;
+                                    const grpSample = `${grpPr}001`;
+                                    const regSample = `${regPr}${String(1001).padStart(pad, '0')}`;
+                                    const crnSample = `${crnPr}001`;
+                                    const rctSample = `${rctPr}${String(settings.nextReceiptNumber || 1001).padStart(pad, '0')}`;
+                                    const kotSample = `${kotPr}0042`;
+
+                                    return (
+                                        <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/80 rounded-xl p-3 mb-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="size-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold">
+                                                        <Receipt size={13} />
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-800">Live Sequence & Prefix Preview</span>
+                                                </div>
+                                                <span className="text-[11px] text-slate-500 font-medium">Padding: {pad} digits</span>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-blue-700 font-bold shadow-2xs">
+                                                    Res: {resSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 font-bold shadow-2xs">
+                                                    Inv: {invSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-purple-200 text-purple-700 font-bold shadow-2xs">
+                                                    Folio: {folSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-700 font-bold shadow-2xs">
+                                                    Group: {grpSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-teal-200 text-teal-700 font-bold shadow-2xs">
+                                                    Reg: {regSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-700 font-bold shadow-2xs">
+                                                    KOT: {kotSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 font-bold shadow-2xs">
+                                                    Credit Note: {crnSample}
+                                                </span>
+                                                <span className="bg-white px-2.5 py-1 rounded-lg border border-cyan-200 text-cyan-700 font-bold shadow-2xs">
+                                                    Receipt: {rctSample}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <FormField
                                         label="Reservation Prefix"
-                                        hint={`Sample: ${settings.reservationPrefix}00492`}
+                                        hint={`Use {YYYY} for dynamic year (e.g. RES-{YYYY}-)`}
                                     >
                                         <Input
                                             value={settings.reservationPrefix}
@@ -2643,7 +2820,19 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             className="font-mono font-bold"
                                         />
                                     </FormField>
-                                    <FormField label="Invoice Prefix" hint={`Sample: ${settings.invoicePrefix}01842`}>
+
+                                    <FormField label="Next Reservation Number" hint="Next starting counter (e.g. 1001)">
+                                        <Input
+                                            type="number"
+                                            value={settings.nextReservationNumber || 1001}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, nextReservationNumber: Number(e.target.value) })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Tax Invoice Prefix" hint={`Use {YYYY} for dynamic year (e.g. INV-{YYYY}-)`}>
                                         <Input
                                             value={settings.invoicePrefix}
                                             onChange={(e: any) =>
@@ -2652,7 +2841,19 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             className="font-mono font-bold"
                                         />
                                     </FormField>
-                                    <FormField label="Folio Prefix" hint={`Sample: ${settings.folioPrefix}8821`}>
+
+                                    <FormField label="Next Invoice Number" hint="Next starting invoice counter">
+                                        <Input
+                                            type="number"
+                                            value={settings.nextInvoiceNumber || 1001}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, nextInvoiceNumber: Number(e.target.value) })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Guest Folio Prefix" hint={`Sample: FOL-`}>
                                         <Input
                                             value={settings.folioPrefix}
                                             onChange={(e: any) =>
@@ -2661,7 +2862,49 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             className="font-mono font-bold"
                                         />
                                     </FormField>
-                                    <FormField label="KOT Prefix" hint={`Sample: ${settings.kotPrefix}3920`}>
+
+                                    <FormField label="Next Folio Number" hint="Next starting folio counter">
+                                        <Input
+                                            type="number"
+                                            value={settings.nextFolioNumber || 1001}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, nextFolioNumber: Number(e.target.value) })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Group Booking Prefix" hint={`Sample: GRP-{YYYY}-`}>
+                                        <Input
+                                            value={settings.groupPrefix || 'GRP-{YYYY}-'}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, groupPrefix: e.target.value })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Registration Card Prefix" hint={`Sample: REG-`}>
+                                        <Input
+                                            value={settings.registrationPrefix || 'REG-'}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, registrationPrefix: e.target.value })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Credit Note / Refund Prefix" hint={`Sample: CRN-{YYYY}-`}>
+                                        <Input
+                                            value={settings.creditNotePrefix || 'CRN-{YYYY}-'}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, creditNotePrefix: e.target.value })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Restaurant KOT Prefix" hint={`Sample: KOT-`}>
                                         <Input
                                             value={settings.kotPrefix}
                                             onChange={(e: any) =>
@@ -2670,7 +2913,8 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             className="font-mono font-bold"
                                         />
                                     </FormField>
-                                    <FormField label="Receipt Prefix" hint={`Sample: ${settings.receiptPrefix}1049`}>
+
+                                    <FormField label="Money Receipt Prefix" hint={`Sample: RCT-`}>
                                         <Input
                                             value={settings.receiptPrefix}
                                             onChange={(e: any) =>
@@ -2679,6 +2923,31 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             className="font-mono font-bold"
                                         />
                                     </FormField>
+
+                                    <FormField label="Next Receipt Number" hint="Next starting receipt counter">
+                                        <Input
+                                            type="number"
+                                            value={settings.nextReceiptNumber || 1001}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, nextReceiptNumber: Number(e.target.value) })
+                                            }
+                                            className="font-mono font-bold"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="Sequence Number Padding" hint="Zero-padding digits for sequence">
+                                        <Select
+                                            value={String(settings.sequencePadding || 5)}
+                                            onChange={(e: any) =>
+                                                setSettings({ ...settings, sequencePadding: Number(e.target.value) })
+                                            }
+                                        >
+                                            <option value="4">4 Digits (e.g. 0001)</option>
+                                            <option value="5">5 Digits (e.g. 00001)</option>
+                                            <option value="6">6 Digits (e.g. 000001)</option>
+                                        </Select>
+                                    </FormField>
+
                                     <div className="flex items-center pt-4">
                                         <Checkbox
                                             label="Reset Sequences Annually"
@@ -3514,18 +3783,19 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                     </FormField>
                                     <FormField label="Inactivity Auto-Lock">
                                         <Select
-                                            value={settings.sessionTimeoutMinutes}
-                                            onChange={(e: any) =>
-                                                setSettings({
-                                                    ...settings,
-                                                    sessionTimeoutMinutes: Number(e.target.value)
-                                                })
-                                            }
+                                            value={settings.sessionTimeoutMinutes ?? 720}
+                                            onChange={(e: any) => {
+                                                const v = Number(e.target.value);
+                                                setSettings(prev => ({ ...prev, sessionTimeoutMinutes: v }));
+                                                try { localStorage.setItem("hotel_session_timeout_minutes", String(v)); } catch {}
+                                            }}
                                         >
-                                            <option value={10}>10 Minutes</option>
-                                            <option value={15}>15 Minutes (Standard)</option>
-                                            <option value={30}>30 Minutes</option>
-                                            <option value={60}>60 Minutes</option>
+                                            <option value={60}>1 Hour (Short Break)</option>
+                                            <option value={240}>4 Hours (Half Shift)</option>
+                                            <option value={480}>8 Hours (Standard Shift)</option>
+                                            <option value={720}>12 Hours (Recommended - Full Shift Coverage)</option>
+                                            <option value={1440}>24 Hours (Full Day Operations)</option>
+                                            <option value={0}>Disabled (Never Auto-Logout)</option>
                                         </Select>
                                     </FormField>
                                 </div>

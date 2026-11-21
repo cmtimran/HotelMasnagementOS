@@ -55,13 +55,15 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
-    // Focus input on open & reset state
+    // Focus input on open & reset state, plus auto-refresh newest DB records
     useEffect(() => {
         if (isOpen) {
             setQuery('');
             setCategoryFilter('ALL');
             setSelectedIndex(0);
             setTimeout(() => inputRef.current?.focus(), 50);
+            // Dynamic rehydration of latest database records (OTA reservations, updated status)
+            syncReservationsFromDB().then(() => setRefreshKey(k => k + 1)).catch(() => {});
         }
     }, [isOpen]);
 
@@ -84,9 +86,18 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
         { id: 'policy-management', title: 'Policies & Cancellation Rules', subtitle: 'Child policy, pet rules, tax VAT policies & check-in limits', icon: <Shield size={14} className="text-amber-600" /> },
     ], []);
 
-    // Load rooms & reservations dynamically
-    const allRooms = useMemo(() => getCanonicalRooms(), [isOpen, refreshKey]);
+    // Load rooms & reservations dynamically (excluding virtual unassigned buffers)
+    const allRooms = useMemo(() => getCanonicalRooms().filter(r => !isRoomUnassigned(r.number)), [isOpen, refreshKey]);
     const allReservations = useMemo(() => getAllStoredReservations(), [isOpen, refreshKey]);
+
+    // Ensure freshest reservations from Cloud DB whenever modal opens
+    useEffect(() => {
+        if (isOpen) {
+            syncReservationsFromDB().then(() => {
+                setRefreshKey(k => k + 1);
+            }).catch(() => {});
+        }
+    }, [isOpen]);
 
     // Quick Action Handlers for Reservations
     const handleViewDetails = (res: StoredReservation, mode: DrawerMode = 'overview') => {
@@ -176,15 +187,23 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
     const { matchedReservations, matchedRooms, matchedPages, matchedActions } = useMemo(() => {
         const q = query.trim().toLowerCase();
 
-        // 1. Matched Reservations
+        // 1. Matched Reservations (Comprehensive multi-attribute search including OTA Reference, Folio, Guest, Phone, Email)
         const resList = allReservations.filter(res => {
             if (!q) return true;
             const matchesGuest = (res.guestName || '').toLowerCase().includes(q);
             const matchesCode = (res.reservationNumber || '').toLowerCase().includes(q);
             const matchesRoom = String(res.roomNumber || '').toLowerCase().includes(q);
             const matchesPhone = String(res.phone || '').toLowerCase().includes(q);
+            const matchesEmail = String((res as any).email || '').toLowerCase().includes(q);
             const matchesStatus = String(res.status || '').toLowerCase().includes(q);
-            return matchesGuest || matchesCode || matchesRoom || matchesPhone || matchesStatus;
+            const rawOta = String((res as any).otaBookingReference || (res as any).channelBookingRef || (res as any).otaRef || '');
+            const parsedOta = (res as any).specialRequests ? ((res as any).specialRequests.match(/OTA-REF:\s*([^\s\.]+)/)?.[1] || (res as any).specialRequests.match(/Ref:\s*([^\s\|]+)/)?.[1] || '') : '';
+            const combinedOta = `${rawOta} ${parsedOta}`.toLowerCase();
+            const matchesOtaRef = combinedOta.includes(q);
+            const matchesSpecial = String((res as any).specialRequests || '').toLowerCase().includes(q);
+            const matchesFolio = String((res as any).folioNumber || '').toLowerCase().includes(q);
+            const matchesChannel = String((res as any).channel || (res as any).source || '').toLowerCase().includes(q);
+            return matchesGuest || matchesCode || matchesRoom || matchesPhone || matchesEmail || matchesStatus || matchesOtaRef || matchesSpecial || matchesFolio || matchesChannel;
         });
 
         // 2. Matched Rooms
@@ -386,9 +405,12 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[99990] flex items-start justify-center pt-10 sm:pt-16 px-3 sm:px-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+        <div 
+            className="fixed inset-0 z-[99990] flex items-start justify-center pt-10 sm:pt-16 px-3 sm:px-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150 cursor-pointer"
+            onClick={onClose}
+        >
             <div
-                className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[84vh] animate-in zoom-in-98 duration-150"
+                className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[84vh] animate-in zoom-in-98 duration-150 cursor-default"
                 onClick={e => e.stopPropagation()}
             >
                 {/* 1. SEARCH INPUT BAR */}
@@ -417,9 +439,25 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
                             <X size={15} />
                         </button>
                     )}
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                        ESC
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 pl-1 border-l border-slate-200/70 ml-1">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            title="Press Esc or click to exit"
+                            className="text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer active:scale-95"
+                        >
+                            ESC
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            title="Close search (Esc)"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer active:scale-95"
+                            aria-label="Close"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* 2. CATEGORY FILTER TABS (All, Reservations, Rooms, Pages, Actions) */}
@@ -557,6 +595,11 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
                                                     <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/60">
                                                         {res.reservationNumber}
                                                     </span>
+                                                    {Boolean((res as any).otaBookingReference || (res as any).channelBookingRef || (res.specialRequests?.match(/OTA-REF:\s*([^\s\.]+)/)?.[1])) && (
+                                                        <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200/80">
+                                                            OTA: {(res as any).otaBookingReference || (res as any).channelBookingRef || (res.specialRequests?.match(/OTA-REF:\s*([^\s\.]+)/)?.[1])}
+                                                        </span>
+                                                    )}
                                                     {res.vip && (
                                                         <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
                                                             VIP

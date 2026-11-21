@@ -1,16 +1,68 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { pgPool } from '../database/postgres.js';
 import { signJwt } from '../utils/jwt.js';
 
 const router = Router();
 
-function hashPassword(password: string): string {
-    return crypto.createHash('sha256').update(password).digest('hex');
+/**
+ * Strict Rate Limiter for Authentication endpoints.
+ * Prevents high-frequency automated brute-force attacks and credential stuffing.
+ */
+export const loginRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes window
+    max: 15, // Limit each IP to 15 login requests per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: 'Too many login attempts from this IP. Please try again after 15 minutes.'
+    }
+});
+
+/**
+ * Hashes a plaintext password using salted scrypt KDF.
+ * Output format: scrypt:<salt_hex>:<hash_hex>
+ */
+export function hashPassword(password: string): string {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `scrypt:${salt}:${hash}`;
+}
+
+/**
+ * Timing-safe password verification supporting modern scrypt and legacy SHA-256.
+ * Completely eliminates timing side-channel attacks and mitigates rainbow table lookups.
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+    if (!password || !storedHash) return false;
+
+    try {
+        if (storedHash.startsWith('scrypt:')) {
+            const parts = storedHash.split(':');
+            if (parts.length !== 3) return false;
+            const [, salt, expectedHash] = parts;
+            const calculatedHash = crypto.scryptSync(password, salt, 64).toString('hex');
+            const calcBuffer = Buffer.from(calculatedHash, 'hex');
+            const expBuffer = Buffer.from(expectedHash, 'hex');
+            if (calcBuffer.length !== expBuffer.length) return false;
+            return crypto.timingSafeEqual(calcBuffer, expBuffer);
+        }
+
+        // Legacy SHA-256 fallback (timing-safe constant time comparison)
+        const legacyHash = crypto.createHash('sha256').update(password).digest('hex');
+        const legacyBuffer = Buffer.from(legacyHash, 'hex');
+        const storedBuffer = Buffer.from(storedHash, 'hex');
+        if (legacyBuffer.length !== storedBuffer.length) return false;
+        return crypto.timingSafeEqual(legacyBuffer, storedBuffer);
+    } catch {
+        return false;
+    }
 }
 
 // POST /api/auth/login
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
@@ -27,6 +79,8 @@ router.post('/login', async (req: Request, res: Response) => {
             );
 
             if (result.rows.length === 0) {
+                // Timing normalization: avoid revealing whether user exists
+                verifyPassword(password, 'scrypt:00000000000000000000000000000000:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
                 return res.status(401).json({ success: false, error: 'Invalid email or password' });
             }
 
@@ -36,11 +90,19 @@ router.post('/login', async (req: Request, res: Response) => {
                 return res.status(403).json({ success: false, error: 'Account is deactivated' });
             }
 
-            const incomingHash = hashPassword(password);
-            const isValid = (incomingHash === user.password_hash);
+            const isValid = verifyPassword(password, user.password_hash);
 
             if (!isValid) {
                 return res.status(401).json({ success: false, error: 'Invalid email or password' });
+            }
+
+            // Transparent Password Hash Migration:
+            // If user logged in with legacy unsalted SHA-256, upgrade to modern salted scrypt
+            if (!user.password_hash.startsWith('scrypt:')) {
+                const upgradedHash = hashPassword(password);
+                client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [upgradedHash, user.id])
+                    .then(() => console.log(`🔒 Upgraded user ${user.id} password to modern salted scrypt.`))
+                    .catch((err) => console.warn('Failed to auto-upgrade password hash:', err?.message));
             }
 
             // Issue cryptographic HS256 JWT
@@ -77,11 +139,33 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/auth/me
+// GET /api/auth/me - Identity Inspection with Strict RBAC & IDOR Prevention
 router.get('/me', async (req: Request, res: Response) => {
     try {
-        const email = req.query.email as string;
-        if (!email) {
+        const authReq = req as any;
+        const authenticatedUser = authReq.user;
+        const requestedEmail = req.query.email as string | undefined;
+
+        // Default to the authenticated user's own identity
+        let targetEmail = authenticatedUser?.email;
+
+        // If inspecting another email, enforce super_admin / general_manager role check
+        if (requestedEmail) {
+            const cleanReqEmail = requestedEmail.trim().toLowerCase();
+            const isSelf = authenticatedUser?.email && authenticatedUser.email.toLowerCase() === cleanReqEmail;
+            const isPrivileged = authenticatedUser?.role === 'super_admin' || authenticatedUser?.role === 'general_manager';
+
+            if (isSelf || isPrivileged) {
+                targetEmail = cleanReqEmail;
+            } else {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Forbidden: Insufficient privileges to inspect another user profile'
+                });
+            }
+        }
+
+        if (!targetEmail) {
             return res.status(400).json({ success: false, error: 'User identifier required' });
         }
 
@@ -89,7 +173,7 @@ router.get('/me', async (req: Request, res: Response) => {
         try {
             const result = await client.query(
                 'SELECT id, organization_id, property_id, name, email, role, is_active, image FROM users WHERE LOWER(email) = $1 LIMIT 1;',
-                [email.toLowerCase()]
+                [targetEmail.toLowerCase()]
             );
 
             if (result.rows.length === 0) {

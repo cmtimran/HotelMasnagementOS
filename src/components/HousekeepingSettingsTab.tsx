@@ -14,12 +14,15 @@ import {
     type HousekeepingSettings,
     DEFAULT_HOUSEKEEPING_SETTINGS,
     getHousekeepingSettings,
-    saveHousekeepingSettings,
     getHousekeepersList,
     saveHousekeepersList,
+    fetchHousekeepingSettingsFromDB,
+    saveHousekeepingSettingsToDB,
+    fetchHousekeepersListFromDB,
     type Housekeeper
 } from '../utils/housekeepingSettingsEngine';
 import { toast } from '../context/ToastContext';
+import { confirmModal } from '../context/ConfirmModalContext';
 import { getActivePropertyId } from '../utils/apiUrl';
 
 interface HousekeepingSettingsTabProps {
@@ -45,16 +48,16 @@ export const HousekeepingSettingsTab: React.FC<HousekeepingSettingsTabProps> = (
     });
 
     useEffect(() => {
-        setSettings(getHousekeepingSettings(propertyId));
-        setHousekeepers(getHousekeepersList(propertyId));
+        fetchHousekeepingSettingsFromDB(propertyId).then(setSettings);
+        fetchHousekeepersListFromDB(propertyId).then(setHousekeepers);
     }, [propertyId]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         setIsSaving(true);
         try {
-            saveHousekeepingSettings(settings, propertyId);
+            await saveHousekeepingSettingsToDB(settings, propertyId);
             saveHousekeepersList(housekeepers, propertyId);
-            toast.success('Housekeeping settings and roster successfully saved.');
+            toast.success('Housekeeping settings and roster successfully saved & synced with PostgreSQL.');
             onSaveSuccess?.();
         } catch (e: any) {
             toast.error(e?.message || 'Failed to save housekeeping settings.');
@@ -63,11 +66,17 @@ export const HousekeepingSettingsTab: React.FC<HousekeepingSettingsTabProps> = (
         }
     };
 
-    const handleResetDefaults = () => {
-        if (window.confirm('Reset all housekeeping settings to recommended industry standards?')) {
-            setSettings(DEFAULT_HOUSEKEEPING_SETTINGS);
-            toast.info('Housekeeping settings reset to defaults. Click Save to persist.');
-        }
+    const handleResetDefaults = async () => {
+        const confirmed = await confirmModal({
+            title: 'Reset Housekeeping Settings?',
+            message: 'Are you sure you want to reset all housekeeping settings and credit targets to recommended industry standards?',
+            confirmText: 'Reset Defaults',
+            variant: 'warning'
+        });
+        if (!confirmed) return;
+
+        setSettings(DEFAULT_HOUSEKEEPING_SETTINGS);
+        toast.info('Housekeeping settings reset to defaults. Click Save to persist.');
     };
 
     const handleAddHousekeeper = (e: React.FormEvent) => {
@@ -681,13 +690,13 @@ export const HousekeepingSettingsTab: React.FC<HousekeepingSettingsTabProps> = (
                 </div>
             </div>
 
-            {/* 6. Room Status & Status Color Configuration (eZee / YCS Standard) */}
+            {/* 6. Room Status & Status Color Configuration (Enterprise PMS Standard) */}
             <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
                 <div className="px-5 py-3.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Palette className="w-4 h-4 text-pink-600" />
                         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                            6. Room Status Lifecycle & Color Configuration (eZee / YCS Standard)
+                            6. Room Status Lifecycle & Color Configuration (System Standard)
                         </h4>
                     </div>
                 </div>
@@ -747,7 +756,7 @@ export const HousekeepingSettingsTab: React.FC<HousekeepingSettingsTabProps> = (
                         </div>
                     </div>
 
-                    {/* Status Visual Colors (eZee Configuration >> Miscellaneous >> Status Color) */}
+                    {/* Status Visual Colors (System Configuration >> Miscellaneous >> Status Color) */}
                     <div>
                         <label className="text-xs font-bold text-slate-900 block mb-1">
                             Operational Room Status Palette (Stay View, Housekeeping Grid & Rack)

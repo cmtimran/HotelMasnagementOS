@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import { useActiveCurrency } from '../utils/currencyUtils';
+import { usePropertyLocalization } from '../utils/localizationEngine';
 
 interface AuditStep {
     id: number;
@@ -59,8 +61,9 @@ const INITIAL_STEPS: AuditStep[] = [
 ];
 
 export const NightAuditAutomation: React.FC = () => {
+    const { currencySymbol, currencyCode } = useActiveCurrency();
     const [reservations, setReservations] = useState(() => getAllStoredReservations());
-    const [rooms] = useState(() => getCanonicalRooms());
+    const [rooms, setRooms] = useState(() => getCanonicalRooms());
 
     const [businessDate, setBusinessDate] = useState<string>(() => getOperatingSystemDate());
     const [steps, setSteps] = useState<AuditStep[]>(INITIAL_STEPS);
@@ -102,6 +105,7 @@ export const NightAuditAutomation: React.FC = () => {
 
     useEffect(() => {
         const reload = () => {
+            setRooms(getCanonicalRooms());
             syncReservationsFromDB().then(res => {
                 if (res.length > 0) setReservations(res);
             }).catch(() => {});
@@ -116,34 +120,73 @@ export const NightAuditAutomation: React.FC = () => {
         return () => unsub();
     }, []);
 
-    const glPostings = useMemo<GLPosting[]>(() => {
-        const active = reservations.filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW');
-        const roomRev = active.reduce((sum, r) => sum + (Number(r.ratePerNight) || Math.round((Number(r.totalAmount) || Number(r.totalRate) || 0) / Math.max(1, Number(r.nights) || 1))), 0);
+    const revenueMetrics = useMemo(() => {
+        const active = reservations.filter(r => {
+            const s = (r.status || '').toUpperCase();
+            return s !== 'CANCELLED' && s !== 'NO_SHOW';
+        });
+
+        const activeRooms = active.length;
+        const totalRooms = rooms.length > 0 ? rooms.length : 28;
+        const occPercent = totalRooms > 0 ? ((activeRooms / totalRooms) * 100).toFixed(1) : '0.0';
+
+        const roomRev = active.reduce((sum, r) => {
+            const daily = Number(r.ratePerNight) || Number(r.rate) || (Number(r.nights) > 0 ? Math.round((Number(r.totalAmount) || Number(r.totalRate) || 0) / Number(r.nights)) : (Number(r.totalAmount) || Number(r.totalRate) || 0));
+            return sum + (daily > 0 ? daily : 0);
+        }, 0);
+
         const fnbRev = Math.round(roomRev * 0.22);
         const hkRev = Math.round(roomRev * 0.05);
-        const trnRev = active.reduce((sum, r) => {
+
+        const trnFromExtras = active.reduce((sum, r) => {
             if (Array.isArray(r.selectedExtras)) {
                 return sum + r.selectedExtras.reduce((s, e: any) => s + (Number(e.price) || 0), 0);
             }
             return sum;
         }, 0);
+        const trnRev = trnFromExtras > 0 ? trnFromExtras : (roomRev > 0 ? Math.round(roomRev * 0.03) : 0);
+
         const vatAmt = Math.round((roomRev + fnbRev) * 0.15);
         const scAmt = Math.round((roomRev + fnbRev) * 0.10);
         const totalAR = roomRev + fnbRev + hkRev + trnRev + vatAmt + scAmt;
+        const totalOperationalRev = roomRev + fnbRev + hkRev + trnRev;
 
+        const adr = activeRooms > 0 ? Math.round(roomRev / activeRooms) : 0;
+        const revpar = totalRooms > 0 ? Math.round(roomRev / totalRooms) : 0;
+
+        return {
+            active,
+            activeRooms,
+            totalRooms,
+            occPercent,
+            adr,
+            revpar,
+            roomRev,
+            fnbRev,
+            hkRev,
+            trnRev,
+            vatAmt,
+            scAmt,
+            totalAR,
+            totalOperationalRev
+        };
+    }, [reservations, rooms]);
+
+    const glPostings = useMemo<GLPosting[]>(() => {
         return [
-            { id: 1, accountCode: '10010-01', accountName: `Master Room Rent (Active ${active.length} Folios)`, debitBDT: 0, creditBDT: roomRev, department: 'Front Desk' },
-            { id: 2, accountCode: '40010-01', accountName: 'F&B Buffet Breakfast & Restaurant Sales', debitBDT: 0, creditBDT: fnbRev, department: 'Food & Beverage' },
-            { id: 3, accountCode: '60010-02', accountName: 'Laundry Valet & Housekeeping Services', debitBDT: 0, creditBDT: hkRev, department: 'Housekeeping' },
-            { id: 4, accountCode: '50020-01', accountName: 'Ancillary Add-ons & Transport Surcharge', debitBDT: 0, creditBDT: trnRev, department: 'Transportation' },
-            { id: 5, accountCode: '22010-01', accountName: 'Govt VAT 15% (Mushak-6.3 Output Tax)', debitBDT: 0, creditBDT: vatAmt, department: 'Tax Authority' },
-            { id: 6, accountCode: '22020-01', accountName: 'Hotel Service Charge Pool 10%', debitBDT: 0, creditBDT: scAmt, department: 'Tax Authority' },
-            { id: 7, accountCode: '11010-01', accountName: 'Guest Ledger Accounts Receivable (A/R)', debitBDT: totalAR, creditBDT: 0, department: 'Front Desk' }
+            { id: 1, accountCode: '10010-01', accountName: `Master Room Rent (Active ${revenueMetrics.activeRooms} Folios)`, debitBDT: 0, creditBDT: revenueMetrics.roomRev, department: 'Front Desk' },
+            { id: 2, accountCode: '40010-01', accountName: 'F&B Buffet Breakfast & Restaurant Sales', debitBDT: 0, creditBDT: revenueMetrics.fnbRev, department: 'Food & Beverage' },
+            { id: 3, accountCode: '60010-02', accountName: 'Laundry Valet & Housekeeping Services', debitBDT: 0, creditBDT: revenueMetrics.hkRev, department: 'Housekeeping' },
+            { id: 4, accountCode: '50020-01', accountName: 'Ancillary Add-ons & Transport Surcharge', debitBDT: 0, creditBDT: revenueMetrics.trnRev, department: 'Transportation' },
+            { id: 5, accountCode: '22010-01', accountName: 'Govt VAT 15% (Mushak-6.3 Output Tax)', debitBDT: 0, creditBDT: revenueMetrics.vatAmt, department: 'Tax Authority' },
+            { id: 6, accountCode: '22020-01', accountName: 'Hotel Service Charge Pool 10%', debitBDT: 0, creditBDT: revenueMetrics.scAmt, department: 'Tax Authority' },
+            { id: 7, accountCode: '11010-01', accountName: 'Guest Ledger Accounts Receivable (A/R)', debitBDT: revenueMetrics.totalAR, creditBDT: 0, department: 'Front Desk' }
         ];
-    }, [reservations]);
+    }, [revenueMetrics]);
 
     const [activeTab, setActiveTab] = useState<'pipeline' | 'gl-ledger' | 'report'>('pipeline');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const { formatTime } = usePropertyLocalization();
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -151,7 +194,7 @@ export const NightAuditAutomation: React.FC = () => {
     };
 
     const addLog = (msg: string) => {
-        const time = new Date().toLocaleTimeString('en-GB');
+        const time = formatTime(new Date());
         setAuditLogs(prev => [`[${time}] ${msg}`, ...prev]);
     };
 
@@ -520,8 +563,8 @@ export const NightAuditAutomation: React.FC = () => {
                                     <th className="px-3 py-2">Account Code</th>
                                     <th className="px-3 py-2">General Ledger Description</th>
                                     <th className="px-3 py-2">Department</th>
-                                    <th className="px-3 py-2 text-right">Debit (৳)</th>
-                                    <th className="px-3 py-2 text-right">Credit (৳)</th>
+                                    <th className="px-3 py-2 text-right">Debit ({currencySymbol})</th>
+                                    <th className="px-3 py-2 text-right">Credit ({currencySymbol})</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
@@ -537,10 +580,10 @@ export const NightAuditAutomation: React.FC = () => {
                                             {gl.department}
                                         </td>
                                         <td className="px-3 py-2 text-right font-mono text-gray-900">
-                                            {gl.debitBDT > 0 ? `৳ ${gl.debitBDT.toLocaleString()}` : '-'}
+                                            {gl.debitBDT > 0 ? `${currencySymbol} ${gl.debitBDT.toLocaleString()}` : '-'}
                                         </td>
                                         <td className="px-3 py-2 text-right font-mono text-emerald-700">
-                                            {gl.creditBDT > 0 ? `৳ ${gl.creditBDT.toLocaleString()}` : '-'}
+                                            {gl.creditBDT > 0 ? `${currencySymbol} ${gl.creditBDT.toLocaleString()}` : '-'}
                                         </td>
                                     </tr>
                                 ))}
@@ -551,10 +594,10 @@ export const NightAuditAutomation: React.FC = () => {
                                         Trial Balance Net Summary
                                     </td>
                                     <td className="px-3 py-2 text-right font-mono text-gray-900">
-                                        ৳ {totalDebits.toLocaleString()}
+                                        {currencySymbol} {totalDebits.toLocaleString()}
                                     </td>
                                     <td className="px-3 py-2 text-right font-mono text-emerald-800">
-                                        ৳ {totalCredits.toLocaleString()}
+                                        {currencySymbol} {totalCredits.toLocaleString()}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -583,15 +626,15 @@ export const NightAuditAutomation: React.FC = () => {
                             <div className="grid grid-cols-3 gap-3 bg-gray-50 p-3 rounded border border-gray-200">
                                 <div>
                                     <span className="text-[9.5px] text-gray-400 uppercase">Occupancy</span>
-                                    <p className="text-sm text-gray-900 mt-0.5">85.7% (24 / 28 Rooms)</p>
+                                    <p className="text-sm text-gray-900 mt-0.5">{revenueMetrics.occPercent}% ({revenueMetrics.activeRooms} / {revenueMetrics.totalRooms} Rooms)</p>
                                 </div>
                                 <div>
                                     <span className="text-[9.5px] text-gray-400 uppercase">Average Daily Rate (ADR)</span>
-                                    <p className="text-sm text-gray-900 font-mono mt-0.5">৳ 6,500 BDT</p>
+                                    <p className="text-sm text-gray-900 font-mono mt-0.5">{currencySymbol} {revenueMetrics.adr.toLocaleString()} {currencyCode}</p>
                                 </div>
                                 <div>
                                     <span className="text-[9.5px] text-gray-400 uppercase">RevPAR</span>
-                                    <p className="text-sm text-emerald-700 font-mono mt-0.5">৳ 5,571 BDT</p>
+                                    <p className="text-sm text-emerald-700 font-mono mt-0.5">{currencySymbol} {revenueMetrics.revpar.toLocaleString()} {currencyCode}</p>
                                 </div>
                             </div>
 
@@ -599,24 +642,24 @@ export const NightAuditAutomation: React.FC = () => {
                                 <h4 className="text-gray-900 text-xs">Revenue Breakdown</h4>
                                 <div className="border border-gray-200 rounded divide-y divide-gray-100 text-xs">
                                     <div className="p-2 flex justify-between">
-                                        <span className="text-gray-700">Room Rent (24 Rooms)</span>
-                                        <span className="font-mono text-gray-900">৳ 156,000</span>
+                                        <span className="text-gray-700">Room Rent ({revenueMetrics.activeRooms} Rooms)</span>
+                                        <span className="font-mono text-gray-900">{currencySymbol} {revenueMetrics.roomRev.toLocaleString()}</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Food & Beverage (Breakfast & Restaurant)</span>
-                                        <span className="font-mono text-gray-900">৳ 42,500</span>
+                                        <span className="font-mono text-gray-900">{currencySymbol} {revenueMetrics.fnbRev.toLocaleString()}</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Laundry & Valet Service</span>
-                                        <span className="font-mono text-gray-900">৳ 6,800</span>
+                                        <span className="font-mono text-gray-900">{currencySymbol} {revenueMetrics.hkRev.toLocaleString()}</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Airport & Transportation</span>
-                                        <span className="font-mono text-gray-900">৳ 4,500</span>
+                                        <span className="font-mono text-gray-900">{currencySymbol} {revenueMetrics.trnRev.toLocaleString()}</span>
                                     </div>
                                     <div className="p-2 flex justify-between bg-gray-50 font-bold">
                                         <span className="text-gray-900">Total Operational Revenue</span>
-                                        <span className="font-mono text-purple-700">৳ 209,800</span>
+                                        <span className="font-mono text-purple-700">{currencySymbol} {revenueMetrics.totalOperationalRev.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

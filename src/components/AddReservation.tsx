@@ -28,10 +28,14 @@ import {
     X,
     Edit3,
     Ban,
-    FileText
+    FileText,
+    MessageSquare
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import { formatIdentityDisplay } from '../utils/identityUtils';
-import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../utils/geoData';
+import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry, getAllNationalities, getAllCountries } from '../utils/geoData';
+import { SearchableSelect } from './common/SearchableSelect';
+import { PhoneInputWithCountry } from './common/PhoneInputWithCountry';
 import { useNavigation } from '../context/NavigationContext';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
 import { getCanonicalGuestProfiles } from '../utils/guestProfileEngine';
@@ -39,6 +43,12 @@ import { ChildAgeSelector } from './common/ChildAgeSelector';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
 import { MultiRoomSelectorModal } from './modals/MultiRoomSelectorModal';
 import { HoldTillModal, type HoldTillPayload } from './modals/HoldTillModal';
+import {
+    FinancialStatusStrip,
+    PaymentTenderConsole,
+    DiscountConsole,
+    SettlementBreakdownCard
+} from './reservations/shared';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -61,7 +71,6 @@ import {
     isMatchingRoomType,
     getStandardDailyRateForRoom,
     getDynamicRoomTypes,
-    calculateTariffForRatePlan,
     validateRatePlanRestrictions,
     getRoomTypeCapacity,
     getAllStoredReservations,
@@ -97,6 +106,13 @@ import {
     type TaxCalculationResult
 } from '../utils/taxCalculationEngine';
 import { isSamePhoneNumber } from '../utils/phoneUtils';
+import {
+    classifyReservation,
+        generateGroupCode,
+    generateSubBookingNumber,
+    generateFolioNumber,
+    generateRegistrationNumber
+} from '../utils/reservationNumbering';
 
 interface RoomRow {
     id: number;
@@ -123,8 +139,9 @@ interface RoomRow {
 
 interface PaymentRow {
     id: number;
-    method: 'Cash' | 'Card' | 'bKash' | 'Bank Transfer';
+    method: 'Cash' | 'Card' | 'bKash' | 'Nagad' | 'Bank Transfer' | 'Direct Billing' | string;
     amount: number;
+    reference?: string;
 }
 export const AddReservation: React.FC = () => {
     const { setActivePage } = useNavigation();
@@ -281,6 +298,31 @@ export const AddReservation: React.FC = () => {
     const [homeCountry, setHomeCountry] = useState('Bangladesh');
     const [postalCode, setPostalCode] = useState('');
 
+    const allCountryOptions = useMemo(() => {
+        return getAllCountries().map(c => ({
+            value: c.name,
+            label: c.name,
+            subLabel: `Dial: ${c.dialCode} • Code: ${c.code}`,
+            badge: c.code
+        }));
+    }, []);
+
+    const allNationalityOptions = useMemo(() => {
+        return getAllNationalities().map(n => ({
+            value: n.nationality,
+            label: n.nationality,
+            subLabel: `Country: ${n.countryName}`,
+            badge: n.code
+        }));
+    }, []);
+
+    const reservationCityOptions = useMemo(() => {
+        return getCitiesForCountry(homeCountry).map(ct => ({
+            value: ct,
+            label: ct
+        }));
+    }, [homeCountry]);
+
     // Work Details
     const [companyName, setCompanyName] = useState('');
     const [designation, setDesignation] = useState('');
@@ -317,13 +359,13 @@ export const AddReservation: React.FC = () => {
             };
         }
         const cleanP = (mobile || phone || '').replace(/[^0-9]/g, '');
-        const cleanId = idNumber.trim().toLowerCase();
+        const cleanId = String(idNumber || '').trim().toLowerCase();
         if (cleanP.length >= 8 || (cleanId && cleanId.length >= 4)) {
             const match = allKnownGuests.find(g => {
                 if (!g.isBlacklisted) return false;
                 const gPhoneClean = (g.phone || '').replace(/[^0-9]/g, '');
                 const phoneMatch = Boolean(cleanP && gPhoneClean && (cleanP.endsWith(gPhoneClean.slice(-8)) || gPhoneClean.endsWith(cleanP.slice(-8))));
-                const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.toLowerCase() === cleanId);
+                const idMatch = Boolean(cleanId && g.idNumber && String(g.idNumber || '').toLowerCase() === cleanId);
                 return phoneMatch || idMatch;
             });
             if (match) {
@@ -340,15 +382,15 @@ export const AddReservation: React.FC = () => {
     }, [selectedExistingGuest, mobile, phone, idNumber, allKnownGuests]);
 
     const filteredKnownGuests = useMemo(() => {
-        const q = (guestSearchQuery || guestName || '').toLowerCase().trim();
+        const q = String(guestSearchQuery || guestName || '').toLowerCase().trim();
         if (q.length < 2 || selectedExistingGuest) return [];
         return allKnownGuests.filter(g =>
-            g.name.toLowerCase().includes(q) ||
-            g.phone.includes(q) ||
-            (g.altPhone && g.altPhone.includes(q)) ||
-            (g.email && g.email.toLowerCase().includes(q)) ||
-            (g.idNumber && g.idNumber.toLowerCase().includes(q)) ||
-            (g.company && g.company.toLowerCase().includes(q))
+            String(g.name || '').toLowerCase().includes(q) ||
+            String(g.phone || '').includes(q) ||
+            (g.altPhone && String(g.altPhone || '').includes(q)) ||
+            (g.email && String(g.email || '').toLowerCase().includes(q)) ||
+            (g.idNumber && String(g.idNumber || '').toLowerCase().includes(q)) ||
+            (g.company && String(g.company || '').toLowerCase().includes(q))
         ).slice(0, 6);
     }, [allKnownGuests, guestSearchQuery, guestName, selectedExistingGuest]);
 
@@ -360,8 +402,8 @@ export const AddReservation: React.FC = () => {
             return gp.length >= 8 && (gp.endsWith(cleanP.slice(-8)) || cleanP.endsWith(gp.slice(-8)));
         });
         if (match && guestName.trim()) {
-            const exName = match.name.toLowerCase().trim();
-            const inName = guestName.toLowerCase().trim();
+            const exName = String(match.name || '').toLowerCase().trim();
+            const inName = String(guestName || '').toLowerCase().trim();
             if (!exName.includes(inName) && !inName.includes(exName)) {
                 return {
                     existingGuestName: match.name,
@@ -449,13 +491,12 @@ export const AddReservation: React.FC = () => {
     // ==========================================
     const [discountType, setDiscountType] = useState<'Percentage' | 'Fixed'>('Fixed');
     const [discountValue, setDiscountValue] = useState<number>(0);
-    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([
-        { id: 1, method: 'Cash', amount: 3000 }
-    ]);
-    const [keypadTargetIndex, setKeypadTargetIndex] = useState<number>(0);
+    const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
 
     // Success State
     const [createdReservation, setCreatedReservation] = useState<any | null>(null);
+    const [isDispatchingVoucher, setIsDispatchingVoucher] = useState<{ whatsapp: boolean; email: boolean }>({ whatsapp: false, email: false });
+    const [dispatchedVouchers, setDispatchedVouchers] = useState<{ whatsapp: boolean; email: boolean }>({ whatsapp: false, email: false });
 
     // Room Add-On Services (Full Bundle) State
     const [serviceModalConfig, setServiceModalConfig] = useState<{
@@ -518,9 +559,10 @@ export const AddReservation: React.FC = () => {
             if ((found as any).taxConfigId) setSelectedTaxConfigId((found as any).taxConfigId);
 
             // Step 1: Rooms List
+            const foundRoomTypeLower = String(found.roomType || '').toLowerCase();
             const isConnRes = Boolean(
                 found.isConnectingSuite ||
-                (found.roomType && (found.roomType.toLowerCase().includes('connecting') || found.roomType.toLowerCase().includes('interconnecting')))
+                (foundRoomTypeLower && (foundRoomTypeLower.includes('connecting') || foundRoomTypeLower.includes('interconnecting')))
             );
 
             if (isConnRes) {
@@ -697,6 +739,23 @@ export const AddReservation: React.FC = () => {
         return roomsList.find(r => r.id === serviceModalConfig.rowId);
     }, [roomsList, serviceModalConfig.rowId]);
 
+    const {
+        availableRatePlans,
+        availablePackages,
+        calculateRoomRate,
+        validateAllRoomRestrictions,
+        getStayHolidaySummary,
+        getOfferValue,
+        resolveOfferSelection,
+        validatePackageRestrictions
+    } = useReservationBookingEngine();
+
+    const holidaySummary = useMemo(() => {
+        const totalA = roomsList.reduce((acc, r) => acc + (r.adults || 1), 0);
+        const totalC = roomsList.reduce((acc, r) => acc + (r.children || 0), 0);
+        return getStayHolidaySummary(checkIn, nights, totalA, totalC);
+    }, [getStayHolidaySummary, checkIn, nights, roomsList]);
+
     // Calculations
     const nightMultiplier = dayUse ? 1 : Math.max(1, nights);
     const roomBaseTotal = roomsList.reduce((acc, r) => acc + (r.rate * r.roomsCount * getRowNights(r)), 0);
@@ -715,8 +774,9 @@ export const AddReservation: React.FC = () => {
     const totalSpaCharge = roomsList.reduce((acc, r) => acc + getSpaWellnessTotal(r.servicesBundle?.spaWellness), 0);
     const totalTimingCharge = roomsList.reduce((acc, r) => acc + getTimingFlexTotal(r.servicesBundle?.timingFlex), 0);
     const totalCustomCharge = roomsList.reduce((acc, r) => acc + getCustomAddonsTotal(r.servicesBundle?.customAddons, getRowNights(r)), 0);
+    const totalGalaDinnerCharge = holidaySummary.hasGalaDinner ? holidaySummary.totalGalaFee : 0;
 
-    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge;
+    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge + totalGalaDinnerCharge;
     const grossTotal = roomBaseTotal + totalAllAddonsCharges;
 
     const discountedAmount = discountType === 'Percentage'
@@ -734,16 +794,6 @@ export const AddReservation: React.FC = () => {
     const totalDue = Math.max(0, finalPayable - totalPaid);
 
     const [pmsSyncVersion, setPmsSyncVersion] = useState(0);
-
-    const {
-        availableRatePlans,
-        availablePackages,
-        calculateRoomRate,
-        validateAllRoomRestrictions,
-        getOfferValue,
-        resolveOfferSelection,
-        validatePackageRestrictions
-    } = useReservationBookingEngine();
 
     // Connecting Suites from connecting_rooms table and localStorage
     const [connectingSuites, setConnectingSuites] = useState<ConnectingSuite[]>(() => getStoredConnectingSuites(getActivePropertyId()));
@@ -792,7 +842,7 @@ export const AddReservation: React.FC = () => {
             const usedInForm = new Set<string>();
 
             const updated = prev.map(row => {
-                if (activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase())) {
+                if (activeConnectingSuites.some(s => String(s?.name || '').trim().toLowerCase() === String(row?.roomType || '').trim().toLowerCase())) {
                     (row.assignedRooms || [row.roomNumber]).forEach(rn => usedInForm.add(String(rn)));
                     return row;
                 }
@@ -866,7 +916,8 @@ export const AddReservation: React.FC = () => {
 
     // Total inventory free for this type in the hotel (before any form selection)
     const getTotalInventoryForType = (typeName: string): number => {
-        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        const targetTypeLower = String(typeName || '').trim().toLowerCase();
+        const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === targetTypeLower);
         if (suite) {
             const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
             if (suiteRooms.length === 0) return 0;
@@ -883,9 +934,10 @@ export const AddReservation: React.FC = () => {
 
     // Rooms of this type already allocated across ALL rows in this form
     const getAllocatedCountForType = (typeName: string): number => {
-        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        const targetTypeLower = String(typeName || '').trim().toLowerCase();
+        const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === targetTypeLower);
         if (suite) {
-            return roomsList.filter(r => r.roomType.trim().toLowerCase() === typeName.trim().toLowerCase()).length;
+            return roomsList.filter(r => String(r?.roomType || '').trim().toLowerCase() === targetTypeLower).length;
         }
         return roomsList
             .filter(r => isMatchingRoomType(r.roomType, typeName))
@@ -894,12 +946,13 @@ export const AddReservation: React.FC = () => {
 
     // Rooms of this type allocated in OTHER rows (excluding currentRowId)
     const getAllocatedCountInOtherRows = (typeName: string, currentRowId?: number): number => {
-        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        const targetTypeLower = String(typeName || '').trim().toLowerCase();
+        const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === targetTypeLower);
         if (suite) {
             const suiteRooms = new Set(suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String));
             const conflict = roomsList.some(r => {
                 if (r.id === currentRowId) return false;
-                if (r.roomType.trim().toLowerCase() === typeName.trim().toLowerCase()) return true;
+                if (String(r?.roomType || '').trim().toLowerCase() === targetTypeLower) return true;
                 const assigned = r.assignedRooms && r.assignedRooms.length > 0 ? r.assignedRooms : [r.roomNumber];
                 return assigned.some(rm => suiteRooms.has(String(rm)));
             });
@@ -936,7 +989,7 @@ export const AddReservation: React.FC = () => {
 
     // Helper to get auto-allocated physical room numbers for a given row based on its roomsCount
     const getAutoAssignedRoomsForRow = (row: RoomRow): string[] => {
-        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+        const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === String(row?.roomType || '').trim().toLowerCase());
         if (suite) {
             const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
             if (suiteRooms.length > 0) return suiteRooms;
@@ -1100,7 +1153,16 @@ export const AddReservation: React.FC = () => {
                         toast.warning(restriction.reason || 'Selected rate plan has restrictions for this stay duration.');
                     }
                     const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
-                    const newRate = calculateTariffForRatePlan(planName, r.roomType, standardRate, r.adults, r.children, availableRatePlans);
+                    const newRate = calculateRoomRate({
+                        roomType: r.roomType,
+                        ratePlan: planName,
+                        packageId: r.packageId,
+                        adults: r.adults,
+                        children: r.children,
+                        baseRate: standardRate,
+                        nights: getRowNights(r),
+                        checkInDate: checkIn
+                    });
                     return {
                         ...r,
                         ratePlan: planName,
@@ -1122,7 +1184,8 @@ export const AddReservation: React.FC = () => {
                         adults: newAdults,
                         children: r.children,
                         baseRate: standardRate,
-                        nights
+                        nights: getRowNights(r),
+                        checkInDate: checkIn
                     });
                     return {
                         ...r,
@@ -1145,7 +1208,8 @@ export const AddReservation: React.FC = () => {
                         adults: r.adults,
                         children: newChildren,
                         baseRate: standardRate,
-                        nights
+                        nights: getRowNights(r),
+                        checkInDate: checkIn
                     });
                     return {
                         ...r,
@@ -1155,7 +1219,7 @@ export const AddReservation: React.FC = () => {
                 }
                 if (field === 'roomType') {
                     const newTypeName = String(value);
-                    const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === newTypeName.trim().toLowerCase());
+                    const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === newTypeName.trim().toLowerCase());
                     if (suite) {
                         const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
                         const otherUsed = new Set<string>();
@@ -1247,7 +1311,8 @@ export const AddReservation: React.FC = () => {
                         adults: clampedAdults,
                         children: clampedChildren,
                         baseRate: standardRate,
-                        nights
+                        nights: getRowNights(r),
+                        checkInDate: checkIn
                     });
                     return {
                         ...r,
@@ -1271,7 +1336,8 @@ export const AddReservation: React.FC = () => {
                         adults: r.adults,
                         children: r.children,
                         baseRate: standardRate,
-                        nights
+                        nights: getRowNights(r),
+                        checkInDate: checkIn
                     });
                     return {
                         ...r,
@@ -1281,7 +1347,7 @@ export const AddReservation: React.FC = () => {
                     };
                 }
                 if (field === 'roomsCount') {
-                    const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
+                    const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === String(r?.roomType || '').trim().toLowerCase());
                     if (suite) {
                         toast.info(`${suite.name} is a 1-unit interconnecting suite.`);
                         return {
@@ -1346,39 +1412,28 @@ export const AddReservation: React.FC = () => {
         });
     };
 
-    // Payment Handlers
+    // Payment Handlers (Functional & Atomic to eliminate state loss)
     const handleAddPaymentRow = () => {
-        const nextId = paymentRows.length > 0 ? Math.max(...paymentRows.map(p => p.id)) + 1 : 1;
-        setPaymentRows([...paymentRows, { id: nextId, method: 'Cash', amount: totalDue }]);
+        setPaymentRows(prev => {
+            const nextId = prev.length > 0 ? Math.max(...prev.map(p => p.id)) + 1 : 1;
+            const currentPaid = prev.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const remainingDue = Math.max(0, Number((finalPayable - currentPaid).toFixed(2)));
+            return [...prev, { id: nextId, method: 'Cash', amount: remainingDue }];
+        });
     };
 
     const handleRemovePaymentRow = (id: number) => {
-        if (paymentRows.length === 1) return;
-        setPaymentRows(paymentRows.filter(p => p.id !== id));
+        setPaymentRows(prev => prev.filter(p => p.id !== id));
     };
 
-    const updatePaymentRow = (id: number, field: keyof PaymentRow, value: any) => {
-        setPaymentRows(paymentRows.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
-    // Keypad Handler
-    const handleKeypadPress = (val: string) => {
-        const currentTarget = paymentRows[keypadTargetIndex] || paymentRows[0];
-        if (!currentTarget) return;
-
-        let currentStr = String(currentTarget.amount || '');
-        if (val === 'CLEAR') {
-            updatePaymentRow(currentTarget.id, 'amount', 0);
-        } else if (val === 'BACK') {
-            const trimmed = currentStr.slice(0, -1);
-            updatePaymentRow(currentTarget.id, 'amount', Number(trimmed) || 0);
-        } else if (val === 'FULL') {
-            updatePaymentRow(currentTarget.id, 'amount', finalPayable);
-        } else {
-            if (currentStr === '0') currentStr = '';
-            const newStr = currentStr + val;
-            updatePaymentRow(currentTarget.id, 'amount', Number(newStr));
-        }
+    const updatePaymentRow = (id: number, fieldOrUpdates: keyof PaymentRow | Partial<PaymentRow>, value?: any) => {
+        setPaymentRows(prev => prev.map(p => {
+            if (p.id !== id) return p;
+            if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
+                return { ...p, ...fieldOrUpdates };
+            }
+            return { ...p, [fieldOrUpdates as keyof PaymentRow]: value };
+        }));
     };
 
     // Save Reservation with Atomic Pre-Commit Validation Guard
@@ -1429,7 +1484,7 @@ export const AddReservation: React.FC = () => {
         const rowAllocatedMap = new Map<number, string[]>();
 
         for (const r of roomsList) {
-            const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
+            const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === String(r?.roomType || '').trim().toLowerCase());
             if (suite) {
                 const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
                 const conflict = suiteRooms.find(rm => usedRoomsAcrossBooking.has(rm));
@@ -1497,7 +1552,7 @@ export const AddReservation: React.FC = () => {
         }
 
         const hasConnectingSuite = roomsList.some(r =>
-            activeConnectingSuites.some(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase())
+            activeConnectingSuites.some(s => String(s?.name || '').trim().toLowerCase() === String(r?.roomType || '').trim().toLowerCase())
         );
         const isConnectingSuite = hasConnectingSuite && roomsList.length === 1 && totalRoomsCount === 1;
 
@@ -1506,12 +1561,107 @@ export const AddReservation: React.FC = () => {
             ? allocatedRoomNumbers.join(' + ')
             : (allocatedRoomNumbers[0] || mainRoom.roomNumber);
 
+        // Pre-expand rooms for deterministic Stay Classification
+        const expandedRoomsForClassification = roomsList.flatMap((r) => {
+            const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === String(r?.roomType || '').trim().toLowerCase());
+            if (suite) {
+                const assigned = rowAllocatedMap.get(r.id) || r.assignedRooms || suite.componentRooms.flatMap(c => c.roomNumbers || []);
+                return [{
+                    roomNumber: assigned.join(' + '),
+                    checkInDate: r.checkInDate || checkIn,
+                    checkOutDate: r.checkOutDate || checkOut,
+                    nights: r.nights || Math.max(1, nights)
+                }];
+            }
+            const countNeeded = Number(r.roomsCount) || 1;
+            const assigned = rowAllocatedMap.get(r.id) || (
+                (r.assignedRooms && r.assignedRooms.length === countNeeded) ? r.assignedRooms : [r.roomNumber]
+            );
+            return assigned.map(rm => {
+                const dateConf = r.roomDatesMap?.[rm];
+                return {
+                    roomNumber: rm,
+                    checkInDate: dateConf?.checkIn || r.checkInDate || checkIn,
+                    checkOutDate: dateConf?.checkOut || r.checkOutDate || checkOut,
+                    nights: dateConf?.nights || r.nights || Math.max(1, nights)
+                };
+            });
+        });
+
+        const stayType = classifyReservation({
+            isConnectingSuite,
+            isGroup: isConnectingSuite ? false : (totalRoomsCount > 1),
+            groupCode: editingReservation?.groupCode,
+            roomNumber: primaryRoomNumber,
+            roomType: mainRoom.roomType,
+            allocatedRooms: allocatedRoomNumbers,
+            roomsCount: isConnectingSuite ? 1 : totalRoomsCount,
+            roomsList: expandedRoomsForClassification
+        });
+
+        const isGroupBooking = stayType === 'GROUP';
+        const isSplitStayBooking = stayType === 'SPLIT_STAY';
+        const resolvedGroupCode = isGroupBooking 
+            ? (editingReservation?.groupCode || generateGroupCode(checkIn)) 
+            : undefined;
+
+        let roomSeqCounter = 0;
+        const processedRoomsList = roomsList.flatMap((r) => {
+            const suite = activeConnectingSuites.find(s => String(s?.name || '').trim().toLowerCase() === String(r?.roomType || '').trim().toLowerCase());
+            if (suite) {
+                const assigned = rowAllocatedMap.get(r.id) || r.assignedRooms || suite.componentRooms.flatMap(c => c.roomNumbers || []);
+                const subNo = generateSubBookingNumber(reservationNumber, 0, stayType);
+                const folNo = generateFolioNumber(reservationNumber, 0, stayType);
+                const regNo = generateRegistrationNumber(reservationNumber, 0, stayType);
+                return [{
+                    ...r,
+                    roomsCount: 1,
+                    roomNumber: assigned.join(' + '),
+                    assignedRooms: assigned,
+                    checkInDate: r.checkInDate || checkIn,
+                    checkOutDate: r.checkOutDate || checkOut,
+                    nights: r.nights || Math.max(1, nights),
+                    subBookingNumber: subNo,
+                    folioNumber: folNo,
+                    registrationNumber: regNo
+                }];
+            }
+            const countNeeded = Number(r.roomsCount) || 1;
+            const assigned = rowAllocatedMap.get(r.id) || (
+                (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                    ? r.assignedRooms
+                    : [r.roomNumber]
+            );
+            return assigned.map(rm => {
+                const dateConf = r.roomDatesMap?.[rm];
+                const currentIndex = roomSeqCounter++;
+                const subNo = generateSubBookingNumber(reservationNumber, currentIndex, stayType);
+                const folNo = generateFolioNumber(reservationNumber, currentIndex, stayType);
+                const regNo = generateRegistrationNumber(reservationNumber, currentIndex, stayType);
+                return {
+                    ...r,
+                    roomsCount: 1,
+                    roomNumber: rm,
+                    assignedRooms: [rm],
+                    checkInDate: dateConf?.checkIn || r.checkInDate || checkIn,
+                    checkOutDate: dateConf?.checkOut || r.checkOutDate || checkOut,
+                    nights: dateConf?.nights || r.nights || Math.max(1, nights),
+                    subBookingNumber: subNo,
+                    folioNumber: folNo,
+                    registrationNumber: regNo
+                };
+            });
+        });
+
         const newReservation = {
             id: reservationId,
             reservationNumber,
-            registrationNumber: statusVal === 'in-house' ? (editingReservation?.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : editingReservation?.registrationNumber,
-            folioNumber: editingReservation?.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`,
-            groupCode: isConnectingSuite ? undefined : (editingReservation?.groupCode || (totalRoomsCount > 1 ? `GRP-${reservationNumber.replace(/^RES-/, '')}` : undefined)),
+            registrationNumber: statusVal === 'in-house' 
+                ? (editingReservation?.registrationNumber || generateRegistrationNumber(reservationNumber, 0, stayType)) 
+                : editingReservation?.registrationNumber,
+            folioNumber: editingReservation?.folioNumber || generateFolioNumber(reservationNumber, 0, stayType, isGroupBooking),
+            groupCode: resolvedGroupCode,
+            stayType,
             guestId: selectedExistingGuest?.id,
             guestName: `${salutation} ${guestName.trim()}`,
             phone: mobile || phone,
@@ -1529,7 +1679,8 @@ export const AddReservation: React.FC = () => {
             checkIn: groupHorizon.hasCustomDates ? groupHorizon.minIn : checkIn,
             checkOut: groupHorizon.hasCustomDates ? groupHorizon.maxOut : checkOut,
             nights: groupHorizon.hasCustomDates ? groupHorizon.spanNights : nights,
-            isGroup: isConnectingSuite ? false : (totalRoomsCount > 1),
+            isGroup: isGroupBooking,
+            isSplitStay: isSplitStayBooking,
             isConnectingSuite,
             staggeredDates: groupHorizon.hasCustomDates,
             dayUse,
@@ -1550,6 +1701,8 @@ export const AddReservation: React.FC = () => {
             totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
             dueAmount: actionType === 'hold' ? finalPayable : totalDue,
+            paymentRows: paymentRows,
+            advancePayments: paymentRows,
             taxApplicable,
             taxConfigId: selectedTaxConfigId,
             taxConfigName: taxCalculation.configName,
@@ -1584,39 +1737,7 @@ export const AddReservation: React.FC = () => {
             idIssueCountry,
             idIssuePlace,
             specialRequests: remarksMap['Guest'] || '',
-            roomsList: roomsList.flatMap((r) => {
-                const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
-                if (suite) {
-                    const assigned = rowAllocatedMap.get(r.id) || r.assignedRooms || suite.componentRooms.flatMap(c => c.roomNumbers || []);
-                    return [{
-                        ...r,
-                        roomsCount: 1,
-                        roomNumber: assigned.join(' + '),
-                        assignedRooms: assigned,
-                        checkInDate: r.checkInDate || checkIn,
-                        checkOutDate: r.checkOutDate || checkOut,
-                        nights: r.nights || Math.max(1, nights)
-                    }];
-                }
-                const countNeeded = Number(r.roomsCount) || 1;
-                const assigned = rowAllocatedMap.get(r.id) || (
-                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
-                        ? r.assignedRooms
-                        : [r.roomNumber]
-                );
-                return assigned.map(rm => {
-                    const dateConf = r.roomDatesMap?.[rm];
-                    return {
-                        ...r,
-                        roomsCount: 1,
-                        roomNumber: rm,
-                        assignedRooms: [rm],
-                        checkInDate: dateConf?.checkIn || r.checkInDate || checkIn,
-                        checkOutDate: dateConf?.checkOut || r.checkOutDate || checkOut,
-                        nights: dateConf?.nights || r.nights || Math.max(1, nights)
-                    };
-                });
-            }),
+            roomsList: processedRoomsList,
             servicesBundle: mainRoom.servicesBundle || { extraBed: mainRoom.extraBed, pickup: mainRoom.pickup },
             extraBed: mainRoom.servicesBundle?.extraBed || mainRoom.extraBed || null,
             pickup: mainRoom.servicesBundle?.pickup || mainRoom.pickup || null,
@@ -1734,11 +1855,11 @@ export const AddReservation: React.FC = () => {
             const inputCleanId = (idNumber || '').trim().toLowerCase();
 
             const existingIdx = selectedExistingGuest
-                ? profiles.findIndex(p => String(p.id) === String(selectedExistingGuest.id) || (p.name && p.name.trim().toLowerCase() === selectedExistingGuest.name.trim().toLowerCase()))
+                ? profiles.findIndex(p => String(p.id) === String(selectedExistingGuest.id) || (p.name && String(p.name).trim().toLowerCase() === String(selectedExistingGuest.name || '').trim().toLowerCase()))
                 : profiles.findIndex(p => {
-                    const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
-                    const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
-                    const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
+                    const nameMatch = Boolean(cleanName && p.name && String(p.name).trim().toLowerCase() === cleanName.toLowerCase());
+                    const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === String(p.idNumber).trim().toLowerCase());
+                    const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === String(p.email).trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
                     const phoneMatch = Boolean((mobile || phone) && isSamePhoneNumber(mobile || phone, p.phone));
                     if ((phoneMatch || emailMatch) && !nameMatch) return false;
                     return nameMatch || idMatch;
@@ -1853,6 +1974,46 @@ export const AddReservation: React.FC = () => {
                             : `Reservation ${reservationNumber} saved as Reserve (Non-Guaranteed)!`
         );
         setCreatedReservation(newReservation);
+        setDispatchedVouchers({ whatsapp: false, email: false });
+    };
+
+    const handleManualDispatchConfirmation = async (channel: 'whatsapp' | 'email') => {
+        if (!createdReservation) return;
+        setIsDispatchingVoucher(prev => ({ ...prev, [channel]: true }));
+        try {
+            const token = localStorage.getItem('token');
+            const targetPhone = createdReservation.phone || mobile;
+            const targetEmail = createdReservation.email || email;
+
+            const res = await fetch(`${getApiBaseUrl()}/api/bookings/${createdReservation.id || createdReservation.reservationNumber}/send-confirmation`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                    'x-property-id': String(activeProperty?.id || getActivePropertyId() || 1)
+                },
+                body: JSON.stringify({
+                    phone: targetPhone,
+                    email: targetEmail,
+                    channels: {
+                        whatsapp: channel === 'whatsapp',
+                        email: channel === 'email'
+                    }
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setDispatchedVouchers(prev => ({ ...prev, [channel]: true }));
+                toast.success(`${channel === 'whatsapp' ? 'WhatsApp Voucher' : 'Email Confirmation'} dispatched successfully!`);
+            } else {
+                toast.error(data.error || 'Failed to dispatch confirmation.');
+            }
+        } catch (err: any) {
+            console.error('Confirmation dispatch error:', err);
+            toast.error('Network error dispatching voucher.');
+        } finally {
+            setIsDispatchingVoucher(prev => ({ ...prev, [channel]: false }));
+        }
     };
 
     const resetForm = () => {
@@ -2073,6 +2234,7 @@ export const AddReservation: React.FC = () => {
                                             dayUse={dayUse}
                                             onDateChange={(newIn, newOut, newNights) => {
                                                 setCheckIn(newIn);
+                                                const targetNights = dayUse ? 0 : newNights;
                                                 if (dayUse) {
                                                     setCheckOut(newIn);
                                                     setNights(0);
@@ -2080,6 +2242,24 @@ export const AddReservation: React.FC = () => {
                                                     setCheckOut(newOut);
                                                     setNights(newNights);
                                                 }
+                                                // Dynamic Holiday & Peak Tariff Recalculation across all room rows
+                                                setRoomsList(prev => prev.map(r => {
+                                                    const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
+                                                    const recalcedRate = calculateRoomRate({
+                                                        roomType: r.roomType,
+                                                        ratePlan: r.ratePlan,
+                                                        packageId: r.packageId,
+                                                        adults: r.adults,
+                                                        children: r.children,
+                                                        baseRate: standardRate,
+                                                        nights: targetNights || 1,
+                                                        checkInDate: newIn
+                                                    });
+                                                    return {
+                                                        ...r,
+                                                        rate: recalcedRate
+                                                    };
+                                                }));
                                             }}
                                             label="Stay Period (Check In - Check Out)"
                                         />
@@ -2172,6 +2352,37 @@ export const AddReservation: React.FC = () => {
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* Active Holiday & Festive Surge Alert Banner */}
+                                {holidaySummary.hasHoliday && (
+                                    <div className={`p-2.5 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 border transition-all ${holidaySummary.hasSurge
+                                        ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-2xs'
+                                        : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-950 shadow-2xs'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base select-none">🎉</span>
+                                            <div>
+                                                <span className="font-bold">{holidaySummary.activeHolidays.join(', ')}</span>
+                                                {holidaySummary.hasSurge && (
+                                                    <span className="ml-2 text-[10.5px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded">
+                                                        ⚡ +{Math.round((holidaySummary.maxMultiplier - 1) * 100)}% Peak Surge Active
+                                                    </span>
+                                                )}
+                                                {holidaySummary.hasGalaDinner && (
+                                                    <span className="ml-2 text-[10.5px] font-bold text-fuchsia-800 bg-fuchsia-100/90 border border-fuchsia-300 px-1.5 py-0.5 rounded">
+                                                        🍽️ Mandatory Gala Dinner Included
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {holidaySummary.isMlosViolated && (
+                                            <span className="text-[11px] font-bold text-rose-800 bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                                <span>⚠️</span>
+                                                <span>Min {holidaySummary.mlosRequiredNights} Nights Stay Policy Required</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Options Row */}
                                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80">
@@ -2358,7 +2569,7 @@ export const AddReservation: React.FC = () => {
                                                     </td>
                                                     <td className="p-1.5 text-center">
                                                         {(() => {
-                                                            const isConnectingSuite = activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+                                                            const isConnectingSuite = activeConnectingSuites.some(s => String(s?.name || '').trim().toLowerCase() === String(row?.roomType || '').trim().toLowerCase());
                                                             if (isConnectingSuite) {
                                                                 return (
                                                                     <div className="flex items-center justify-center">
@@ -2420,11 +2631,15 @@ export const AddReservation: React.FC = () => {
                                                                     className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800"
                                                                     title="Select Rate Plan or Bundled Stay Package"
                                                                 >
-                                                                    <optgroup label="── 🏷️ Rate Plans ──">
-                                                                        {availableRatePlans.length === 0 ? (
-                                                                            <option value="" disabled>No rate plans configured</option>
-                                                                        ) : (
-                                                                            availableRatePlans.map(p => {
+                                                                    <optgroup label="── 📋 Standard Direct Rate ──">
+                                                                        <option value="direct:Direct Standard Room Rate (Rack Rate)">
+                                                                            🏷️ Direct Standard Room Rate (Rack Rate)
+                                                                        </option>
+                                                                    </optgroup>
+
+                                                                    {availableRatePlans.length > 0 && (
+                                                                        <optgroup label="── 🏷️ Rate Plans ──">
+                                                                            {availableRatePlans.map((p: any) => {
                                                                                 const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
                                                                                 const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
                                                                                 return (
@@ -2432,22 +2647,29 @@ export const AddReservation: React.FC = () => {
                                                                                         🏷️ {p.name}{badge}
                                                                                     </option>
                                                                                 );
-                                                                            })
-                                                                        )}
-                                                                    </optgroup>
+                                                                            })}
+                                                                        </optgroup>
+                                                                    )}
 
-                                                                    {availablePackages.filter(p => !p.status || p.status === 'Active').length > 0 && (
+                                                                    {availablePackages.filter(p => {
+                                                                        if (p.status && p.status !== 'Active') return false;
+                                                                        const applicable = p.roomConfig?.applicableRoomTypes;
+                                                                        if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                        return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(row?.roomType || '').toLowerCase());
+                                                                    }).length > 0 && (
                                                                         <optgroup label="── 🎁 Bundled Packages ──">
                                                                             {availablePackages
-                                                                                .filter(p => !p.status || p.status === 'Active')
-                                                                                .map(p => {
+                                                                                .filter(p => {
+                                                                                    if (p.status && p.status !== 'Active') return false;
                                                                                     const applicable = p.roomConfig?.applicableRoomTypes;
-                                                                                    const isApplicable = !applicable || !Array.isArray(applicable) || applicable.length === 0 || applicable.some((t: string) => t.toLowerCase() === 'all' || t.toLowerCase() === row.roomType.toLowerCase());
-                                                                                    const roomTypeNote = (!isApplicable && applicable && applicable.length > 0) ? ` (${applicable[0]})` : '';
+                                                                                    if (!applicable || !Array.isArray(applicable) || applicable.length === 0) return true;
+                                                                                    return applicable.some((t: any) => String(t || '').toLowerCase() === 'all' || String(t || '').toLowerCase() === String(row?.roomType || '').toLowerCase());
+                                                                                })
+                                                                                .map(p => {
                                                                                     const surchargeText = p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : '';
                                                                                     return (
                                                                                         <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
-                                                                                            🎁 {p.name}{roomTypeNote}{surchargeText}
+                                                                                            🎁 {p.name}{surchargeText}
                                                                                         </option>
                                                                                     );
                                                                                 })
@@ -2532,7 +2754,7 @@ export const AddReservation: React.FC = () => {
                                                             }
 
                                                             // Connecting suite display mode
-                                                            const isConnectingSuite = activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+                                                            const isConnectingSuite = activeConnectingSuites.some(s => String(s?.name || '').trim().toLowerCase() === String(row?.roomType || '').trim().toLowerCase());
                                                             if (isConnectingSuite) {
                                                                 const suiteRoomsStr = (row.assignedRooms && row.assignedRooms.length > 0)
                                                                     ? row.assignedRooms.join(' + ')
@@ -3096,17 +3318,17 @@ export const AddReservation: React.FC = () => {
                                     {/* Tab 1: Identity & Contact */}
                                     {step2Tab === 'profile' && (
                                         <div className="space-y-2.5 animate-in fade-in duration-100">
-                                            {/* Row 1: Name, Phone, Mobile, Email */}
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                                                <div className="flex flex-col gap-0.5">
+                                            {/* Row 1: Name, Mobile, Email, Phone - Responsive Grid */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 min-w-0">
+                                                <div className="flex flex-col gap-0.5 min-w-0">
                                                     <label className="text-[10px] font-semibold text-gray-700 flex items-center justify-between">
                                                         <span>FULL LEGAL NAME <span className="text-red-500">*</span></span>
                                                     </label>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex gap-1 min-w-0">
                                                         <select
                                                             value={salutation}
                                                             onChange={e => setSalutation(e.target.value)}
-                                                            className="w-16 h-7 px-1 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium"
+                                                            className="w-14 h-7 px-1 border border-gray-200 rounded text-[11px] bg-slate-50 hover:bg-slate-100 outline-none cursor-pointer font-medium shrink-0"
                                                         >
                                                             <option value="Mr">Mr.</option>
                                                             <option value="Ms">Ms.</option>
@@ -3115,7 +3337,7 @@ export const AddReservation: React.FC = () => {
                                                             <option value="Engr">Engr.</option>
                                                             <option value="Prof">Prof.</option>
                                                         </select>
-                                                        <div className="relative flex-1">
+                                                        <div className="relative flex-1 min-w-0">
                                                             <input
                                                                 type="text"
                                                                 name="reservation_guest_name_lookup"
@@ -3147,7 +3369,7 @@ export const AddReservation: React.FC = () => {
                                                                     }
                                                                 }}
                                                                 onBlur={() => setTimeout(() => setIsGuestSearchOpen(false), 250)}
-                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
+                                                                className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
                                                             />
 
                                                             {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
@@ -3165,12 +3387,12 @@ export const AddReservation: React.FC = () => {
                                                                         >
                                                                             <div className="flex items-center gap-2.5 min-w-0">
                                                                                 <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
-                                                                                    {g.name.slice(0, 2).toUpperCase()}
+                                                                                    {String(g?.name || 'G').slice(0, 2).toUpperCase()}
                                                                                 </div>
                                                                                 <div className="min-w-0">
                                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                                         <span className="font-bold text-gray-900 text-[11.5px] truncate">
-                                                                                            {g.title && !g.name.toLowerCase().startsWith(g.title.toLowerCase()) ? `${g.title} ` : ''}{g.name}
+                                                                                            {g?.title && !String(g?.name || '').toLowerCase().startsWith(String(g?.title || '').toLowerCase()) ? `${g.title} ` : ''}{g?.name}
                                                                                         </span>
                                                                                         <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
                                                                                             {g.vipTier}
@@ -3199,27 +3421,21 @@ export const AddReservation: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="flex flex-col gap-0.5">
+                                                <div className="flex flex-col gap-0.5 min-w-0">
                                                     <label className="text-[10px] font-semibold text-gray-700">
                                                         MOBILE NUMBER <span className="text-red-500">*</span>
                                                     </label>
-                                                    <input
-                                                        type="text"
-                                                        name="pms_add_guest_mobile_query"
-                                                        autoComplete="one-time-code"
-                                                        autoCorrect="off"
-                                                        spellCheck={false}
-                                                        data-lpignore="true"
-                                                        data-1p-ignore="true"
-                                                        data-form-type="other"
-                                                        placeholder="+880 1711-000000"
+                                                    <PhoneInputWithCountry
+                                                        compact={true}
                                                         value={mobile}
-                                                        onChange={e => setMobile(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-mono"
+                                                        onChange={val => setMobile(val)}
+                                                        defaultCountryCode="BD"
+                                                        placeholder="1711-000000"
+                                                        name="pms_add_guest_mobile_query"
                                                     />
                                                 </div>
 
-                                                <div className="flex flex-col gap-0.5">
+                                                <div className="flex flex-col gap-0.5 min-w-0">
                                                     <label className="text-[10px] font-semibold text-gray-700">EMAIL ADDRESS</label>
                                                     <input
                                                         type="email"
@@ -3233,25 +3449,19 @@ export const AddReservation: React.FC = () => {
                                                         placeholder="guest@example.com"
                                                         value={email}
                                                         onChange={e => setEmail(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
                                                     />
                                                 </div>
 
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">PHONE</label>
-                                                    <input
-                                                        type="text"
-                                                        name="pms_add_guest_phone_query"
-                                                        autoComplete="one-time-code"
-                                                        autoCorrect="off"
-                                                        spellCheck={false}
-                                                        data-lpignore="true"
-                                                        data-1p-ignore="true"
-                                                        data-form-type="other"
-                                                        placeholder="Alternative contact..."
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <label className="text-[10px] font-semibold text-gray-700">PHONE / LANDLINE</label>
+                                                    <PhoneInputWithCountry
+                                                        compact={true}
                                                         value={phone}
-                                                        onChange={e => setPhone(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        onChange={val => setPhone(val)}
+                                                        defaultCountryCode="BD"
+                                                        placeholder="2 9880000"
+                                                        name="pms_add_guest_phone_query"
                                                     />
                                                 </div>
                                             </div>
@@ -3287,17 +3497,15 @@ export const AddReservation: React.FC = () => {
 
                                                 <div className="flex flex-col gap-0.5">
                                                     <label className="text-[10px] font-semibold text-gray-700">NATIONALITY</label>
-                                                    <select
+                                                    <SearchableSelect
+                                                        compact={true}
                                                         value={nationality}
-                                                        onChange={e => setNationality(e.target.value)}
-                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                    >
-                                                        {COUNTRIES_DATABASE.map(c => (
-                                                            <option key={c.code} value={c.nationality}>
-                                                                {c.nationality} ({c.name})
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={val => setNationality(val)}
+                                                        options={allNationalityOptions}
+                                                        placeholder="Select Nationality..."
+                                                        searchPlaceholder="Search nationality..."
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">
@@ -3603,10 +3811,10 @@ export const AddReservation: React.FC = () => {
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
                                                     <div className="flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-semibold text-gray-700">COUNTRY OF RESIDENCE</label>
-                                                        <select
+                                                        <SearchableSelect
+                                                            compact={true}
                                                             value={homeCountry}
-                                                            onChange={e => {
-                                                                const newCountry = e.target.value;
+                                                            onChange={newCountry => {
                                                                 setHomeCountry(newCountry);
                                                                 const cities = getCitiesForCountry(newCountry);
                                                                 if (cities.length > 0) {
@@ -3619,39 +3827,25 @@ export const AddReservation: React.FC = () => {
                                                                     setNationality(nat);
                                                                 }
                                                             }}
-                                                            className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                        >
-                                                            {COUNTRIES_DATABASE.map(c => (
-                                                                <option key={c.code} value={c.name}>
-                                                                    {c.name} ({c.dialCode})
-                                                                </option>
-                                                            ))}
-                                                        </select>
+                                                            options={allCountryOptions}
+                                                            placeholder="Select Country..."
+                                                            searchPlaceholder="Search country..."
+                                                            allowCustom={true}
+                                                        />
                                                     </div>
 
                                                     <div className="flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-semibold text-gray-700">CITY / DISTRICT</label>
-                                                        {getCitiesForCountry(homeCountry).length > 0 ? (
-                                                            <select
-                                                                value={homeCity}
-                                                                onChange={e => setHomeCity(e.target.value)}
-                                                                className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                            >
-                                                                <option value="">Select City / District...</option>
-                                                                {getCitiesForCountry(homeCountry).map(ct => (
-                                                                    <option key={ct} value={ct}>{ct}</option>
-                                                                ))}
-                                                                <option value="__other__">+ Other / Enter Manually</option>
-                                                            </select>
-                                                        ) : (
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Dhaka..."
-                                                                value={homeCity}
-                                                                onChange={e => setHomeCity(e.target.value)}
-                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                            />
-                                                        )}
+                                                        <SearchableSelect
+                                                            compact={true}
+                                                            value={homeCity}
+                                                            onChange={val => setHomeCity(val)}
+                                                            options={reservationCityOptions}
+                                                            placeholder="Select or enter city..."
+                                                            searchPlaceholder="Search or type city..."
+                                                            allowCustom={true}
+                                                            customPromptText="Use custom city:"
+                                                        />
                                                     </div>
 
                                                     <div className="flex flex-col gap-0.5 lg:col-span-2">
@@ -3709,12 +3903,12 @@ export const AddReservation: React.FC = () => {
                                                     </div>
                                                     <div className="flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-semibold text-gray-700">EMERGENCY PHONE</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="+880 18..."
+                                                        <PhoneInputWithCountry
+                                                            compact={true}
                                                             value={emergencyPhone}
-                                                            onChange={e => setEmergencyPhone(e.target.value)}
-                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                            onChange={val => setEmergencyPhone(val)}
+                                                            defaultCountryCode="BD"
+                                                            placeholder="1811-000000"
                                                         />
                                                     </div>
                                                 </div>
@@ -3722,58 +3916,58 @@ export const AddReservation: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* Tab 3: Corporate & Work */}
+                                    {/* Tab 3: Corporate & Work - Responsive Balanced Grid */}
                                     {step2Tab === 'corporate' && (
                                         <div className="space-y-3 animate-in fade-in duration-100">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">COMPANY / ORGANIZATION</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5 min-w-0">
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <label className="text-[10px] font-semibold text-gray-700 truncate">COMPANY / ORGANIZATION</label>
                                                     <input
                                                         type="text"
                                                         placeholder="e.g. Grameenphone Ltd."
                                                         value={companyName}
                                                         onChange={e => setCompanyName(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-medium"
+                                                        className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-medium"
                                                     />
                                                 </div>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">DESIGNATION</label>
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <label className="text-[10px] font-semibold text-gray-700 truncate">DESIGNATION</label>
                                                     <input
                                                         type="text"
                                                         placeholder="e.g. Managing Director"
                                                         value={designation}
                                                         onChange={e => setDesignation(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
                                                     />
                                                 </div>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">OFFICE PHONE</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="+880 2..."
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <label className="text-[10px] font-semibold text-gray-700 truncate">OFFICE PHONE</label>
+                                                    <PhoneInputWithCountry
+                                                        compact={true}
                                                         value={officePhone}
-                                                        onChange={e => setOfficePhone(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        onChange={val => setOfficePhone(val)}
+                                                        defaultCountryCode="BD"
+                                                        placeholder="2 9880000"
                                                     />
                                                 </div>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">CORPORATE EMAIL</label>
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <label className="text-[10px] font-semibold text-gray-700 truncate">CORPORATE EMAIL</label>
                                                     <input
                                                         type="email"
                                                         placeholder="corporate@company.com"
                                                         value={corporateEmail}
                                                         onChange={e => setCorporateEmail(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
                                                     />
                                                 </div>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">TAX / BIN / VAT ID</label>
+                                                <div className="flex flex-col gap-0.5 min-w-0 sm:col-span-2 lg:col-span-1">
+                                                    <label className="text-[10px] font-semibold text-gray-700 truncate">TAX / BIN / VAT ID</label>
                                                     <input
                                                         type="text"
                                                         placeholder="TIN-9812..."
                                                         value={taxVatId}
                                                         onChange={e => setTaxVatId(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        className="w-full min-w-0 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
                                                     />
                                                 </div>
                                             </div>
@@ -3899,301 +4093,76 @@ export const AddReservation: React.FC = () => {
                     )}
 
                     {/* ========================================================
-                        STEP 3: PAYMENTS & SUMMARY BOX
+                        STEP 3: PAYMENTS & SUMMARY BOX (SHARED MODULAR)
                         ======================================================== */}
                     {step === 3 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 animate-in fade-in duration-150">
-                            {/* Left Column: Discount & Payment Methods */}
-                            <div className="lg:col-span-7 space-y-2.5">
-                                {/* Discount Box */}
-                                <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-2xs space-y-2">
-                                    <h3 className="text-gray-900 text-[10.5px] uppercase tracking-wider">Discount</h3>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            value={discountType}
-                                            onChange={e => setDiscountType(e.target.value as any)}
-                                            className="w-28 h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                        >
-                                            <option value="Fixed">Fixed Amount</option>
-                                            <option value="Percentage">Percentage (%)</option>
-                                        </select>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={discountValue}
-                                            onChange={e => setDiscountValue(Number(e.target.value))}
-                                            className="w-24 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                        />
-                                        {discountValue > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setDiscountValue(0)}
-                                                className="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer"
-                                                title="Remove Discount"
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-gray-500">Remarks: Added promotional/corporate discount.</p>
+                        <div className="flex flex-col gap-2.5 animate-in fade-in duration-150">
+                            {/* 1. Top Live Financial Status Strip */}
+                            <FinancialStatusStrip
+                                finalPayable={finalPayable}
+                                totalPaid={totalPaid}
+                                totalDue={totalDue}
+                                currencySymbol={currencySymbol}
+                            />
+
+                            {/* 2. Main 2-Column Console */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+                                {/* Left Column: Payment Methods & Discount */}
+                                <div className="lg:col-span-7 space-y-2">
+                                    <PaymentTenderConsole
+                                        paymentRows={paymentRows}
+                                        totalDue={totalDue}
+                                        finalPayable={finalPayable}
+                                        currencySymbol={currencySymbol}
+                                        onAddRow={handleAddPaymentRow}
+                                        onRemoveRow={handleRemovePaymentRow}
+                                        onUpdateRow={updatePaymentRow}
+                                    />
+
+                                    <DiscountConsole
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        discountedAmount={discountedAmount}
+                                        currencySymbol={currencySymbol}
+                                        onTypeChange={setDiscountType}
+                                        onValueChange={setDiscountValue}
+                                        onClear={() => setDiscountValue(0)}
+                                    />
                                 </div>
 
-                                {/* Payment Methods Box */}
-                                <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-2xs space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-gray-900 text-[10.5px] uppercase tracking-wider">Payment Method</h3>
-                                        <span className="text-[10px] text-gray-500">Add partial or multi-tender settlement</span>
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        {paymentRows.map((pRow, idx) => (
-                                            <div
-                                                key={pRow.id}
-                                                onClick={() => setKeypadTargetIndex(idx)}
-                                                className={`flex items-center gap-2 p-1.5 rounded-md border transition-colors ${keypadTargetIndex === idx ? 'border-blue-500 bg-blue-50/20' : 'border-gray-200 bg-white'
-                                                    }`}
-                                            >
-                                                <div className="w-36 flex flex-col gap-0.5">
-                                                    <label className="text-[9.5px] text-gray-500">Method</label>
-                                                    <select
-                                                        value={pRow.method}
-                                                        onChange={e => updatePaymentRow(pRow.id, 'method', e.target.value)}
-                                                        className="h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                    >
-                                                        <option value="Cash">Cash at Desk</option>
-                                                        <option value="Card">Credit / Debit Card</option>
-                                                        <option value="bKash">bKash (MFS)</option>
-                                                        <option value="Nagad">Nagad (MFS)</option>
-                                                        <option value="Bank Transfer">Bank Transfer</option>
-                                                        <option value="Direct Billing">Company Direct Billing</option>
-                                                    </select>
-                                                </div>
-
-                                                <div className="flex-1 flex flex-col gap-0.5">
-                                                    <label className="text-[9.5px] text-gray-500">Amount</label>
-                                                    <input
-                                                        type="number"
-                                                        value={pRow.amount}
-                                                        onChange={e => updatePaymentRow(pRow.id, 'amount', Number(e.target.value))}
-                                                        className="h-7 px-2 border border-gray-200 rounded text-[11px] text-gray-900 outline-none"
-                                                    />
-                                                </div>
-
-                                                {paymentRows.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemovePaymentRow(pRow.id)}
-                                                        className="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer self-end mb-0.5"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex justify-end pt-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={handleAddPaymentRow}
-                                            className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-blue-700 rounded text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                        >
-                                            <Plus size={12} />
-                                            <span>Add New Payment Method</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right Column: Summary Box & Keypad */}
-                            <div className="lg:col-span-5 space-y-2.5">
-                                <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-2xs space-y-2">
-                                    <h3 className="text-gray-900 text-[10.5px] uppercase tracking-wider border-b border-gray-100 pb-1.5 flex items-center justify-between">
-                                        <span>Settlement Summary</span>
-                                        {totalAllAddonsCharges > 0 && (
-                                            <span className="text-[9.5px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-                                                Addons: +{currencySymbol}{totalAllAddonsCharges.toFixed(0)}
-                                            </span>
-                                        )}
-                                    </h3>
-
-                                    <div className="space-y-1 text-[11px]">
-                                        <div className="flex items-center justify-between py-0.5 text-gray-600">
-                                            <span>Room Base Tariff:</span>
-                                            <span className="text-gray-900 font-mono">{currencySymbol} {roomBaseTotal.toFixed(2)}</span>
-                                        </div>
-
-                                        {totalPickupArrivalCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-blue-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Car size={11} />
-                                                    <span>Airport Pickup (Inbound):</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalPickupArrivalCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalDropDepartureCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-sky-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Plane size={11} />
-                                                    <span>Airport Drop (Outbound):</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalDropDepartureCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalExtraBedCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-indigo-700">
-                                                <span className="flex items-center gap-1">
-                                                    <BedDouble size={11} />
-                                                    <span>Extra Bed / Cot Surcharge:</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalExtraBedCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalMealPlanCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-amber-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Utensils size={11} />
-                                                    <span>Meal Plans &amp; Dining:</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalMealPlanCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalCelebrationCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-rose-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Gift size={11} />
-                                                    <span>Celebration &amp; Room Decor:</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalCelebrationCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalSpaCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-teal-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Sparkles size={11} />
-                                                    <span>Wellness &amp; Spa Treatments:</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalSpaCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalTimingCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-sky-700">
-                                                <span className="flex items-center gap-1">
-                                                    <Clock size={11} />
-                                                    <span>Early / Late Check-In Flex:</span>
-                                                </span>
-                                                <span className="font-mono">+{currencySymbol} {totalTimingCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        {totalCustomCharge > 0 && (
-                                            <div className="flex items-center justify-between py-0.5 text-purple-700">
-                                                <span>Custom Ancillary Add-Ons:</span>
-                                                <span className="font-mono">+{currencySymbol} {totalCustomCharge.toFixed(2)}</span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center justify-between py-0.5 text-gray-700 border-t border-gray-100 pt-1 font-semibold">
-                                            <span>Gross Total:</span>
-                                            <span className="text-gray-900 font-mono">{currencySymbol} {grossTotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-0.5 text-gray-600">
-                                            <span>Discounted Amount:</span>
-                                            <span className="text-emerald-600 font-mono">-{currencySymbol} {discountedAmount.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-0.5 text-gray-700 text-[10.5px]">
-                                            <span>Net Base (Taxable):</span>
-                                            <span className="font-semibold font-mono text-gray-900">{currencySymbol} {netBaseAmount.toFixed(2)}</span>
-                                        </div>
-
-                                        {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
-                                        {taxCalculation.isTaxApplicable && taxCalculation.breakdown.length > 0 ? (
-                                            <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
-                                                <div className="flex items-center justify-between text-[9.5px] text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
-                                                    <span>{taxCalculation.configCode} Tax Rules</span>
-                                                    <span className="text-blue-700 font-mono">+{currencySymbol} {taxCalculation.totalTaxAmount.toFixed(2)}</span>
-                                                </div>
-                                                {taxCalculation.breakdown.map((item, idx) => (
-                                                    <div key={idx} className="flex justify-between text-[10.5px] text-slate-600">
-                                                        <span title={item.formula}>
-                                                            {item.name} ({item.rate}%):
-                                                        </span>
-                                                        <span className="font-mono text-slate-800 font-semibold">
-                                                            +{currencySymbol} {item.amount.toFixed(2)}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="my-1 py-1 px-2 bg-amber-50 border border-amber-200 rounded text-[10.5px] text-amber-800 font-medium flex justify-between">
-                                                <span>Tax Exemption</span>
-                                                <span className="font-mono">{currencySymbol} 0.00 (Exempt)</span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center justify-between py-1 px-1.5 bg-blue-50/80 border border-blue-100 rounded text-blue-900 font-bold">
-                                            <span>Grand Total (Payable):</span>
-                                            <span className="font-mono text-xs font-extrabold">{currencySymbol} {finalPayable.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-0.5 text-gray-600">
-                                            <span>Total Paid:</span>
-                                            <span className="text-blue-700 font-mono">{currencySymbol} {totalPaid.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-1 px-2 bg-rose-50 border border-rose-200 rounded text-rose-800 font-bold">
-                                            <span>Total Due Balance:</span>
-                                            <span className="font-mono text-xs">{currencySymbol} {totalDue.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Keypad Quick Entry */}
-                                    <div className="pt-1.5 border-t border-gray-100">
-                                        <div className="text-[9.5px] text-gray-500 font-medium mb-1 flex items-center justify-between">
-                                            <span>Quick Keypad</span>
-                                            <span className="text-blue-700 font-mono">Row #{keypadTargetIndex + 1}</span>
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-1">
-                                            {['1', '2', '3', 'CLEAR'].map(btn => (
-                                                <button
-                                                    key={btn}
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress(btn)}
-                                                    className={`h-7 rounded text-[11px] transition-colors cursor-pointer ${btn === 'CLEAR' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    {btn}
-                                                </button>
-                                            ))}
-                                            {['4', '5', '6', 'BACK'].map(btn => (
-                                                <button
-                                                    key={btn}
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress(btn)}
-                                                    className={`h-7 rounded text-[11px] transition-colors cursor-pointer ${btn === 'BACK' ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    {btn === 'BACK' ? '⌫' : btn}
-                                                </button>
-                                            ))}
-                                            {['7', '8', '9', 'FULL'].map(btn => (
-                                                <button
-                                                    key={btn}
-                                                    type="button"
-                                                    onClick={() => handleKeypadPress(btn)}
-                                                    className={`h-7 rounded text-[11px] transition-colors cursor-pointer ${btn === 'FULL' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    {btn === 'FULL' ? 'Full Due' : btn}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                {/* Right Column: Settlement Breakdown */}
+                                <div className="lg:col-span-5 space-y-2">
+                                    <SettlementBreakdownCard
+                                        roomBaseTotal={roomBaseTotal}
+                                        nights={nights}
+                                        grossTotal={grossTotal}
+                                        discountedAmount={discountedAmount}
+                                        discountType={discountType}
+                                        discountValue={discountValue}
+                                        netBaseAmount={netBaseAmount}
+                                        taxCalculation={taxCalculation}
+                                        finalPayable={finalPayable}
+                                        totalPaid={totalPaid}
+                                        totalDue={totalDue}
+                                        currencySymbol={currencySymbol}
+                                        addons={{
+                                            pickup: totalPickupArrivalCharge,
+                                            drop: totalDropDepartureCharge,
+                                            extraBed: totalExtraBedCharge,
+                                            mealPlan: totalMealPlanCharge,
+                                            celebration: totalCelebrationCharge,
+                                            spa: totalSpaCharge,
+                                            timing: totalTimingCharge,
+                                            custom: totalCustomCharge,
+                                            galaDinner: totalGalaDinnerCharge,
+                                            totalAll: totalAllAddonsCharges
+                                        }}
+                                        holidaySurge={{
+                                            hasSurge: holidaySummary.hasSurge,
+                                            multiplier: holidaySummary.maxMultiplier,
+                                            holidayName: holidaySummary.activeHolidays[0]
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -4359,59 +4328,130 @@ export const AddReservation: React.FC = () => {
 
             {/* Success Booking Confirmation Modal */}
             {createdReservation && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-[460px] w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
-                        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                            <CheckCircle2 size={28} />
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[460px] w-full p-4.5 sm:p-5 space-y-3 max-h-[92vh] overflow-y-auto no-scrollbar relative animate-in zoom-in-95 duration-150 my-auto">
+                        {/* Close button */}
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('reservations')}
+                            className="absolute top-3.5 right-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                            title="Close"
+                        >
+                            <X size={16} />
+                        </button>
+
+                        <div className="text-center space-y-1.5 pt-1">
+                            <div className="w-11 h-11 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto shadow-2xs">
+                                <CheckCircle2 size={24} className="stroke-[2.5]" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 tracking-tight">Reservation Confirmed!</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    Booking reference <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">{createdReservation.reservationNumber}</span>
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="text-center space-y-1">
-                            <h3 className="text-base text-gray-900">Reservation Confirmed!</h3>
-                            <p className="text-xs text-gray-500">
-                                Booking reference <strong className="font-mono text-blue-700">{createdReservation.reservationNumber}</strong> has been saved.
-                            </p>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-lg p-3.5 space-y-2 text-xs border border-gray-100">
-                            <div className="flex justify-between text-gray-600">
-                                <span>Guest Name:</span>
-                                <strong className="text-gray-900">{createdReservation.guestName}</strong>
+                        <div className="bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-xs border border-slate-200/80 shadow-2xs">
+                            <div className="flex justify-between items-center text-slate-600 pb-1 border-b border-slate-200/60">
+                                <span className="text-[11px] font-medium text-slate-500">Guest Name:</span>
+                                <strong className="text-slate-900 font-bold">{createdReservation.guestName}</strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
-                                <span>Room:</span>
-                                <strong className="text-blue-700 font-mono">{createdReservation.roomNumber} ({createdReservation.roomType})</strong>
+                            <div className="flex justify-between items-center text-slate-600">
+                                <span className="text-[11px] font-medium text-slate-500">Room:</span>
+                                <strong className="text-blue-700 font-mono font-bold bg-white px-1.5 py-0.2 rounded border border-blue-200/60">
+                                    Rm {createdReservation.roomNumber} ({createdReservation.roomType})
+                                </strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
-                                <span>Stay Dates:</span>
-                                <span className="font-medium text-gray-900">{createdReservation.checkIn} to {createdReservation.checkOut} ({createdReservation.nights} nights)</span>
+                            <div className="flex justify-between items-center text-slate-600">
+                                <span className="text-[11px] font-medium text-slate-500">Stay Dates:</span>
+                                <span className="font-semibold text-slate-800 text-[11px]">
+                                    {createdReservation.checkIn} → {createdReservation.checkOut} ({createdReservation.nights}N)
+                                </span>
                             </div>
                             {createdReservation.taxApplicable && (createdReservation.totalTaxAmount > 0) && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Taxes &amp; VAT ({createdReservation.taxConfigCode}):</span>
+                                <div className="flex justify-between items-center text-slate-600">
+                                    <span className="text-[11px] font-medium text-slate-500">Taxes &amp; VAT ({createdReservation.taxConfigCode || 'STD'}):</span>
                                     <strong className="text-blue-700 font-mono">+{currencySymbol}{(createdReservation.totalTaxAmount || 0).toFixed(2)}</strong>
                                 </div>
                             )}
-                            <div className="flex justify-between text-gray-800 font-semibold border-t border-gray-200 pt-1">
-                                <span>Grand Total (Payable):</span>
-                                <strong className="text-gray-900 font-mono">{currencySymbol}{createdReservation.totalAmount.toFixed(2)}</strong>
+                            <div className="flex justify-between items-center border-t border-slate-200/60 pt-1.5 text-slate-800">
+                                <span className="text-xs font-bold text-slate-800">Grand Total (Payable):</span>
+                                <strong className="text-slate-900 font-mono font-bold text-xs">{currencySymbol}{createdReservation.totalAmount.toFixed(2)}</strong>
                             </div>
-                            <div className="flex justify-between text-rose-700 font-semibold">
-                                <span>Due Balance:</span>
-                                <strong className="font-mono">{currencySymbol}{(createdReservation.dueAmount || 0).toFixed(2)}</strong>
+                            <div className="flex justify-between items-center text-rose-700">
+                                <span className="text-xs font-bold">Due Balance:</span>
+                                <strong className="font-mono font-bold text-xs bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200/60 text-rose-700">
+                                    {currencySymbol}{(createdReservation.dueAmount || 0).toFixed(2)}
+                                </strong>
                             </div>
-                            <div className="flex justify-between text-gray-600">
-                                <span>Status:</span>
-                                <span className="px-2 py-0.5 rounded text-[10px] uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <div className="flex justify-between items-center pt-0.5">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Booking Status</span>
+                                <span className="px-2 py-0.2 rounded text-[9.5px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     {createdReservation.status}
                                 </span>
                             </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 pt-2">
+                        {/* Compact Instant Voucher & Fast-Pass Dispatch Card */}
+                        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 shrink-0">
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] font-bold text-emerald-950 truncate">
+                                            Guest Voucher &amp; Fast-Pass KYC
+                                        </span>
+                                        <span className="text-[8.5px] font-bold text-emerald-800 bg-white/90 px-1.5 py-0.2 rounded border border-emerald-200 shadow-2xs shrink-0">
+                                            5-Star
+                                        </span>
+                                    </div>
+                                    <p className="text-[9.5px] text-emerald-800/80 truncate">
+                                        Room Wi-Fi, map &amp; digital pre-arrival check-in
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Compact Action Buttons */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => handleManualDispatchConfirmation('whatsapp')}
+                                    disabled={isDispatchingVoucher.whatsapp || (!createdReservation.phone && !mobile)}
+                                    className={`h-7 px-2.5 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer ${
+                                        dispatchedVouchers.whatsapp
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    }`}
+                                    title={!createdReservation.phone && !mobile ? 'No phone number provided' : 'Send WhatsApp voucher'}
+                                >
+                                    <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                    <span>{dispatchedVouchers.whatsapp ? '✓ Sent' : isDispatchingVoucher.whatsapp ? '...' : 'WhatsApp'}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleManualDispatchConfirmation('email')}
+                                    disabled={isDispatchingVoucher.email || (!createdReservation.email && !email)}
+                                    className={`h-7 px-2.5 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer ${
+                                        dispatchedVouchers.email
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-white hover:bg-blue-50 text-blue-800 border border-blue-200'
+                                    }`}
+                                    title={!createdReservation.email && !email ? 'No email provided' : 'Send Email confirmation'}
+                                >
+                                    <FileText className="w-3 h-3 text-blue-600" />
+                                    <span>{dispatchedVouchers.email ? '✓ Sent' : isDispatchingVoucher.email ? '...' : 'Email'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5 pt-1">
                             <button
                                 type="button"
                                 onClick={() => setActivePage('reservations')}
-                                className="w-full py-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg text-xs cursor-pointer transition-colors shadow-2xs"
+                                className="w-full h-8.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs flex items-center justify-center gap-1.5"
                             >
                                 View in Reservations List
                             </button>
@@ -4419,14 +4459,14 @@ export const AddReservation: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActivePage('stay-view')}
-                                    className="py-2 bg-white border border-gray-200 hover:bg-gray-50 text-blue-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                                    className="h-8 bg-white border border-slate-200 hover:bg-slate-50 text-blue-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
                                 >
                                     Stay View
                                 </button>
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                                    className="h-8 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
                                 >
                                     New Booking
                                 </button>

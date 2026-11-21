@@ -15,7 +15,7 @@ interface ConnectedClient {
 const clients = new Map<string, ConnectedClient>();
 
 // Keep-alive heartbeat ping every 15 seconds to prevent network timeouts
-setInterval(() => {
+const heartbeatInterval = setInterval(() => {
     const pingData = `data: ${JSON.stringify({ type: 'HEARTBEAT_PING', timestamp: Date.now() })}\n\n`;
     for (const [id, client] of clients.entries()) {
         try {
@@ -25,6 +25,9 @@ setInterval(() => {
         }
     }
 }, 15000);
+if (heartbeatInterval.unref) {
+    heartbeatInterval.unref();
+}
 
 /**
  * SSE Endpoint: PC-1, PC-2, PC-3 connect here to receive sub-second updates

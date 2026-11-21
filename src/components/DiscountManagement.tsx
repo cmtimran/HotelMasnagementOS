@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import { toast } from '../context/ToastContext';
 import {
     Percent,
@@ -51,11 +52,51 @@ export const DiscountManagement: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state from localStorage
+    // Hydrate state from backend API with localStorage fallback
     const [discounts, setDiscounts] = useState<DiscountPolicy[]>(() => {
         const saved = localStorage.getItem('master_discounts_v2');
         return saved ? JSON.parse(saved) : INITIAL_DISCOUNTS;
     });
+
+    const fetchDiscountsFromApi = useCallback(async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/discounts`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                const mapped: DiscountPolicy[] = json.data.map((d: any) => ({
+                    id: Number(d.id),
+                    code: d.code,
+                    name: d.title,
+                    category: 'Promotional Public',
+                    type: d.discount_type === 'percentage' ? 'Percentage (%)' : 'Flat Amount (BDT)',
+                    value: Number(d.value),
+                    maxCapBDT: 10000,
+                    minSpendBDT: 2000,
+                    applicableOn: (d.applies_to || 'Rooms').split(',') as any,
+                    requiresManagerPin: false,
+                    reasonRequired: true,
+                    contraRevenueGlCode: 'GL-4990 - Room Revenue Allowances',
+                    active: Boolean(d.is_active)
+                }));
+                setDiscounts(mapped);
+                localStorage.setItem('master_discounts_v2', JSON.stringify(mapped));
+            }
+        } catch (e) {
+            console.warn('API fetch discounts fallback:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchDiscountsFromApi();
+
+        const handleSync = (e: any) => {
+            if (e.detail?.entity === 'discounts' || e.detail?.type === 'MASTER_DATA_UPDATED') {
+                fetchDiscountsFromApi();
+            }
+        };
+        window.addEventListener('pms_network_sync', handleSync);
+        return () => window.removeEventListener('pms_network_sync', handleSync);
+    }, [fetchDiscountsFromApi]);
 
     useEffect(() => {
         localStorage.setItem('master_discounts_v2', JSON.stringify(discounts));
@@ -117,7 +158,7 @@ export const DiscountManagement: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.code || !formData.name) return;
 
@@ -126,25 +167,50 @@ export const DiscountManagement: React.FC = () => {
             return;
         }
 
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/discounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editingDiscount ? editingDiscount.id : undefined,
+                    code: formData.code,
+                    title: formData.name,
+                    discountType: formData.type.includes('%') ? 'percentage' : 'flat',
+                    value: formData.value,
+                    appliesTo: formData.applicableOn.join(','),
+                    isActive: formData.active
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`Discount policy "${formData.name}" saved to PostgreSQL.`);
+                fetchDiscountsFromApi();
+            }
+        } catch {
+            showToast('Saved locally.');
+        }
+
         if (editingDiscount) {
             setDiscounts(prev =>
                 prev.map(d => d.id === editingDiscount.id ? { ...d, ...formData } : d)
             );
-            showToast(`Discount policy "${formData.name}" updated successfully.`);
         } else {
             const newDisc: DiscountPolicy = {
                 id: Date.now(),
                 ...formData
             };
             setDiscounts(prev => [...prev, newDisc]);
-            showToast(`Discount policy "${newDisc.name}" created successfully.`);
         }
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         const item = discounts.find(d => d.id === id);
         if (window.confirm(`Are you sure you want to delete discount policy "${item?.name}"?`)) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/master-data/discounts/${id}`, { method: 'DELETE' });
+                fetchDiscountsFromApi();
+            } catch {}
             setDiscounts(prev => prev.filter(d => d.id !== id));
             showToast('Discount policy removed.');
         }

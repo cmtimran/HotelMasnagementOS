@@ -11,6 +11,9 @@
 
 import { getApiBaseUrl } from './apiUrl';
 import { isRoomOOOForDates, isRoomOOSForDates } from './outOfOrderEngine';
+import { getHolidayForDate } from './holidayHelper';
+import { getActivePropertyNumberingSettings, resolveNumberingTemplate } from './reservationNumbering';
+import { toast } from '../context/ToastContext';
 
 export interface CanonicalRoom {
     id: number;
@@ -69,35 +72,50 @@ export interface StoredReservation {
 }
 
 export const generateMasterReservationNumber = (dateStr?: string): string => {
+    const settings = getActivePropertyNumberingSettings();
+    const prefix = resolveNumberingTemplate(settings.reservationPrefix || 'RES-{YYYY}-');
     const today = dateStr || new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const seqKey = `pms_daily_seq_res_${today}`;
     let current = parseInt(localStorage.getItem(seqKey) || '0', 10);
     current += 1;
     localStorage.setItem(seqKey, String(current));
-    return `RES-${today}${String(current).padStart(4, '0')}`;
+    const pad = Number(settings.sequencePadding) || 4;
+    const suffix = prefix.includes(today.slice(0, 4)) ? `${today.slice(4)}${String(current).padStart(pad, '0')}` : `${today}${String(current).padStart(pad, '0')}`;
+    return `${prefix}${suffix}`;
 };
 
 export const generateGroupCode = (dateStr?: string): string => {
+    const settings = getActivePropertyNumberingSettings();
+    const prefix = resolveNumberingTemplate(settings.groupPrefix || 'GRP-{YYYY}-');
     const today = dateStr || new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const seqKey = `pms_daily_seq_grp_${today}`;
     let current = parseInt(localStorage.getItem(seqKey) || '0', 10);
     current += 1;
     localStorage.setItem(seqKey, String(current));
-    return `GRP-${today}-${String(current).padStart(4, '0')}`;
+    const pad = Number(settings.sequencePadding) || 4;
+    const suffix = prefix.includes(today.slice(0, 4)) ? `${today.slice(4)}-${String(current).padStart(pad, '0')}` : `${today}-${String(current).padStart(pad, '0')}`;
+    return `${prefix}${suffix}`;
 };
 
+// NOTE: This helper is ONLY used for genuine Group Bookings (is_group=true, group_code set).
+// For Split Stays (single guest moving between rooms), the sub-booking number is always
+// the master reservation number itself — never suffixed.
 export const generateSubBookingNumber = (masterResNo: string, roomIndex: number): string => {
     return `${masterResNo}-${String(roomIndex).padStart(2, '0')}`;
 };
 
 export const generateRegistrationNumber = (resNo: string): string => {
-    const clean = String(resNo || '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
-    return `REG-${clean}`;
+    const settings = getActivePropertyNumberingSettings();
+    const prefix = resolveNumberingTemplate(settings.registrationPrefix || 'REG-');
+    const clean = String(resNo || '').replace(/^[A-Za-z0-9_-]+?-/, '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
+    return `${prefix}${clean}`;
 };
 
 export const generateFolioNumber = (resNo: string): string => {
-    const clean = String(resNo || '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
-    return `FOL-${clean}`;
+    const settings = getActivePropertyNumberingSettings();
+    const prefix = resolveNumberingTemplate(settings.folioPrefix || 'FOL-');
+    const clean = String(resNo || '').replace(/^[A-Za-z0-9_-]+?-/, '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
+    return `${prefix}${clean}`;
 };
 
 export interface DynamicRoomType {
@@ -112,12 +130,17 @@ export interface DynamicRoomType {
     extraBedRate: number;
     extraAdultPrice?: number;
     extraChildPrice?: number;
+    extraBedAllowed?: boolean;
+    extraBedQuantity?: number;
+    extraAdultIncludesBed?: boolean;
+    babyCotAllowed?: boolean;
     size?: number;
     bedType?: string;
     viewType?: string;
     smokingPolicy?: string;
     amenities?: string[];
     photos?: string[];
+    videos?: string[];
     isConnecting?: boolean;
     showOnWebsite?: boolean;
     status?: string;
@@ -579,10 +602,11 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
                 return Number(matchedById.baseRate);
             }
             // Match by roomTypeName
-            const matchedByName = dynamicTypes.find(t => 
-                t.name.toLowerCase() === canonical.roomTypeName.toLowerCase() ||
-                canonical.roomTypeName.toLowerCase().includes(t.name.toLowerCase())
-            );
+            const canonicalNameLower = String(canonical.roomTypeName || '').toLowerCase();
+            const matchedByName = dynamicTypes.find(t => {
+                const tNameLower = String(t.name || '').toLowerCase();
+                return (tNameLower && canonicalNameLower && (tNameLower === canonicalNameLower || canonicalNameLower.includes(tNameLower)));
+            });
             if (matchedByName && Number(matchedByName.baseRate) > 0) {
                 return Number(matchedByName.baseRate);
             }
@@ -591,7 +615,7 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
 
     if (roomTypeName) {
         const suites = getStoredConnectingSuites();
-        const foundSuite = suites.find(s => s.name.trim().toLowerCase() === roomTypeName.trim().toLowerCase());
+        const foundSuite = suites.find(s => String(s?.name || '').trim().toLowerCase() === String(roomTypeName || '').trim().toLowerCase());
         if (foundSuite) {
             if (Number(foundSuite.fixedPrice) > 0) return Number(foundSuite.fixedPrice);
             const suiteRooms = foundSuite.componentRooms.flatMap(c => c.roomNumbers || []);
@@ -600,10 +624,10 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
             return 6000;
         }
 
-        const query = roomTypeName.trim().toLowerCase();
+        const query = String(roomTypeName || '').trim().toLowerCase();
         const matched = dynamicTypes.find(t => 
-            t.name.toLowerCase() === query ||
-            t.code.toLowerCase() === query ||
+            String(t.name || '').toLowerCase() === query ||
+            String(t.code || '').toLowerCase() === query ||
             isMatchingRoomType(t.name, roomTypeName)
         );
         if (matched && Number(matched.baseRate) > 0) {
@@ -611,7 +635,7 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
         }
     }
 
-    return Number(dynamicTypes[0]?.baseRate || 3000);
+    return Number(dynamicTypes[0]?.baseRate || 0);
 };
 
 /**
@@ -652,6 +676,11 @@ export interface RoomTypeCapacity {
     maxOccupancy: number;
     extraAdultPrice: number;
     extraChildPrice: number;
+    extraBedRate?: number;
+    extraBedAllowed?: boolean;
+    extraBedQuantity?: number;
+    extraAdultIncludesBed?: boolean;
+    babyCotAllowed?: boolean;
     baseRate: number;
 }
 
@@ -667,7 +696,7 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
         const queryStr = String(roomTypeNameOrId).trim().toLowerCase();
         if (queryStr.includes('connecting') || queryStr.includes('interconnecting')) {
             const suites = getStoredConnectingSuites();
-            const foundSuite = suites.find(s => s.name.trim().toLowerCase() === queryStr || queryStr.includes(s.name.trim().toLowerCase()));
+            const foundSuite = suites.find(s => String(s?.name || '').trim().toLowerCase() === queryStr || queryStr.includes(String(s?.name || '').trim().toLowerCase()));
             const numRooms = foundSuite ? foundSuite.componentRooms.flatMap(c => c.roomNumbers || []).length : 2;
             const multiplier = Math.max(2, numRooms);
 
@@ -695,14 +724,18 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
                 maxOccupancy: multiplier * 3,
                 extraAdultPrice: suiteExtraAdult,
                 extraChildPrice: suiteExtraChild,
+                extraBedRate: suiteExtraAdult,
+                extraBedAllowed: true,
+                extraBedQuantity: multiplier,
+                babyCotAllowed: true,
                 baseRate: suiteBaseRate
             };
         }
         matched = dynamicTypes.find(t => 
-            String(t.id) === String(roomTypeNameOrId) ||
-            t.name.toLowerCase() === queryStr ||
-            t.code.toLowerCase() === queryStr ||
-            isMatchingRoomType(t.name, queryStr)
+            String(t?.id) === String(roomTypeNameOrId) ||
+            (t?.name && t.name.toLowerCase() === queryStr) ||
+            (t?.code && t.code.toLowerCase() === queryStr) ||
+            (t?.name && isMatchingRoomType(t.name, queryStr))
         );
     }
 
@@ -710,7 +743,7 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
         matched = dynamicTypes[0];
     }
 
-    const typeName = matched?.name?.toLowerCase() || String(roomTypeNameOrId || '').toLowerCase();
+    const typeName = String(matched?.name || roomTypeNameOrId || '').toLowerCase();
     const isSingle = typeName.includes('single');
     const isSuite = typeName.includes('suite') || typeName.includes('presidential') || typeName.includes('royal');
     const isKingOrDouble = typeName.includes('king') || typeName.includes('double') || typeName.includes('twin');
@@ -728,6 +761,14 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
     const extraChildPrice = Number(matched?.extraChildPrice ?? (extraAdultPrice > 0 ? Math.round(extraAdultPrice * 0.5) : 0));
     const baseRate = Number(matched?.baseRate || 0);
 
+    const extraBedAllowed = matched?.extraBedAllowed !== undefined
+        ? Boolean(matched.extraBedAllowed)
+        : (Number(matched?.extraBedRate) > 0 || (!isSingle && maxAdults >= 2));
+    const extraBedQuantity = Number(matched?.extraBedQuantity ?? (extraBedAllowed ? 1 : 0));
+    const extraBedRate = Number(matched?.extraBedRate || extraAdultPrice || 1000);
+    const babyCotAllowed = Boolean(matched?.babyCotAllowed ?? true);
+    const extraAdultIncludesBed = Boolean(matched?.extraAdultIncludesBed ?? (matched as any)?.extra_adult_includes_bed ?? false);
+
     return {
         baseOccupancy,
         maxAdults,
@@ -735,12 +776,17 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
         maxOccupancy,
         extraAdultPrice,
         extraChildPrice,
+        extraBedRate,
+        extraBedAllowed,
+        extraBedQuantity,
+        extraAdultIncludesBed,
+        babyCotAllowed,
         baseRate
     };
 };
 
 /**
- * Dynamic Meal Plans cache helper (synced with PostgreSQL/SQLite meal_plans table)
+ * Dynamic Meal Plans cache helper (synced with Cloud PostgreSQL 17 meal_plans table)
  */
 export const getDynamicMealPlans = (): any[] => {
     try {
@@ -756,14 +802,14 @@ export const getDynamicMealPlans = (): any[] => {
 };
 
 /**
- * Dynamic Hotel Packages cache helper (synced with PostgreSQL/SQLite packages table)
+ * Dynamic Hotel Packages cache helper (synced with Cloud PostgreSQL 17 packages table)
  */
 export const getDynamicPackages = (propertyId?: number): any[] => {
     const propId = propertyId || getActivePropertyId();
     try {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && propId > 0) {
             const scopedKey = `hotel_packages_prop_${propId}`;
-            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem('hotel_packages_v2') : null);
+            const saved = localStorage.getItem(scopedKey) || localStorage.getItem('hotel_packages_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -774,7 +820,7 @@ export const getDynamicPackages = (propertyId?: number): any[] => {
 };
 
 /**
- * Dynamic Rate Plans cache helper (synced with PostgreSQL/SQLite rate_plans table)
+ * Dynamic Rate Plans cache helper (synced with Cloud PostgreSQL 17 rate_plans table)
  */
 export const getDynamicRatePlans = (propertyId?: number): any[] => {
     const propId = propertyId || getActivePropertyId();
@@ -837,7 +883,61 @@ export const syncRatePlansAndPackagesFromDB = async (
 };
 
 /**
- * Hospitality Standard: Dynamically calculate room tariff based on Rate Plan, Room Type, and Occupancy
+ * Hospitality Standard: Guard against channel / booking source names leaking into Rate Plan.
+ * Never allow channel names like WHATSAPP, BOOKING_COM, AGODA, DIRECT to become rate plans.
+ */
+export const sanitizeRatePlanName = (rawPlan?: string, fallback: string = 'Best Available Rate (BAR)'): string => {
+    if (!rawPlan) return fallback;
+    const clean = String(rawPlan)
+        .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '') // remove emojis
+        .replace(/[^\x20-\x7E]/g, '') // remove non-ascii/mojibake bytes
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!clean) return fallback;
+    const s = clean.toLowerCase();
+    const isChannelOrInvalid = [
+        'whatsapp', 'booking_com', 'booking.com', 'agoda', 'airbnb', 
+        'expedia', 'direct', 'front desk', 'staypulse', 'staypulse ai', 
+        'ota', 'walk-in', 'walk in', 'summer vacation', 'winter rate plan', 
+        'standard single', 'standard double', 'deluxe suite', 'room unassigned'
+    ].includes(s);
+    if (isChannelOrInvalid) return fallback;
+    return clean;
+};
+
+/**
+ * Helper: Retrieve Rate Calendar dynamic override for a specific room type and date
+ */
+export const getRateCalendarOverrideForDate = (
+    roomTypeName: string,
+    dateStr: string,
+    propertyId?: number
+): { rate: number; isOverridden: boolean; isWeekend: boolean; isHoliday: boolean; eventName?: string } | null => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        if (typeof window !== 'undefined' && propId > 0) {
+            const key = `hotel_rate_calendar_prop_${propId}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                const rtRates = parsed[roomTypeName];
+                if (rtRates && rtRates[dateStr] && Number(rtRates[dateStr].rate) > 0) {
+                    return {
+                        rate: Number(rtRates[dateStr].rate),
+                        isOverridden: true,
+                        isWeekend: Boolean(rtRates[dateStr].isWeekend),
+                        isHoliday: Boolean(rtRates[dateStr].isHoliday),
+                        eventName: rtRates[dateStr].eventName
+                    };
+                }
+            }
+        }
+    } catch {}
+    return null;
+};
+
+/**
+ * Hospitality Standard: Dynamically calculate room tariff based on Rate Plan, Room Type, Occupancy, Child Ages & Extra Bed
  */
 export const calculateTariffForRatePlan = (
     ratePlanNameOrId: string | number,
@@ -845,20 +945,42 @@ export const calculateTariffForRatePlan = (
     canonicalBaseRate: number,
     adults: number = 2,
     children: number = 0,
-    ratePlansList?: any[]
+    ratePlansList?: any[],
+    childrenAges?: number[],
+    extraBed?: boolean,
+    extraBedPrice?: number
 ): number => {
     const capacity = getRoomTypeCapacity(roomTypeName);
     const safeAdults = Math.max(1, adults);
-    const safeChildren = Math.max(0, children);
+    
+    // Infant rule: Age <= 4 is complimentary (৳ 0)
+    let payingChildren = Math.max(0, children);
+    if (Array.isArray(childrenAges) && childrenAges.length > 0) {
+        payingChildren = childrenAges.filter(age => Number(age) > 4).length;
+    }
 
-    if (!ratePlanNameOrId) {
+    // Hardware physical check: Is extra bed physically allowed in this room type?
+    const isBedPhysicallyAllowed = capacity.extraBedAllowed !== false;
+
+    const planStr = String(ratePlanNameOrId || '').trim().toLowerCase();
+    const isDirectRackRate = !ratePlanNameOrId || 
+        planStr === 'direct' || 
+        planStr.includes('rack') || 
+        planStr.includes('standard room rate') || 
+        planStr.includes('direct:');
+
+    if (isDirectRackRate) {
         let standardTariff = canonicalBaseRate;
-        if (safeAdults > capacity.baseOccupancy) {
+        const hasExtraAdult = safeAdults > capacity.baseOccupancy;
+        if (hasExtraAdult) {
             standardTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
         }
-        if (safeChildren > 0) {
-            standardTariff += safeChildren * capacity.extraChildPrice;
+        if (payingChildren > 0) {
+            standardTariff += payingChildren * capacity.extraChildPrice;
         }
+        const waiveBedFee = Boolean(capacity.extraAdultIncludesBed && hasExtraAdult);
+        const extraBedFee = (extraBed && isBedPhysicallyAllowed && !waiveBedFee) ? (capacity.extraBedRate || extraBedPrice || 1000) : 0;
+        standardTariff += extraBedFee;
         return Math.max(0, Math.round(standardTariff));
     }
 
@@ -876,13 +998,15 @@ export const calculateTariffForRatePlan = (
         if (safeAdults > capacity.baseOccupancy) {
             fallbackTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
         }
-        if (safeChildren > 0) {
-            fallbackTariff += safeChildren * capacity.extraChildPrice;
+        if (payingChildren > 0) {
+            fallbackTariff += payingChildren * capacity.extraChildPrice;
         }
+        const extraBedFee = (extraBed && isBedPhysicallyAllowed) ? (capacity.extraBedRate || extraBedPrice || 1000) : 0;
+        fallbackTariff += extraBedFee;
         return Math.max(0, Math.round(fallbackTariff));
     }
 
-    const planQuery = String(ratePlanNameOrId).trim().toLowerCase();
+    const planQuery = planStr;
     const plan = plans.find(p =>
         String(p.id) === String(ratePlanNameOrId) ||
         (p.name && p.name.trim().toLowerCase() === planQuery) ||
@@ -894,20 +1018,37 @@ export const calculateTariffForRatePlan = (
         if (safeAdults > capacity.baseOccupancy) {
             fallbackTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
         }
-        if (safeChildren > 0) {
-            fallbackTariff += safeChildren * capacity.extraChildPrice;
+        if (payingChildren > 0) {
+            fallbackTariff += payingChildren * capacity.extraChildPrice;
         }
+        const extraBedFee = (extraBed && isBedPhysicallyAllowed) ? (capacity.extraBedRate || extraBedPrice || 1000) : 0;
+        fallbackTariff += extraBedFee;
         return Math.max(0, Math.round(fallbackTariff));
     }
 
     // 2. Check explicit pricing for this room type within the selected Rate Plan
-    const roomTypeQuery = roomTypeName.trim().toLowerCase();
+    const roomTypeQuery = String(roomTypeName || '').trim().toLowerCase();
     const pricingEntry = plan.pricing?.find((pr: any) => {
         const prType = String(pr.roomTypeId || '').trim().toLowerCase();
         return prType === roomTypeQuery ||
                roomTypeQuery.includes(prType) ||
                prType.includes(roomTypeQuery);
     });
+
+    // Check plan policy on extra bed (cannot override physical impossibility)
+    let isBedPlanAllowed = isBedPhysicallyAllowed;
+    let planExtraBedPrice = capacity.extraBedRate || extraBedPrice || 1000;
+    if (pricingEntry) {
+        if (pricingEntry.extraBedAllowed !== undefined) {
+            isBedPlanAllowed = isBedPhysicallyAllowed && Boolean(pricingEntry.extraBedAllowed);
+        }
+        if (Number(pricingEntry.extraBedPrice) > 0) {
+            planExtraBedPrice = Number(pricingEntry.extraBedPrice);
+        }
+    }
+    const hasExtraAdult = safeAdults > capacity.baseOccupancy;
+    const waiveBedFee = Boolean(capacity.extraAdultIncludesBed && hasExtraAdult);
+    const extraBedFee = (extraBed && isBedPlanAllowed && !waiveBedFee) ? planExtraBedPrice : 0;
 
     if (pricingEntry) {
         let tariff = 0;
@@ -921,15 +1062,16 @@ export const calculateTariffForRatePlan = (
             const baseOccRate = (safeAdults >= 3 && Number(pricingEntry.tripleRate) > 0)
                 ? Number(pricingEntry.tripleRate)
                 : (Number(pricingEntry.doubleRate) || Number(pricingEntry.baseRate) || canonicalBaseRate);
-            const extraAdultRate = Number(pricingEntry.extraAdult) || capacity.extraAdultPrice || Math.round(baseOccRate * 0.25);
+            const extraAdultRate = Number(pricingEntry.extraAdult) > 0 ? Number(pricingEntry.extraAdult) : (capacity.extraAdultPrice || Math.round(baseOccRate * 0.25));
             const extraPaxCount = (safeAdults >= 3 && Number(pricingEntry.tripleRate) > 0) ? (safeAdults - 3) : (safeAdults - 2);
             tariff = baseOccRate + (extraAdultRate * extraPaxCount);
         }
 
-        if (safeChildren > 0) {
-            const extraChildRate = Number(pricingEntry.extraChild) || capacity.extraChildPrice || 0;
-            tariff += extraChildRate * safeChildren;
+        if (payingChildren > 0) {
+            const extraChildRate = Number(pricingEntry.extraChild) > 0 ? Number(pricingEntry.extraChild) : (capacity.extraChildPrice || 0);
+            tariff += extraChildRate * payingChildren;
         }
+        tariff += extraBedFee;
         return Math.max(0, Math.round(tariff));
     }
 
@@ -938,9 +1080,10 @@ export const calculateTariffForRatePlan = (
     if (safeAdults > capacity.baseOccupancy) {
         base += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
     }
-    if (safeChildren > 0) {
-        base += safeChildren * capacity.extraChildPrice;
+    if (payingChildren > 0) {
+        base += payingChildren * capacity.extraChildPrice;
     }
+    base += extraBedFee;
 
     // 4. Dynamic Meal plan supplements directly from Database & Hotel Configuration
     if (plan.mealPlan) {
@@ -955,13 +1098,214 @@ export const calculateTariffForRatePlan = (
         if (matchedMeal) {
             const adultMealRate = Number(matchedMeal.sellingPriceAdult) || 0;
             const childMealRate = Number(matchedMeal.sellingPriceChild) || 0;
-            base += (adultMealRate * safeAdults) + (childMealRate * safeChildren);
+            base += (adultMealRate * safeAdults) + (childMealRate * payingChildren);
         } else if (Number((plan as any).mealPlanPrice) > 0) {
             base += Number((plan as any).mealPlanPrice);
         }
     }
 
     return Math.max(0, Math.round(base));
+};
+
+export interface StayTariffCalculationResult {
+    totalTariff: number;
+    averageDailyRate: number;
+    nightlyBreakdown: {
+        date: string;
+        rate: number;
+        isOverridden: boolean;
+        isWeekend: boolean;
+        isHoliday: boolean;
+        eventName?: string;
+        holidayName?: string;
+        hasSurgeRate?: boolean;
+        surgeMultiplier?: number;
+        mandatoryGala?: boolean;
+        galaDinnerFee?: number;
+    }[];
+    hasHolidaySurge?: boolean;
+    surgeMultiplier?: number;
+    activeHolidayNames?: string[];
+    totalGalaFee?: number;
+    galaEvents?: {
+        date: string;
+        holidayName: string;
+        feePerGuest: number;
+        totalFee: number;
+    }[];
+}
+
+/**
+ * Enterprise Hospitality Standard: Calculate true date-by-date stay tariff factoring in Rate Calendar Overrides,
+ * weekend surges, holiday surge multipliers, gala events, child ages (infant free), and extra bed.
+ */
+export const calculateStayTariffWithCalendar = (
+    roomTypeName: string,
+    ratePlanNameOrId: string | number,
+    canonicalBaseRate: number,
+    checkInDate: string,
+    nights: number,
+    adults: number = 2,
+    children: number = 0,
+    ratePlansList?: any[],
+    childrenAges?: number[],
+    extraBed?: boolean,
+    extraBedPrice?: number,
+    propertyId?: number
+): StayTariffCalculationResult => {
+    const stayNights = Math.max(1, nights || 1);
+    const standardNightly = calculateTariffForRatePlan(
+        ratePlanNameOrId,
+        roomTypeName,
+        canonicalBaseRate,
+        adults,
+        children,
+        ratePlansList,
+        childrenAges,
+        extraBed,
+        extraBedPrice
+    );
+
+    const nightlyBreakdown: StayTariffCalculationResult['nightlyBreakdown'] = [];
+    let totalTariff = 0;
+    let hasHolidaySurge = false;
+    let maxSurgeMultiplier = 1.0;
+    const activeHolidayNamesSet = new Set<string>();
+    let totalGalaFee = 0;
+    const galaEvents: NonNullable<StayTariffCalculationResult['galaEvents']> = [];
+
+    const totalGuests = Math.max(1, (adults || 1) + (children || 0));
+
+    if (!checkInDate) {
+        for (let i = 0; i < stayNights; i++) {
+            nightlyBreakdown.push({
+                date: '',
+                rate: standardNightly,
+                isOverridden: false,
+                isWeekend: false,
+                isHoliday: false
+            });
+            totalTariff += standardNightly;
+        }
+        return {
+            totalTariff,
+            averageDailyRate: standardNightly,
+            nightlyBreakdown,
+            hasHolidaySurge: false,
+            surgeMultiplier: 1.0,
+            activeHolidayNames: [],
+            totalGalaFee: 0,
+            galaEvents: []
+        };
+    }
+
+    const startDate = new Date(checkInDate);
+    for (let i = 0; i < stayNights; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateStr = currentDate.toISOString().slice(0, 10);
+
+        const override = getRateCalendarOverrideForDate(roomTypeName, dateStr, propertyId);
+        const holiday = getHolidayForDate(dateStr);
+        let nightRate = standardNightly;
+
+        const isGalaNight = Boolean(holiday?.mandatoryGala && (holiday?.galaDinnerFee || 0) > 0);
+        const galaFeePerPax = isGalaNight ? Number(holiday!.galaDinnerFee) : 0;
+        if (isGalaNight && holiday) {
+            const nightGalaTotal = galaFeePerPax * totalGuests;
+            totalGalaFee += nightGalaTotal;
+            galaEvents.push({
+                date: dateStr,
+                holidayName: holiday.name,
+                feePerGuest: galaFeePerPax,
+                totalFee: nightGalaTotal
+            });
+        }
+
+        if (override && override.isOverridden && override.rate > 0) {
+            const capacity = getRoomTypeCapacity(roomTypeName);
+            const safeAdults = Math.max(1, adults);
+            let payingChildren = Math.max(0, children);
+            if (Array.isArray(childrenAges) && childrenAges.length > 0) {
+                payingChildren = childrenAges.filter(a => Number(a) > 4).length;
+            }
+            const extraBedFee = extraBed ? (capacity.extraBedRate || extraBedPrice || 1000) : 0;
+            
+            let overrideTotal = override.rate;
+            if (safeAdults > capacity.baseOccupancy) {
+                overrideTotal += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
+            }
+            if (payingChildren > 0) {
+                overrideTotal += payingChildren * capacity.extraChildPrice;
+            }
+            overrideTotal += extraBedFee;
+            nightRate = Math.round(overrideTotal);
+
+            nightlyBreakdown.push({
+                date: dateStr,
+                rate: nightRate,
+                isOverridden: true,
+                isWeekend: override.isWeekend,
+                isHoliday: override.isHoliday || !!holiday,
+                eventName: override.eventName || (holiday ? holiday.name : undefined),
+                holidayName: holiday?.name,
+                hasSurgeRate: holiday?.hasSurgeRate,
+                surgeMultiplier: holiday?.rateMultiplier,
+                mandatoryGala: isGalaNight,
+                galaDinnerFee: galaFeePerPax
+            });
+        } else if (holiday && holiday.hasSurgeRate && holiday.rateMultiplier > 1.0) {
+            // Enterprise Holiday & Peak Governance Dynamic Surge Tariff
+            nightRate = Math.round(standardNightly * holiday.rateMultiplier);
+            const surgePct = Math.round((holiday.rateMultiplier - 1.0) * 100);
+            hasHolidaySurge = true;
+            if (holiday.rateMultiplier > maxSurgeMultiplier) {
+                maxSurgeMultiplier = holiday.rateMultiplier;
+            }
+            activeHolidayNamesSet.add(holiday.name);
+
+            nightlyBreakdown.push({
+                date: dateStr,
+                rate: nightRate,
+                isOverridden: true,
+                isWeekend: override?.isWeekend || false,
+                isHoliday: true,
+                eventName: `${holiday.name} (+${surgePct}% Surge)`,
+                holidayName: holiday.name,
+                hasSurgeRate: true,
+                surgeMultiplier: holiday.rateMultiplier,
+                mandatoryGala: isGalaNight,
+                galaDinnerFee: galaFeePerPax
+            });
+        } else {
+            nightlyBreakdown.push({
+                date: dateStr,
+                rate: standardNightly,
+                isOverridden: false,
+                isWeekend: override?.isWeekend || false,
+                isHoliday: override?.isHoliday || !!holiday,
+                eventName: override?.eventName || (holiday ? holiday.name : undefined),
+                holidayName: holiday?.name,
+                hasSurgeRate: holiday?.hasSurgeRate || false,
+                surgeMultiplier: holiday?.rateMultiplier || 1.0,
+                mandatoryGala: isGalaNight,
+                galaDinnerFee: galaFeePerPax
+            });
+        }
+        totalTariff += nightRate;
+    }
+
+    const averageDailyRate = Math.round(totalTariff / stayNights);
+    return {
+        totalTariff,
+        averageDailyRate,
+        nightlyBreakdown,
+        hasHolidaySurge,
+        surgeMultiplier: maxSurgeMultiplier,
+        activeHolidayNames: Array.from(activeHolidayNamesSet),
+        totalGalaFee,
+        galaEvents
+    };
 };
 
 export interface RatePlanRestrictionResult {
@@ -1277,7 +1621,7 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
                 const dynamicTypes = getDynamicRoomTypes(propId);
-                return parsed.map((r: any) => {
+                return parsed.filter((r: any) => !isRoomUnassigned(r.number)).map((r: any) => {
                     const roomNum = String(r.number).trim();
                     const dynamicPartner = partnerMap.get(roomNum);
                     const isConnecting = Boolean(dynamicPartner || r.isConnecting);
@@ -1803,9 +2147,14 @@ export const validateAndCommitReservation = (
         if (typeof window !== 'undefined') {
             const API_BASE = getApiBaseUrl();
             const activePropId = getActivePropertyId();
+            const token = localStorage.getItem('token');
             fetch(`${API_BASE}/api/bookings`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                    'x-property-id': String(reservationData.propertyId || activePropId)
+                },
                 body: JSON.stringify({
                     ...reservationData,
                     propertyId: reservationData.propertyId || activePropId
@@ -1922,7 +2271,13 @@ export const isRoomUnassigned = (
  */
 export const updateReservationStatusInDB = async (
     reservationId: string | number,
-    newStatus: string
+    newStatus: string,
+    options?: {
+        skipRoomReadinessCheck?: boolean;
+        managerOverride?: boolean;
+        allowDirectBillToCompany?: boolean;
+        closedBy?: string;
+    }
 ): Promise<boolean> => {
     const rawLower = String(newStatus || '').toLowerCase().replace(/_/g, '-');
     const normalizedUIStatus = (rawLower === 'in-house' || rawLower === 'arrived' || rawLower === 'checked-in')
@@ -1947,66 +2302,84 @@ export const updateReservationStatusInDB = async (
 
     // 0. Strict PMS Check-in Guard: Block Check-In if room is unassigned
     const isCheckIn = normalizedUIStatus === 'in-house';
+    const isCheckOut = normalizedUIStatus === 'checked-out';
+
     if (isCheckIn) {
         const existingList = getAllStoredReservations();
         const targetStr = String(reservationId);
         const targetRes = existingList.find(r => String(r.id) === targetStr || r.reservationNumber === targetStr);
         if (targetRes && isRoomUnassigned(targetRes.roomNumber, targetRes.allocatedRooms)) {
-            console.warn(`[PMS Guard] Check-in blocked for ${targetRes.reservationNumber || reservationId}: Room is unassigned.`);
+            toast.error(`Cannot check in ${targetRes.guestName || reservationId}: Room is unassigned. Please assign a room number first.`);
             return false;
         }
     }
 
-    // 1. Optimistic immediate local storage update & instant event broadcast
+    // 1. Strict PMS Check-out Guard: Block Check-Out if folio balance > 0
+    if (isCheckOut && !options?.managerOverride && !options?.allowDirectBillToCompany) {
+        const existingList = getAllStoredReservations();
+        const targetStr = String(reservationId);
+        const targetRes = existingList.find(r => String(r.id) === targetStr || r.reservationNumber === targetStr);
+        if (targetRes && Number(targetRes.dueAmount) > 0.01) {
+            toast.error(`Cannot check out ${targetRes.guestName || reservationId}: Outstanding balance of ৳${Number(targetRes.dueAmount).toLocaleString()} must be settled or billed to company before checkout.`);
+            return false;
+        }
+    }
+
+    // 2. Direct Relational Database update via REST API (PostgreSQL SSOT First)
     try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status: dbStatus,
+                skipRoomReadinessCheck: options?.skipRoomReadinessCheck,
+                managerOverride: options?.managerOverride,
+                allowDirectBillToCompany: options?.allowDirectBillToCompany,
+                closedBy: options?.closedBy
+            })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            const errMsg = data.error || 'Failed to update reservation status in database';
+            toast.error(errMsg);
+            return false;
+        }
+
+        // 3. Update local cache and state only after backend commits successfully
+        const rec = data.data;
         const existing = getAllStoredReservations();
         const targetStr = String(reservationId);
-        const updated = existing.map(r => {
+        const synced = existing.map(r => {
             if (String(r.id) === targetStr || r.reservationNumber === targetStr) {
                 const regNo = isCheckIn ? (r.registrationNumber || generateRegistrationNumber(r.reservationNumber)) : r.registrationNumber;
                 const folioNo = r.folioNumber || generateFolioNumber(r.reservationNumber);
                 const regAt = isCheckIn ? (r.registeredAt || new Date().toISOString()) : r.registeredAt;
                 return {
                     ...r,
+                    ...(rec || {}),
                     status: normalizedUIStatus,
                     registrationNumber: regNo,
                     folioNumber: folioNo,
-                    registeredAt: regAt
+                    registeredAt: regAt,
+                    paidAmount: isCheckOut ? (r.totalAmount || r.paidAmount) : r.paidAmount,
+                    dueAmount: isCheckOut ? 0 : r.dueAmount
                 };
             }
             return r;
         });
-        saveStoredReservations(updated);
+        saveStoredReservations(synced);
         broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId });
-    } catch (storageErr) {
-        console.warn('Failed to update local reservation cache:', storageErr);
-    }
-
-    // 2. Direct Relational Database update via REST API
-    try {
-        const API_BASE = getApiBaseUrl();
-        const res = await fetch(`${API_BASE}/api/bookings/${reservationId}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: dbStatus })
-        });
-        const data = await res.json();
-        if (data.success && data.data) {
-            const rec = data.data;
-            const existing = getAllStoredReservations();
-            const targetStr = String(reservationId);
-            const synced = existing.map(r => (String(r.id) === targetStr || r.reservationNumber === targetStr) ? { ...r, ...rec } : r);
-            saveStoredReservations(synced);
-        }
-        return Boolean(data.success);
-    } catch (err) {
-        console.warn('Failed to update status in DB:', err);
         return true;
+    } catch (err: any) {
+        console.warn('Failed to update status in DB:', err);
+        toast.error(err.message || 'Network error updating reservation status');
+        return false;
     }
 };
 
 /**
- * Update Stop Room Move in Central Database & Broadcast to PMS (Yanolja PMS Lock feature)
+ * Update Stop Room Move in Central Database & Broadcast to PMS (Security Lock feature)
  */
 export const updateStopRoomMoveInDB = async (
     bookingId: string | number,
@@ -2107,7 +2480,7 @@ export const executeRoomSwapInDB = async (
 };
 
 /**
- * Auto-Apply Advance Deposit to Folio 1 upon Check-In (Yanolja PMS Accounting Rule)
+ * Auto-Apply Advance Deposit to Folio 1 upon Check-In (Deposit Settlement Rule)
  */
 export const autoApplyAdvanceDepositOnCheckIn = async (
     reservationNumber: string,
@@ -2198,6 +2571,15 @@ export const amendStayInDB = async (
         newDueAmount?: number;
         newBaseAmount?: number;
         taxDetails?: any;
+        notificationConfig?: {
+            sendEmail?: boolean;
+            sendSms?: boolean;
+            sendWhatsApp?: boolean;
+            guestEmail?: string;
+            guestPhone?: string;
+            reason?: string;
+            isSilent?: boolean;
+        };
     }
 ): Promise<StoredReservation | null> => {
     try {
@@ -2212,12 +2594,16 @@ export const amendStayInDB = async (
                 newTotalAmount: extraData?.newTotalAmount,
                 newDueAmount: extraData?.newDueAmount,
                 newBaseAmount: extraData?.newBaseAmount,
-                taxDetails: extraData?.taxDetails
+                taxDetails: extraData?.taxDetails,
+                notificationConfig: extraData?.notificationConfig
             })
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2241,10 +2627,24 @@ export const amendStayInDB = async (
  */
 export const moveRoomInDB = async (
     reservationIdOrNo: string | number,
-    newRoomNumber: string,
+    newRoomNumber?: string,
     newFromDate?: string,
     newToDate?: string,
-    oldRoomNumber?: string
+    oldRoomNumber?: string,
+    notificationConfig?: any,
+    options?: {
+        segments?: Array<{
+            roomNumber: string;
+            fromDate: string;
+            toDate: string;
+            roomType?: string;
+            dailyRate?: number;
+            nights?: number;
+        }>;
+        overrideRoomRate?: boolean;
+        newTotalAmount?: number;
+        newDueAmount?: number;
+    }
 ): Promise<StoredReservation | null> => {
     try {
         const API_BASE = getApiBaseUrl();
@@ -2255,12 +2655,20 @@ export const moveRoomInDB = async (
                 newRoomNumber,
                 newFromDate,
                 newToDate,
-                oldRoomNumber
+                oldRoomNumber,
+                notificationConfig,
+                segments: options?.segments,
+                overrideRoomRate: options?.overrideRoomRate,
+                newTotalAmount: options?.newTotalAmount,
+                newDueAmount: options?.newDueAmount
             })
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2302,7 +2710,10 @@ export const recordPaymentInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2340,7 +2751,10 @@ export const splitStayInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2378,7 +2792,10 @@ export const holdReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2415,7 +2832,10 @@ export const confirmHoldReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2450,7 +2870,10 @@ export const releaseHoldReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2485,7 +2908,10 @@ export const voidReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const newList = existing.filter(r => String(r.id) !== String(reservationIdOrNo) && r.reservationNumber !== String(reservationIdOrNo));
             saveStoredReservations(newList);
@@ -2514,7 +2940,10 @@ export const unassignRoomInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, roomNumber: 'Unassigned', allocatedRooms: [] } : r);
             saveStoredReservations(newList);
@@ -2543,7 +2972,10 @@ export const ungroupReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, isGroup: false } : r);
             saveStoredReservations(newList);
@@ -2572,7 +3004,10 @@ export const changeGroupOwnerInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, guestName: newOwner } : r);
             saveStoredReservations(newList);
@@ -2658,7 +3093,10 @@ export const updateReservationInDB = async (
         });
         const data = await res.json();
         if (data.success && data.data) {
-            const updatedRec: StoredReservation = data.data;
+            const updatedRec: StoredReservation = {
+                ...data.data,
+                notificationResult: data.notificationResult
+            };
             const existing = getAllStoredReservations();
             const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
             let newList: StoredReservation[];
@@ -2723,29 +3161,40 @@ export const syncRoomTypesAndRoomsFromDB = async (
             const { roomTypes, rooms } = json.data;
             let mappedTypes: DynamicRoomType[] = [];
             if (Array.isArray(roomTypes) && roomTypes.length > 0) {
-                mappedTypes = roomTypes.map((rt: any) => ({
-                    id: rt.id,
-                    propertyId: rt.property_id,
-                    code: rt.code,
-                    name: rt.name,
-                    baseOccupancy: Number(rt.base_occupancy || 2),
-                    maxAdults: Number(rt.max_adults || rt.max_occupancy || 2),
-                    maxChildren: Number(rt.max_children || rt.max_child || 1),
-                    baseRate: Number(rt.base_rate || 3000),
-                    extraBedRate: Number(rt.extra_bed_rate || 1000),
-                    extraAdultPrice: Number(rt.extra_adult_price || 1000),
-                    extraChildPrice: Number(rt.extra_child_price || 500),
-                    size: Number(rt.size || 350),
-                    bedType: rt.bed_type || 'King',
-                    viewType: rt.view_type || 'City View',
-                    smokingPolicy: rt.smoking_policy || 'Non-Smoking',
-                    amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : []),
-                    photos: Array.isArray(rt.photos) ? rt.photos : (typeof rt.photos === 'string' ? JSON.parse(rt.photos || '[]') : []),
-                    isConnecting: Boolean(rt.is_connecting),
-                    showOnWebsite: rt.show_on_website ?? true,
-                    status: rt.status || 'Active',
-                    description: rt.description
-                }));
+                mappedTypes = roomTypes.map((rt: any) => {
+                    let raw: any = {};
+                    try {
+                        if (rt.raw_json) raw = typeof rt.raw_json === 'string' ? JSON.parse(rt.raw_json) : rt.raw_json;
+                    } catch {}
+                    return {
+                        ...raw,
+                        id: rt.id,
+                        propertyId: rt.property_id,
+                        code: rt.code,
+                        name: rt.name,
+                        baseOccupancy: Number(rt.base_occupancy ?? rt.baseOccupancy ?? raw.baseAdult ?? raw.baseOccupancy ?? 0),
+                        maxAdults: Number(rt.max_adults ?? rt.maxAdults ?? raw.maxAdult ?? raw.maxAdults ?? 0),
+                        maxChildren: Number(rt.max_children ?? rt.maxChildren ?? raw.maxChild ?? raw.maxChildren ?? 0),
+                        baseRate: Number(rt.base_rate ?? rt.baseRate ?? raw.basePrice ?? raw.baseRate ?? 0),
+                        extraBedRate: Number(rt.extra_bed_rate ?? rt.extraBedRate ?? raw.extraBedPrice ?? raw.extraBedRate ?? 0),
+                        extraAdultPrice: Number(rt.extra_adult_price ?? rt.extraAdultPrice ?? raw.extraAdultPrice ?? 0),
+                        extraChildPrice: Number(rt.extra_child_price ?? rt.extraChildPrice ?? raw.extraChildPrice ?? 0),
+                        extraBedAllowed: Boolean(rt.extra_bed_allowed ?? raw.extraBedAllowed ?? (Number(rt.extra_bed_rate ?? rt.extraBedRate ?? raw.extraBedPrice ?? 0) > 0)),
+                        extraBedQuantity: Number(rt.extra_bed_quantity ?? raw.extraBedQuantity ?? (Boolean(rt.extra_bed_allowed ?? raw.extraBedAllowed) ? 1 : 0)),
+                        babyCotAllowed: Boolean(rt.baby_cot_allowed ?? raw.babyCotAllowed ?? true),
+                        size: Number(rt.size ?? raw.size ?? 0),
+                        bedType: rt.bed_type || rt.bedType || raw.bedType || raw.bedConfiguration || '',
+                        viewType: rt.view_type || rt.viewType || raw.viewType || '',
+                        smokingPolicy: rt.smoking_policy || rt.smokingPolicy || raw.smokingPolicy || '',
+                        amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : (raw.amenities || [])),
+                        photos: Array.isArray(rt.photos) ? rt.photos : (typeof rt.photos === 'string' ? JSON.parse(rt.photos || '[]') : (raw.photos || [])),
+                        videos: Array.isArray(rt.videos) ? rt.videos : (typeof rt.videos === 'string' ? JSON.parse(rt.videos || '[]') : (raw.videos || [])),
+                        isConnecting: Boolean(rt.is_connecting ?? raw.isConnecting),
+                        showOnWebsite: rt.show_on_website ?? raw.showOnWebsite ?? true,
+                        status: rt.status || raw.status || 'Active',
+                        description: rt.description || raw.description || ''
+                    };
+                });
                 localStorage.setItem(`hotel_room_types_prop_${propId}`, JSON.stringify(mappedTypes));
                 if (propId === 1) {
                     localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(mappedTypes));
@@ -2754,7 +3203,7 @@ export const syncRoomTypesAndRoomsFromDB = async (
 
             let mappedRooms: CanonicalRoom[] = [];
             if (Array.isArray(rooms) && rooms.length > 0) {
-                mappedRooms = rooms.map((r: any) => ({
+                mappedRooms = rooms.filter((r: any) => !isRoomUnassigned(r.room_number || r.number || r.roomNo)).map((r: any) => ({
                     id: r.id,
                     number: String(r.room_number || r.number || r.roomNo || ''),
                     name: r.name || `Room ${r.room_number || r.number || r.roomNo || ''}`,
@@ -2808,19 +3257,28 @@ export const syncRatesAndPlansFromDB = async (targetPropertyId?: number): Promis
         if (plansRes && plansRes.ok) {
             const json = await plansRes.json();
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                localStorage.setItem(`hotel_rate_plans_prop_${propId}`, JSON.stringify(json.data));
+                if (propId === 1) {
+                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                }
             }
         }
         if (mealsRes && mealsRes.ok) {
             const json = await mealsRes.json();
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                localStorage.setItem('hotel_meal_plans_v1', JSON.stringify(json.data));
+                localStorage.setItem(`hotel_meal_plans_prop_${propId}`, JSON.stringify(json.data));
+                if (propId === 1) {
+                    localStorage.setItem('hotel_meal_plans_v1', JSON.stringify(json.data));
+                }
             }
         }
         if (pkgsRes && pkgsRes.ok) {
             const json = await pkgsRes.json();
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                localStorage.setItem('hotel_packages_v2', JSON.stringify(json.data));
+                localStorage.setItem(`hotel_packages_prop_${propId}`, JSON.stringify(json.data));
+                if (propId === 1) {
+                    localStorage.setItem('hotel_packages_v2', JSON.stringify(json.data));
+                }
             }
         }
     } catch (err) {

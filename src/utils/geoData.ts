@@ -2486,12 +2486,12 @@ export const COUNTRIES_DATABASE: CountryInfo[] = [
 ];
 
 export function getCountryByName(name: string): CountryInfo | undefined {
-    if (!name) return undefined;
+    if (!name || typeof name !== 'string') return undefined;
     const clean = name.trim().toLowerCase();
     return COUNTRIES_DATABASE.find(c =>
-        c.name.toLowerCase() === clean ||
-        c.nationality.toLowerCase() === clean ||
-        c.code.toLowerCase() === clean
+        (c?.name && c.name.toLowerCase() === clean) ||
+        (c?.nationality && c.nationality.toLowerCase() === clean) ||
+        (c?.code && c.code.toLowerCase() === clean)
     );
 }
 
@@ -2510,4 +2510,254 @@ export function getDialCodeForCountry(countryName: string): string {
 export function getNationalityForCountry(countryName: string): string {
     const country = getCountryByName(countryName);
     return country ? country.nationality : 'Bangladeshi';
+}
+
+export interface TimezoneInfo {
+    value: string;
+    label: string;
+    region: 'Asia' | 'Europe' | 'Americas' | 'Pacific' | 'Africa' | 'Middle East' | 'Australia';
+    offset: string;
+}
+
+export const TIMEZONES_DATABASE: TimezoneInfo[] = [
+    // Asia & South Asia
+    { value: 'Asia/Dhaka (GMT+06:00)', label: 'Asia/Dhaka (GMT+06:00) — Bangladesh Standard Time', region: 'Asia', offset: '+06:00' },
+    { value: 'Asia/Kolkata (GMT+05:30)', label: 'Asia/Kolkata (GMT+05:30) — India Standard Time', region: 'Asia', offset: '+05:30' },
+    { value: 'Asia/Colombo (GMT+05:30)', label: 'Asia/Colombo (GMT+05:30) — Sri Lanka Time', region: 'Asia', offset: '+05:30' },
+    { value: 'Asia/Kathmandu (GMT+05:45)', label: 'Asia/Kathmandu (GMT+05:45) — Nepal Time', region: 'Asia', offset: '+05:45' },
+    { value: 'Asia/Thimphu (GMT+06:00)', label: 'Asia/Thimphu (GMT+06:00) — Bhutan Time', region: 'Asia', offset: '+06:00' },
+    { value: 'Asia/Karachi (GMT+05:00)', label: 'Asia/Karachi (GMT+05:00) — Pakistan Standard Time', region: 'Asia', offset: '+05:00' },
+    { value: 'Asia/Bangkok (GMT+07:00)', label: 'Asia/Bangkok (GMT+07:00) — Thailand, Indochina Time', region: 'Asia', offset: '+07:00' },
+    { value: 'Asia/Jakarta (GMT+07:00)', label: 'Asia/Jakarta (GMT+07:00) — Western Indonesia Time', region: 'Asia', offset: '+07:00' },
+    { value: 'Asia/Singapore (GMT+08:00)', label: 'Asia/Singapore (GMT+08:00) — Singapore Standard Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Kuala_Lumpur (GMT+08:00)', label: 'Asia/Kuala_Lumpur (GMT+08:00) — Malaysia Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Hong_Kong (GMT+08:00)', label: 'Asia/Hong_Kong (GMT+08:00) — Hong Kong Standard Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Shanghai (GMT+08:00)', label: 'Asia/Shanghai (GMT+08:00) — China Standard Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Taipei (GMT+08:00)', label: 'Asia/Taipei (GMT+08:00) — Taiwan Standard Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Manila (GMT+08:00)', label: 'Asia/Manila (GMT+08:00) — Philippine Standard Time', region: 'Asia', offset: '+08:00' },
+    { value: 'Asia/Tokyo (GMT+09:00)', label: 'Asia/Tokyo (GMT+09:00) — Japan Standard Time', region: 'Asia', offset: '+09:00' },
+    { value: 'Asia/Seoul (GMT+09:00)', label: 'Asia/Seoul (GMT+09:00) — Korea Standard Time', region: 'Asia', offset: '+09:00' },
+    { value: 'Asia/Almaty (GMT+05:00)', label: 'Asia/Almaty (GMT+05:00) — Kazakhstan Time', region: 'Asia', offset: '+05:00' },
+    { value: 'Asia/Tashkent (GMT+05:00)', label: 'Asia/Tashkent (GMT+05:00) — Uzbekistan Time', region: 'Asia', offset: '+05:00' },
+
+    // Middle East
+    { value: 'Asia/Dubai (GMT+04:00)', label: 'Asia/Dubai (GMT+04:00) — Gulf Standard Time (UAE, Oman)', region: 'Middle East', offset: '+04:00' },
+    { value: 'Asia/Riyadh (GMT+03:00)', label: 'Asia/Riyadh (GMT+03:00) — Arabia Standard Time (Saudi Arabia)', region: 'Middle East', offset: '+03:00' },
+    { value: 'Asia/Qatar (GMT+03:00)', label: 'Asia/Qatar (GMT+03:00) — Qatar Standard Time', region: 'Middle East', offset: '+03:00' },
+    { value: 'Asia/Kuwait (GMT+03:00)', label: 'Asia/Kuwait (GMT+03:00) — Kuwait Time', region: 'Middle East', offset: '+03:00' },
+    { value: 'Asia/Bahrain (GMT+03:00)', label: 'Asia/Bahrain (GMT+03:00) — Bahrain Time', region: 'Middle East', offset: '+03:00' },
+    { value: 'Asia/Muscat (GMT+04:00)', label: 'Asia/Muscat (GMT+04:00) — Oman Standard Time', region: 'Middle East', offset: '+04:00' },
+    { value: 'Asia/Jerusalem (GMT+02:00)', label: 'Asia/Jerusalem (GMT+02:00) — Israel Standard Time', region: 'Middle East', offset: '+02:00' },
+    { value: 'Asia/Amman (GMT+03:00)', label: 'Asia/Amman (GMT+03:00) — Jordan Time', region: 'Middle East', offset: '+03:00' },
+    { value: 'Asia/Beirut (GMT+02:00)', label: 'Asia/Beirut (GMT+02:00) — Lebanon Time', region: 'Middle East', offset: '+02:00' },
+
+    // Europe
+    { value: 'Europe/London (GMT+00:00)', label: 'Europe/London (GMT+00:00) — United Kingdom, GMT / BST', region: 'Europe', offset: '+00:00' },
+    { value: 'Europe/Dublin (GMT+00:00)', label: 'Europe/Dublin (GMT+00:00) — Ireland Standard Time', region: 'Europe', offset: '+00:00' },
+    { value: 'Europe/Paris (GMT+01:00)', label: 'Europe/Paris (GMT+01:00) — France, Central European Time', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Berlin (GMT+01:00)', label: 'Europe/Berlin (GMT+01:00) — Germany, Central European Time', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Rome (GMT+01:00)', label: 'Europe/Rome (GMT+01:00) — Italy, Central European Time', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Madrid (GMT+01:00)', label: 'Europe/Madrid (GMT+01:00) — Spain, Central European Time', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Amsterdam (GMT+01:00)', label: 'Europe/Amsterdam (GMT+01:00) — Netherlands, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Brussels (GMT+01:00)', label: 'Europe/Brussels (GMT+01:00) — Belgium, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Vienna (GMT+01:00)', label: 'Europe/Vienna (GMT+01:00) — Austria, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Zurich (GMT+01:00)', label: 'Europe/Zurich (GMT+01:00) — Switzerland, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Stockholm (GMT+01:00)', label: 'Europe/Stockholm (GMT+01:00) — Sweden, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Oslo (GMT+01:00)', label: 'Europe/Oslo (GMT+01:00) — Norway, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Copenhagen (GMT+01:00)', label: 'Europe/Copenhagen (GMT+01:00) — Denmark, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Warsaw (GMT+01:00)', label: 'Europe/Warsaw (GMT+01:00) — Poland, CET', region: 'Europe', offset: '+01:00' },
+    { value: 'Europe/Athens (GMT+02:00)', label: 'Europe/Athens (GMT+02:00) — Greece, Eastern European Time', region: 'Europe', offset: '+02:00' },
+    { value: 'Europe/Helsinki (GMT+02:00)', label: 'Europe/Helsinki (GMT+02:00) — Finland, EET', region: 'Europe', offset: '+02:00' },
+    { value: 'Europe/Istanbul (GMT+03:00)', label: 'Europe/Istanbul (GMT+03:00) — Turkey Time', region: 'Europe', offset: '+03:00' },
+    { value: 'Europe/Moscow (GMT+03:00)', label: 'Europe/Moscow (GMT+03:00) — Moscow Standard Time', region: 'Europe', offset: '+03:00' },
+
+    // Americas
+    { value: 'America/New_York (GMT-05:00)', label: 'America/New_York (GMT-05:00) — US Eastern Time', region: 'Americas', offset: '-05:00' },
+    { value: 'America/Chicago (GMT-06:00)', label: 'America/Chicago (GMT-06:00) — US Central Time', region: 'Americas', offset: '-06:00' },
+    { value: 'America/Denver (GMT-07:00)', label: 'America/Denver (GMT-07:00) — US Mountain Time', region: 'Americas', offset: '-07:00' },
+    { value: 'America/Los_Angeles (GMT-08:00)', label: 'America/Los_Angeles (GMT-08:00) — US Pacific Time', region: 'Americas', offset: '-08:00' },
+    { value: 'America/Anchorage (GMT-09:00)', label: 'America/Anchorage (GMT-09:00) — Alaska Time', region: 'Americas', offset: '-09:00' },
+    { value: 'Pacific/Honolulu (GMT-10:00)', label: 'Pacific/Honolulu (GMT-10:00) — Hawaii Standard Time', region: 'Americas', offset: '-10:00' },
+    { value: 'America/Toronto (GMT-05:00)', label: 'America/Toronto (GMT-05:00) — Eastern Canada Time', region: 'Americas', offset: '-05:00' },
+    { value: 'America/Vancouver (GMT-08:00)', label: 'America/Vancouver (GMT-08:00) — Pacific Canada Time', region: 'Americas', offset: '-08:00' },
+    { value: 'America/Mexico_City (GMT-06:00)', label: 'America/Mexico_City (GMT-06:00) — Central Mexico Time', region: 'Americas', offset: '-06:00' },
+    { value: 'America/Bogota (GMT-05:00)', label: 'America/Bogota (GMT-05:00) — Colombia Time', region: 'Americas', offset: '-05:00' },
+    { value: 'America/Lima (GMT-05:00)', label: 'America/Lima (GMT-05:00) — Peru Time', region: 'Americas', offset: '-05:00' },
+    { value: 'America/Santiago (GMT-04:00)', label: 'America/Santiago (GMT-04:00) — Chile Standard Time', region: 'Americas', offset: '-04:00' },
+    { value: 'America/Buenos_Aires (GMT-03:00)', label: 'America/Buenos_Aires (GMT-03:00) — Argentina Time', region: 'Americas', offset: '-03:00' },
+    { value: 'America/Sao_Paulo (GMT-03:00)', label: 'America/Sao_Paulo (GMT-03:00) — Brazil Time (Brasilia)', region: 'Americas', offset: '-03:00' },
+
+    // Australia & Pacific
+    { value: 'Australia/Sydney (GMT+10:00)', label: 'Australia/Sydney (GMT+10:00) — Australian Eastern Time (AEST)', region: 'Australia', offset: '+10:00' },
+    { value: 'Australia/Melbourne (GMT+10:00)', label: 'Australia/Melbourne (GMT+10:00) — Australian Eastern Time', region: 'Australia', offset: '+10:00' },
+    { value: 'Australia/Brisbane (GMT+10:00)', label: 'Australia/Brisbane (GMT+10:00) — Queensland Time (No DST)', region: 'Australia', offset: '+10:00' },
+    { value: 'Australia/Adelaide (GMT+09:30)', label: 'Australia/Adelaide (GMT+09:30) — Australian Central Time (ACST)', region: 'Australia', offset: '+09:30' },
+    { value: 'Australia/Perth (GMT+08:00)', label: 'Australia/Perth (GMT+08:00) — Australian Western Time (AWST)', region: 'Australia', offset: '+08:00' },
+    { value: 'Pacific/Auckland (GMT+12:00)', label: 'Pacific/Auckland (GMT+12:00) — New Zealand Standard Time', region: 'Pacific', offset: '+12:00' },
+    { value: 'Pacific/Fiji (GMT+12:00)', label: 'Pacific/Fiji (GMT+12:00) — Fiji Standard Time', region: 'Pacific', offset: '+12:00' },
+
+    // Africa
+    { value: 'Africa/Cairo (GMT+02:00)', label: 'Africa/Cairo (GMT+02:00) — Egypt Standard Time', region: 'Africa', offset: '+02:00' },
+    { value: 'Africa/Johannesburg (GMT+02:00)', label: 'Africa/Johannesburg (GMT+02:00) — South Africa Standard Time', region: 'Africa', offset: '+02:00' },
+    { value: 'Africa/Nairobi (GMT+03:00)', label: 'Africa/Nairobi (GMT+03:00) — East Africa Time (Kenya, Tanzania)', region: 'Africa', offset: '+03:00' },
+    { value: 'Africa/Lagos (GMT+01:00)', label: 'Africa/Lagos (GMT+01:00) — West Africa Time (Nigeria)', region: 'Africa', offset: '+01:00' },
+    { value: 'Africa/Casablanca (GMT+01:00)', label: 'Africa/Casablanca (GMT+01:00) — Morocco Time', region: 'Africa', offset: '+01:00' }
+];
+
+export const COUNTRY_DIVISIONS: Record<string, string[]> = {
+    'Bangladesh': [
+        'Dhaka Division',
+        'Chattogram Division',
+        'Sylhet Division',
+        'Rajshahi Division',
+        'Khulna Division',
+        'Barishal Division',
+        'Rangpur Division',
+        'Mymensingh Division'
+    ],
+    'India': [
+        'Delhi (NCT)',
+        'Maharashtra',
+        'West Bengal',
+        'Karnataka',
+        'Tamil Nadu',
+        'Gujarat',
+        'Uttar Pradesh',
+        'Telangana',
+        'Kerala',
+        'Rajasthan',
+        'Punjab',
+        'Haryana',
+        'Assam',
+        'Bihar',
+        'Odisha',
+        'Goa'
+    ],
+    'United States': [
+        'California',
+        'New York',
+        'Texas',
+        'Florida',
+        'Illinois',
+        'Pennsylvania',
+        'Ohio',
+        'Georgia',
+        'North Carolina',
+        'Washington',
+        'Nevada',
+        'Massachusetts',
+        'New Jersey',
+        'Virginia',
+        'Colorado',
+        'Arizona'
+    ],
+    'United Kingdom': [
+        'Greater London',
+        'South East England',
+        'North West England',
+        'West Midlands',
+        'Scotland',
+        'Wales',
+        'Northern Ireland',
+        'Yorkshire and the Humber',
+        'East of England'
+    ],
+    'United Arab Emirates': [
+        'Dubai',
+        'Abu Dhabi',
+        'Sharjah',
+        'Ajman',
+        'Ras Al Khaimah',
+        'Fujairah',
+        'Umm Al Quwain'
+    ],
+    'Saudi Arabia': [
+        'Riyadh Region',
+        'Makkah Region',
+        'Eastern Province',
+        'Madinah Region',
+        'Asir Region',
+        'Tabuk Region'
+    ],
+    'Canada': [
+        'Ontario',
+        'Quebec',
+        'British Columbia',
+        'Alberta',
+        'Manitoba',
+        'Nova Scotia',
+        'Saskatchewan'
+    ],
+    'Australia': [
+        'New South Wales',
+        'Victoria',
+        'Queensland',
+        'Western Australia',
+        'South Australia',
+        'Tasmania',
+        'Australian Capital Territory'
+    ],
+    'Malaysia': [
+        'Kuala Lumpur',
+        'Selangor',
+        'Penang',
+        'Johor',
+        'Sabah',
+        'Sarawak',
+        'Melaka'
+    ],
+    'Singapore': [
+        'Central Region',
+        'East Region',
+        'North Region',
+        'North-East Region',
+        'West Region'
+    ],
+    'Thailand': [
+        'Bangkok',
+        'Chiang Mai',
+        'Phuket',
+        'Chonburi (Pattaya)',
+        'Surat Thani (Koh Samui)',
+        'Krabi'
+    ]
+};
+
+export function getAllTimezones(): TimezoneInfo[] {
+    return TIMEZONES_DATABASE;
+}
+
+export function getAllCountries(): CountryInfo[] {
+    return COUNTRIES_DATABASE;
+}
+
+export function getAllNationalities(): Array<{ nationality: string; countryName: string; code: string }> {
+    const map = new Map<string, { nationality: string; countryName: string; code: string }>();
+    for (const c of COUNTRIES_DATABASE) {
+        if (c?.nationality && !map.has(c.nationality.toLowerCase())) {
+            map.set(c.nationality.toLowerCase(), {
+                nationality: c.nationality,
+                countryName: c.name || '',
+                code: c.code || ''
+            });
+        }
+    }
+    return Array.from(map.values()).sort((a, b) => a.nationality.localeCompare(b.nationality));
+}
+
+export function getStatesForCountry(countryName: string): string[] {
+    if (!countryName || typeof countryName !== 'string') return COUNTRY_DIVISIONS['Bangladesh'];
+    const clean = countryName.trim().toLowerCase();
+    const matchedKey = Object.keys(COUNTRY_DIVISIONS).find(
+        k => k.toLowerCase() === clean
+    );
+    if (matchedKey) return COUNTRY_DIVISIONS[matchedKey];
+    return [
+        'Capital Region',
+        'Central Division',
+        'Northern Province',
+        'Southern Province',
+        'Eastern Province',
+        'Western Province'
+    ];
 }

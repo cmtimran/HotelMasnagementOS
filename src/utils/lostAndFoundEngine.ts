@@ -2,7 +2,7 @@
  * HotelManagementOS - Enterprise Lost & Found Management Engine
  * 
  * Standards Compliant with AHLA (American Hotel & Lodging Association),
- * Opera Cloud, and eZee Technosys (Yanolja Cloud) SOPs:
+ * Enterprise Hospitality Loss Prevention SOPs:
  * 
  * 1. Immediate Registration with Auto-Generated Reference No (LF-YYYY-XXXX).
  * 2. Room & Guest Auto-Discovery (Finds current in-house or recent guest for the room).

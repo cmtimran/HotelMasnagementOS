@@ -119,7 +119,7 @@
 ## 1.1 Purpose
 This Software Requirements Specification (SRS) establishes the definitive, comprehensive architectural and implementation requirements for the **HotelManagementOS Platform** — an enterprise-grade cloud Property Management System (PMS), global Online Travel Agency (OTA) Channel Manager, and full-stack Hospitality Enterprise Resource Planning (ERP) platform.
 
-Traditional lodging operators suffer from fragmented software architectures: separate legacy PMS applications (e.g., OPERA, eZee), third-party channel managers (e.g., SiteMinder, RateGain), standalone accounting software (e.g., Tally, QuickBooks), standalone HR/payroll software, and disparate point-of-sale systems. This fragmentation creates severe data silos, high recurring licensing costs, frequent double-bookings (overbooking), and reconciliation nightmares.
+Traditional lodging operators suffer from fragmented software architectures: separate legacy PMS applications (e.g., OPERA, Cloudbeds), third-party channel managers (e.g., SiteMinder, RateGain), standalone accounting software (e.g., Tally, QuickBooks), standalone HR/payroll software, and disparate point-of-sale systems. This fragmentation creates severe data silos, high recurring licensing costs, frequent double-bookings (overbooking), and reconciliation nightmares.
 
 The **HotelManagementOS** resolves these foundational problems by delivering a **Unified Single-Stack Architecture**:
 1. **Core Cloud PMS**: Complete Front Desk, Central Reservation System (CRS), Multi-Folio Cashiering, Housekeeping, and Automated Night Audit.

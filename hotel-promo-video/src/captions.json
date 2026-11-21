@@ -1,0 +1,422 @@
+[
+  {
+    "text": "পুরনো",
+    "startMs": 100,
+    "endMs": 514,
+    "timestampMs": 100,
+    "confidence": 1.0
+  },
+  {
+    "text": " স্লো",
+    "startMs": 514,
+    "endMs": 845,
+    "timestampMs": 514,
+    "confidence": 1.0
+  },
+  {
+    "text": " সফটওয়্যার",
+    "startMs": 845,
+    "endMs": 1672,
+    "timestampMs": 845,
+    "confidence": 1.0
+  },
+  {
+    "text": " আর",
+    "startMs": 1672,
+    "endMs": 1837,
+    "timestampMs": 1672,
+    "confidence": 1.0
+  },
+  {
+    "text": " কাগজের",
+    "startMs": 1837,
+    "endMs": 2333,
+    "timestampMs": 1837,
+    "confidence": 1.0
+  },
+  {
+    "text": " খাতায়",
+    "startMs": 2333,
+    "endMs": 2829,
+    "timestampMs": 2333,
+    "confidence": 1.0
+  },
+  {
+    "text": " আপনি",
+    "startMs": 2829,
+    "endMs": 3160,
+    "timestampMs": 2829,
+    "confidence": 1.0
+  },
+  {
+    "text": " কি",
+    "startMs": 3160,
+    "endMs": 3325,
+    "timestampMs": 3160,
+    "confidence": 1.0
+  },
+  {
+    "text": " ক্লান্ত?",
+    "startMs": 3325,
+    "endMs": 3988,
+    "timestampMs": 3325,
+    "confidence": 1.0
+  },
+  {
+    "text": "বুকিং",
+    "startMs": 3938,
+    "endMs": 4407,
+    "timestampMs": 3938,
+    "confidence": 1.0
+  },
+  {
+    "text": " মিসম্যাচ",
+    "startMs": 4407,
+    "endMs": 5157,
+    "timestampMs": 4407,
+    "confidence": 1.0
+  },
+  {
+    "text": " আর",
+    "startMs": 5157,
+    "endMs": 5345,
+    "timestampMs": 5157,
+    "confidence": 1.0
+  },
+  {
+    "text": " দীর্ঘ",
+    "startMs": 5345,
+    "endMs": 5814,
+    "timestampMs": 5345,
+    "confidence": 1.0
+  },
+  {
+    "text": " লাইনের",
+    "startMs": 5814,
+    "endMs": 6376,
+    "timestampMs": 5814,
+    "confidence": 1.0
+  },
+  {
+    "text": " চেক-ইন",
+    "startMs": 6376,
+    "endMs": 6938,
+    "timestampMs": 6376,
+    "confidence": 1.0
+  },
+  {
+    "text": " এখন",
+    "startMs": 6938,
+    "endMs": 7219,
+    "timestampMs": 6938,
+    "confidence": 1.0
+  },
+  {
+    "text": " অতীত!",
+    "startMs": 7219,
+    "endMs": 7688,
+    "timestampMs": 7219,
+    "confidence": 1.0
+  },
+  {
+    "text": "চলে",
+    "startMs": 7688,
+    "endMs": 7998,
+    "timestampMs": 7688,
+    "confidence": 1.0
+  },
+  {
+    "text": " এলো",
+    "startMs": 7998,
+    "endMs": 8308,
+    "timestampMs": 7998,
+    "confidence": 1.0
+  },
+  {
+    "text": " হোটেল",
+    "startMs": 8308,
+    "endMs": 8824,
+    "timestampMs": 8308,
+    "confidence": 1.0
+  },
+  {
+    "text": " ম্যানেজমেন্ট",
+    "startMs": 8824,
+    "endMs": 10063,
+    "timestampMs": 8824,
+    "confidence": 1.0
+  },
+  {
+    "text": " ওএস!",
+    "startMs": 10063,
+    "endMs": 10476,
+    "timestampMs": 10063,
+    "confidence": 1.0
+  },
+  {
+    "text": "আপনার",
+    "startMs": 10475,
+    "endMs": 10914,
+    "timestampMs": 10475,
+    "confidence": 1.0
+  },
+  {
+    "text": " হোটেলের",
+    "startMs": 10914,
+    "endMs": 11528,
+    "timestampMs": 10914,
+    "confidence": 1.0
+  },
+  {
+    "text": " প্রতিটি",
+    "startMs": 11528,
+    "endMs": 12142,
+    "timestampMs": 11528,
+    "confidence": 1.0
+  },
+  {
+    "text": " অপারেশনের",
+    "startMs": 12142,
+    "endMs": 12932,
+    "timestampMs": 12142,
+    "confidence": 1.0
+  },
+  {
+    "text": " একমাত্র",
+    "startMs": 12932,
+    "endMs": 13546,
+    "timestampMs": 12932,
+    "confidence": 1.0
+  },
+  {
+    "text": " আধুনিক",
+    "startMs": 13546,
+    "endMs": 14073,
+    "timestampMs": 13546,
+    "confidence": 1.0
+  },
+  {
+    "text": " সমাধান",
+    "startMs": 14073,
+    "endMs": 14600,
+    "timestampMs": 14073,
+    "confidence": 1.0
+  },
+  {
+    "text": "রিয়েলটাইম",
+    "startMs": 14600,
+    "endMs": 15350,
+    "timestampMs": 14600,
+    "confidence": 1.0
+  },
+  {
+    "text": " ভিজ্যুয়াল",
+    "startMs": 15350,
+    "endMs": 16100,
+    "timestampMs": 15350,
+    "confidence": 1.0
+  },
+  {
+    "text": " স্টে",
+    "startMs": 16100,
+    "endMs": 16400,
+    "timestampMs": 16100,
+    "confidence": 1.0
+  },
+  {
+    "text": " ভিউ,",
+    "startMs": 16400,
+    "endMs": 16700,
+    "timestampMs": 16400,
+    "confidence": 1.0
+  },
+  {
+    "text": " মাত্র",
+    "startMs": 16700,
+    "endMs": 17075,
+    "timestampMs": 16700,
+    "confidence": 1.0
+  },
+  {
+    "text": " এক",
+    "startMs": 17075,
+    "endMs": 17225,
+    "timestampMs": 17075,
+    "confidence": 1.0
+  },
+  {
+    "text": " ক্লিকে",
+    "startMs": 17225,
+    "endMs": 17675,
+    "timestampMs": 17225,
+    "confidence": 1.0
+  },
+  {
+    "text": " এক্সপ্রেস",
+    "startMs": 17675,
+    "endMs": 18350,
+    "timestampMs": 17675,
+    "confidence": 1.0
+  },
+  {
+    "text": " চেক-ইন,",
+    "startMs": 18350,
+    "endMs": 18875,
+    "timestampMs": 18350,
+    "confidence": 1.0
+  },
+  {
+    "text": " এবং",
+    "startMs": 18875,
+    "endMs": 19100,
+    "timestampMs": 18875,
+    "confidence": 1.0
+  },
+  {
+    "text": " সাথে",
+    "startMs": 19100,
+    "endMs": 19400,
+    "timestampMs": 19100,
+    "confidence": 1.0
+  },
+  {
+    "text": " সাথে",
+    "startMs": 19400,
+    "endMs": 19700,
+    "timestampMs": 19400,
+    "confidence": 1.0
+  },
+  {
+    "text": " অটোমেটিক",
+    "startMs": 19700,
+    "endMs": 20300,
+    "timestampMs": 19700,
+    "confidence": 1.0
+  },
+  {
+    "text": " মানি",
+    "startMs": 20300,
+    "endMs": 20600,
+    "timestampMs": 20300,
+    "confidence": 1.0
+  },
+  {
+    "text": " রিসিপ্ট",
+    "startMs": 20600,
+    "endMs": 21125,
+    "timestampMs": 20600,
+    "confidence": 1.0
+  },
+  {
+    "text": " প্রিন্ট",
+    "startMs": 21125,
+    "endMs": 21650,
+    "timestampMs": 21125,
+    "confidence": 1.0
+  },
+  {
+    "text": "হোটেল",
+    "startMs": 21650,
+    "endMs": 22084,
+    "timestampMs": 21650,
+    "confidence": 1.0
+  },
+  {
+    "text": " ম্যানেজমেন্ট",
+    "startMs": 22084,
+    "endMs": 23125,
+    "timestampMs": 22084,
+    "confidence": 1.0
+  },
+  {
+    "text": " এবার",
+    "startMs": 23125,
+    "endMs": 23472,
+    "timestampMs": 23125,
+    "confidence": 1.0
+  },
+  {
+    "text": " হবে",
+    "startMs": 23472,
+    "endMs": 23732,
+    "timestampMs": 23472,
+    "confidence": 1.0
+  },
+  {
+    "text": " আরও",
+    "startMs": 23732,
+    "endMs": 23992,
+    "timestampMs": 23732,
+    "confidence": 1.0
+  },
+  {
+    "text": " নির্ভুল,",
+    "startMs": 23992,
+    "endMs": 24686,
+    "timestampMs": 23992,
+    "confidence": 1.0
+  },
+  {
+    "text": " দ্রুত",
+    "startMs": 24686,
+    "endMs": 25120,
+    "timestampMs": 24686,
+    "confidence": 1.0
+  },
+  {
+    "text": " এবং",
+    "startMs": 25120,
+    "endMs": 25380,
+    "timestampMs": 25120,
+    "confidence": 1.0
+  },
+  {
+    "text": " প্রফেশনাল",
+    "startMs": 25380,
+    "endMs": 26162,
+    "timestampMs": 25380,
+    "confidence": 1.0
+  },
+  {
+    "text": "আজই",
+    "startMs": 26162,
+    "endMs": 26461,
+    "timestampMs": 26162,
+    "confidence": 1.0
+  },
+  {
+    "text": " শুরু",
+    "startMs": 26461,
+    "endMs": 26859,
+    "timestampMs": 26461,
+    "confidence": 1.0
+  },
+  {
+    "text": " করুন",
+    "startMs": 26859,
+    "endMs": 27257,
+    "timestampMs": 26859,
+    "confidence": 1.0
+  },
+  {
+    "text": " হোটেল",
+    "startMs": 27257,
+    "endMs": 27755,
+    "timestampMs": 27257,
+    "confidence": 1.0
+  },
+  {
+    "text": " ম্যানেজমেন্ট",
+    "startMs": 27755,
+    "endMs": 28951,
+    "timestampMs": 27755,
+    "confidence": 1.0
+  },
+  {
+    "text": " ওএস!",
+    "startMs": 28951,
+    "endMs": 29350,
+    "timestampMs": 28951,
+    "confidence": 1.0
+  }
+]

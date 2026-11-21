@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import {
     Landmark,
     Wallet,
@@ -64,7 +65,7 @@ export const BankingManagement: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state from localStorage
+    // Hydrate state from localStorage and sync with PostgreSQL
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
         const saved = localStorage.getItem('master_banks_v2');
         return saved ? JSON.parse(saved) : INITIAL_BANKS;
@@ -74,6 +75,60 @@ export const BankingManagement: React.FC = () => {
         const saved = localStorage.getItem('master_mfs_v2');
         return saved ? JSON.parse(saved) : INITIAL_MFS_WALLETS;
     });
+
+    const fetchBanksFromApi = useCallback(async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/banks`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                const banks = json.data.filter((x: any) => x.account_type === 'bank').map((b: any) => ({
+                    id: Number(b.id),
+                    bankName: b.bank_name,
+                    accountTitle: b.account_name,
+                    accountNumber: b.account_number,
+                    branchName: b.branch || '',
+                    routingNumber: b.routing_number || '',
+                    swiftCode: b.swift_code || '',
+                    isDefaultSettlement: Boolean(b.is_default),
+                    linkedGlCode: 'GL-1020',
+                    status: b.is_active ? 'Active' : 'Inactive'
+                }));
+                const mfs = json.data.filter((x: any) => x.account_type === 'mfs').map((m: any) => ({
+                    id: Number(m.id),
+                    provider: m.bank_name,
+                    merchantNumber: m.account_number,
+                    counterId: m.account_name,
+                    commissionRatePercent: 1.2,
+                    linkedBankName: m.branch || 'City Bank PLC',
+                    linkedGlCode: 'GL-1030',
+                    dailyLimitBDT: 500000,
+                    status: m.is_active ? 'Active' : 'Inactive'
+                }));
+                if (banks.length > 0) {
+                    setBankAccounts(banks);
+                    localStorage.setItem('master_banks_v2', JSON.stringify(banks));
+                }
+                if (mfs.length > 0) {
+                    setMfsWallets(mfs);
+                    localStorage.setItem('master_mfs_v2', JSON.stringify(mfs));
+                }
+            }
+        } catch (e) {
+            console.warn('API fetch banks fallback to local storage:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchBanksFromApi();
+
+        const handleSync = (e: any) => {
+            if (e.detail?.entity === 'banks' || e.detail?.type === 'MASTER_DATA_UPDATED') {
+                fetchBanksFromApi();
+            }
+        };
+        window.addEventListener('pms_network_sync', handleSync);
+        return () => window.removeEventListener('pms_network_sync', handleSync);
+    }, [fetchBanksFromApi]);
 
     useEffect(() => {
         localStorage.setItem('master_banks_v2', JSON.stringify(bankAccounts));
@@ -144,7 +199,7 @@ export const BankingManagement: React.FC = () => {
         setIsBankModalOpen(true);
     };
 
-    const handleSaveBank = (e: React.FormEvent) => {
+    const handleSaveBank = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!bankForm.bankName || !bankForm.accountNumber) return;
 
@@ -152,18 +207,41 @@ export const BankingManagement: React.FC = () => {
             setBankAccounts(prev => prev.map(b => ({ ...b, isDefaultSettlement: false })));
         }
 
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/banks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editingBank ? editingBank.id : undefined,
+                    bankName: bankForm.bankName,
+                    accountName: bankForm.accountTitle,
+                    accountNumber: bankForm.accountNumber,
+                    branch: bankForm.branchName,
+                    routingNumber: bankForm.routingNumber,
+                    swiftCode: bankForm.swiftCode,
+                    accountType: 'bank',
+                    isActive: bankForm.status === 'Active'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`Bank account ${bankForm.bankName} saved to PostgreSQL.`);
+                fetchBanksFromApi();
+            }
+        } catch {
+            showToast('Saved locally.');
+        }
+
         if (editingBank) {
             setBankAccounts(prev =>
                 prev.map(b => b.id === editingBank.id ? { ...b, ...bankForm } : b)
             );
-            showToast(`Bank account ${bankForm.bankName} updated.`);
         } else {
             const newBank: BankAccount = {
                 id: Date.now(),
                 ...bankForm
             };
             setBankAccounts(prev => [...prev, newBank]);
-            showToast(`Bank account ${newBank.bankName} registered.`);
         }
         setIsBankModalOpen(false);
     };
@@ -179,7 +257,11 @@ export const BankingManagement: React.FC = () => {
         showToast(`${b?.bankName} set as Default Folio Settlement Bank.`);
     };
 
-    const handleDeleteBank = (id: number) => {
+    const handleDeleteBank = async (id: number) => {
+        try {
+            await fetch(`${getApiBaseUrl()}/api/master-data/banks/${id}`, { method: 'DELETE' });
+            fetchBanksFromApi();
+        } catch {}
         setBankAccounts(prev => prev.filter(b => b.id !== id));
         showToast('Bank account removed.');
     };
@@ -215,27 +297,52 @@ export const BankingManagement: React.FC = () => {
         setIsMfsModalOpen(true);
     };
 
-    const handleSaveMfs = (e: React.FormEvent) => {
+    const handleSaveMfs = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!mfsForm.merchantNumber) return;
+
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/master-data/banks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editingMfs ? editingMfs.id : undefined,
+                    bankName: mfsForm.provider,
+                    accountName: mfsForm.counterId,
+                    accountNumber: mfsForm.merchantNumber,
+                    branch: mfsForm.linkedBankName,
+                    accountType: 'mfs',
+                    isActive: mfsForm.status === 'Active'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`${mfsForm.provider} configuration saved to PostgreSQL.`);
+                fetchBanksFromApi();
+            }
+        } catch {
+            showToast('Saved locally.');
+        }
 
         if (editingMfs) {
             setMfsWallets(prev =>
                 prev.map(m => m.id === editingMfs.id ? { ...m, ...mfsForm } : m)
             );
-            showToast(`${mfsForm.provider} configuration updated.`);
         } else {
             const newMfs: MfsWallet = {
                 id: Date.now(),
                 ...mfsForm
             };
             setMfsWallets(prev => [...prev, newMfs]);
-            showToast(`${newMfs.provider} wallet registered.`);
         }
         setIsMfsModalOpen(false);
     };
 
-    const handleDeleteMfs = (id: number) => {
+    const handleDeleteMfs = async (id: number) => {
+        try {
+            await fetch(`${getApiBaseUrl()}/api/master-data/banks/${id}`, { method: 'DELETE' });
+            fetchBanksFromApi();
+        } catch {}
         setMfsWallets(prev => prev.filter(m => m.id !== id));
         showToast('MFS gateway removed.');
     };
