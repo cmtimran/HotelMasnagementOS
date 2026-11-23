@@ -80,6 +80,7 @@ const SpaServicesPage = lazy(() => import('./components/spa/SpaServicesPage').th
 const RetailPOSPage = lazy(() => import('./components/retail/RetailPOSPage').then(m => ({ default: m.RetailPOSPage })));
 const RetailInventoryPage = lazy(() => import('./components/retail/RetailInventoryPage').then(m => ({ default: m.RetailInventoryPage })));
 const FitnessPOSPage = lazy(() => import('./components/fitness/FitnessPOSPage').then(m => ({ default: m.FitnessPOSPage })));
+const DirectBookingEngine = lazy(() => import('./components/booking-engine/DirectBookingEngine').then(m => ({ default: m.DirectBookingEngine })));
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
@@ -385,6 +386,10 @@ function App() {
       case 'all-properties':
       case 'properties':
         return <MultiPropertyConsole />;
+      case 'book':
+      case 'direct-booking':
+      case 'web-booking':
+        return <DirectBookingEngine onBack={() => setActivePage('dashboard')} propertyId={activeProperty?.id || 1} />;
       case 'restaurant-outlets':
       case 'dining-outlets':
       case 'outlets':
@@ -677,6 +682,20 @@ function App() {
     return (
       <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading Fast-Pass...</div>}>
         <ExpressCheckInView />
+      </Suspense>
+    );
+  }
+
+  // Public Guest-Facing Route Bypass: Direct Web Booking Engine (/book)
+  if (typeof window !== 'undefined' && (
+    window.location.pathname.startsWith('/book') || 
+    window.location.search.includes('page=book') ||
+    (!isAuthenticated && (activePage === 'book' || activePage === 'direct-booking'))
+  )) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading Luxury Booking Engine...</div>}>
+        <DirectBookingEngine propertyId={activeProperty?.id || 1} />
+        <Devnotation />
       </Suspense>
     );
   }

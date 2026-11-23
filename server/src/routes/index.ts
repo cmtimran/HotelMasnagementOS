@@ -22,6 +22,7 @@ import guestCxRoutes from './guestCx.routes.js';
 import housekeepingRoutes from './housekeeping.routes.js';
 import restaurantRoutes from './restaurant.routes.js';
 import posRoutes from './pos.routes.js';
+import bookingEngineRoutes from './bookingEngine.routes.js';
 
 const apiRouter = Router();
 
@@ -75,6 +76,7 @@ apiRouter.use('/restaurant', restaurantRoutes);
 apiRouter.use('/pos', posRoutes);
 apiRouter.use('/master-data', masterDataRoutes);
 apiRouter.use('/cx', guestCxRoutes);
+apiRouter.use('/booking-engine', bookingEngineRoutes);
 apiRouter.use('/central', tenantRoutes);
 apiRouter.use('/tenants', tenantRoutes);
 

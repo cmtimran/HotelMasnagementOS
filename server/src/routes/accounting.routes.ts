@@ -134,6 +134,65 @@ router.get('/revenue-heads', async (_req: Request, res: Response) => {
     }
 });
 
+// GET /api/accounting/currencies/rates - Multi-Currency Exchange Rates
+router.get('/currencies/rates', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.query.propertyId || req.headers['x-property-id']) || 1;
+        const rates = await queryRows(`
+            SELECT id, property_id, from_currency, to_currency, exchange_rate, effective_date, source, updated_at
+            FROM currency_exchange_rates
+            WHERE property_id = ?
+            ORDER BY from_currency ASC
+        `, [propertyId]);
+
+        res.json({
+            success: true,
+            data: rates.map((r: any) => ({
+                id: r.id,
+                fromCurrency: r.from_currency,
+                toCurrency: r.to_currency,
+                exchangeRate: parseFloat(r.exchange_rate),
+                effectiveDate: r.effective_date,
+                source: r.source
+            }))
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to fetch currency exchange rates' });
+    }
+});
+
+// POST /api/accounting/currencies/rates - Set / Update Exchange Rate
+router.post('/currencies/rates', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || 1;
+        const { fromCurrency, toCurrency = 'BDT', exchangeRate, source = 'Treasury Rate Update' } = req.body;
+
+        if (!fromCurrency || !exchangeRate || Number(exchangeRate) <= 0) {
+            return res.status(400).json({ success: false, error: 'fromCurrency and positive exchangeRate are required' });
+        }
+
+        const cleanFrom = String(fromCurrency).toUpperCase().trim();
+        const cleanTo = String(toCurrency).toUpperCase().trim();
+        const numRate = Number(exchangeRate);
+
+        const result = await queryRows(`
+            INSERT INTO currency_exchange_rates (property_id, from_currency, to_currency, exchange_rate, effective_date, source)
+            VALUES (?, ?, ?, ?, CURRENT_DATE, ?)
+            ON CONFLICT (property_id, from_currency, to_currency, effective_date)
+            DO UPDATE SET exchange_rate = EXCLUDED.exchange_rate, source = EXCLUDED.source, updated_at = CURRENT_TIMESTAMP
+            RETURNING id, from_currency, to_currency, exchange_rate, effective_date;
+        `, [propertyId, cleanFrom, cleanTo, numRate, source]);
+
+        res.status(201).json({
+            success: true,
+            data: result[0],
+            message: `Exchange rate set: 1 ${cleanFrom} = ${numRate} ${cleanTo}`
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update currency exchange rate' });
+    }
+});
+
 // GET /api/accounting/folios - List active folios with itemized charges & payments scoped by property or reservation
 router.get('/folios', async (req: Request, res: Response) => {
     try {
@@ -1687,8 +1746,15 @@ router.post('/folios/group-payment', async (req: Request, res: Response) => {
 router.post('/folios/:id/payments', async (req: Request, res: Response) => {
     try {
         const folioId = Number(req.params.id);
-        const { paymentMethod = 'CASH', amount, referenceCode = 'FRONT_DESK_SETTLE' } = req.body;
-        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || null;
+        const { 
+            paymentMethod = 'CASH', 
+            amount, 
+            referenceCode = 'FRONT_DESK_SETTLE',
+            currency = 'BDT',
+            customExchangeRate,
+            userName = 'Front Desk'
+        } = req.body;
+        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || 1;
 
         let normalizedMethod = String(paymentMethod || 'CASH').toUpperCase().trim();
         if (normalizedMethod === 'CARD' || normalizedMethod === 'CREDIT CARD' || normalizedMethod === 'DEBIT_CARD' || normalizedMethod === 'POS') {
@@ -1702,31 +1768,69 @@ router.post('/folios/:id/payments', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Invalid payment amount' });
         }
 
+        const transCurrency = String(currency || 'BDT').toUpperCase().trim();
+        let exchangeRate = 1.0;
+
+        if (transCurrency !== 'BDT') {
+            if (customExchangeRate && Number(customExchangeRate) > 0) {
+                exchangeRate = Number(customExchangeRate);
+            } else {
+                const rateRows = await queryRows(`
+                    SELECT exchange_rate FROM currency_exchange_rates
+                    WHERE property_id = ? AND from_currency = ? AND to_currency = 'BDT'
+                    ORDER BY effective_date DESC LIMIT 1;
+                `, [propertyId, transCurrency]);
+                if (rateRows.length > 0) {
+                    exchangeRate = parseFloat(rateRows[0].exchange_rate);
+                }
+            }
+        }
+
+        const baseCurrencyAmount = Math.round((numAmount * exchangeRate) * 100) / 100;
         const paymentNumber = `PAY-${Date.now().toString().slice(-8)}`;
 
-        // 1. Insert payment
+        // 1. Insert payment with multi-currency tracking
         const payInsert = await queryExec(`
-            INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `, [folioId, propertyId, paymentNumber, normalizedMethod, numAmount, referenceCode]);
+            INSERT INTO payments (
+                folio_id, property_id, payment_number, payment_method, amount, 
+                reference_code, transaction_currency, exchange_rate, base_currency_amount
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            folioId, propertyId, paymentNumber, normalizedMethod, numAmount, 
+            referenceCode, transCurrency, exchangeRate, baseCurrencyAmount
+        ]);
 
-        // 2. Update Folio balance & status
+        // 2. Update Folio balance in base currency
         await queryExec(`
             UPDATE folios 
             SET balance = GREATEST(0, balance - ?),
                 status = CASE WHEN (balance - ?) <= 0 THEN 'SETTLED' ELSE 'OPEN' END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `, [numAmount, numAmount, folioId]);
+        `, [baseCurrencyAmount, baseCurrencyAmount, folioId]);
 
-        // 3. Emit real-time event
+        // 3. Log into Folio Audit Trail
+        try {
+            await queryExec(`
+                INSERT INTO folio_audit_trail (folio_id, action_type, description, user_name)
+                VALUES (?, 'PAYMENT_RECEIVED', ?, ?)
+            `, [
+                folioId,
+                `Payment of ${numAmount.toFixed(2)} ${transCurrency} (৳${baseCurrencyAmount.toFixed(2)} BDT @ ${exchangeRate}) received via ${normalizedMethod}`,
+                userName
+            ]);
+        } catch {}
+
+        // 4. Emit real-time event
         try {
             broadcastServerEvent({
                 type: 'FOLIO_UPDATED',
                 propertyId,
                 folioId,
                 paymentId: payInsert.lastInsertRowid,
-                amount: numAmount
+                amount: baseCurrencyAmount,
+                currency: transCurrency
             });
         } catch (err) {
             console.warn('Failed to broadcast payment update', err);
@@ -1734,11 +1838,17 @@ router.post('/folios/:id/payments', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            message: `Payment of ৳${numAmount.toFixed(2)} recorded successfully`,
-            paymentNumber
+            paymentId: payInsert.lastInsertRowid,
+            paymentNumber,
+            amount: numAmount,
+            currency: transCurrency,
+            exchangeRate,
+            baseCurrencyAmount,
+            message: `Recorded payment of ${numAmount.toFixed(2)} ${transCurrency} (৳${baseCurrencyAmount.toFixed(2)} BDT)`
         });
     } catch (e: any) {
-        res.status(500).json({ success: false, error: e?.message || 'Failed to record payment' });
+        console.error('Error posting payment:', e);
+        res.status(500).json({ success: false, error: e?.message || 'Failed to process payment' });
     }
 });
 

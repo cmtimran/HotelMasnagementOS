@@ -514,6 +514,17 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: true,
   },
   {
+    id: 'direct-booking',
+    slug: '/book',
+    title: 'Direct Web Booking Engine',
+    panel: 'main',
+    category: 'Reservations & Front Office',
+    permission: 'reservation.view',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
     id: 'channel-manager-logs',
     slug: '/channel-manager-logs',
     title: 'Sync & Audit Logs',
